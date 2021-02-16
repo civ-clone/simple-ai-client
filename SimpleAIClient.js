@@ -359,7 +359,7 @@ class SimpleAIClient extends AIClient_1.default {
                     playerGovernment.set(new Governments_1.Monarchy());
                 }
                 while (this.player().hasMandatoryActions()) {
-                    const item = this.player().getMandatoryAction().value();
+                    const item = this.player().mandatoryAction().value();
                     // TODO: Remove this when it's working as expected
                     if (loopCheck++ > 1e3) {
                         // TODO: raise warning - notification?

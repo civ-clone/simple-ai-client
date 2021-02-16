@@ -964,9 +964,9 @@
     "@civ-clone/core-unit" "^0.1.0"
 
 "@civ-clone/base-unit-type-naval-transport@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@civ-clone/base-unit-type-naval-transport/-/base-unit-type-naval-transport-0.1.0.tgz#a3e1e52601c9f94f566df39abae818208fbb0fe7"
-  integrity sha512-QMSxnTVf3wgWpzS9wS7chMJC+VF8NTZ+LUoU8vmq4iDZePnrj5BCaAx41PytiZFwN4PS374cTB0TifaYKjRN6A==
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@civ-clone/base-unit-type-naval-transport/-/base-unit-type-naval-transport-0.1.1.tgz#56af9b780f3185c638795274e335007941b82bfd"
+  integrity sha512-WLSjb0zJuEsO05UIA3h2YoJMlCAe6TTwDKUpmmRhRE5RxVP21SXD08MgYg2KurT54H0ADqT+qjv78iGrVs3GPw==
   dependencies:
     "@civ-clone/base-unit-action-sleep" "^0.1.0"
     "@civ-clone/base-unit-type-naval" "^0.1.0"
@@ -1102,11 +1102,12 @@
 
 "@civ-clone/civ1-player@github:civ-clone/civ1-player":
   version "0.1.0"
-  resolved "https://codeload.github.com/civ-clone/civ1-player/tar.gz/26db95631a7e5bc799e6359c50ecfb20a1131bad"
+  resolved "https://codeload.github.com/civ-clone/civ1-player/tar.gz/1a8c6f9d64c389b36951793d8f0e3a2869777ba7"
   dependencies:
     "@civ-clone/civ1-unit" "github:civ-clone/civ1-unit"
     "@civ-clone/civ1-world" "github:civ-clone/civ1-world"
     "@civ-clone/core-city" "^0.1.0"
+    "@civ-clone/core-civ-client" "^0.1.0"
     "@civ-clone/core-civilization" "^0.1.0"
     "@civ-clone/core-client" "^0.1.0"
     "@civ-clone/core-engine" "^0.1.0"
@@ -1159,7 +1160,7 @@
 
 "@civ-clone/civ1-unit@github:civ-clone/civ1-unit":
   version "0.1.0"
-  resolved "https://codeload.github.com/civ-clone/civ1-unit/tar.gz/41234362ebde310b30e4fb92d2ad7938ff0657af"
+  resolved "https://codeload.github.com/civ-clone/civ1-unit/tar.gz/6924780fd104978b1e74c31ce6dcb668b4f80642"
   dependencies:
     "@civ-clone/base-player-action-active-unit" "^0.1.0"
     "@civ-clone/base-player-action-inactive-unit" "^0.1.0"
@@ -1316,6 +1317,16 @@
     "@civ-clone/core-world" "^0.1.0"
     "@civ-clone/core-yield" "^0.1.0"
 
+"@civ-clone/core-civ-client@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@civ-clone/core-civ-client/-/core-civ-client-0.1.0.tgz#31c91edcb546c29f5bd4fe97c9ed28b4667f63aa"
+  integrity sha512-ZDkem5YzkZlje4NivA+LZXWFEgavCaVUzyh0H8O7ZCCSwcOukKEQA9Gaal1RN6s5kGqzGFqSAZ5wmAfGjQ3Hqw==
+  dependencies:
+    "@civ-clone/core-civilization" "^0.1.0"
+    "@civ-clone/core-client" "^0.1.0"
+    "@civ-clone/core-player" "^0.1.0"
+    "@civ-clone/core-registry" "^0.1.0"
+
 "@civ-clone/core-civilization@^0.1.0":
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/@civ-clone/core-civilization/-/core-civilization-0.1.0.tgz#4d24c7350a706e88a17826a77120efee142c2763"
@@ -1334,11 +1345,12 @@
     "@civ-clone/core-registry" "^0.1.0"
 
 "@civ-clone/core-data-object@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@civ-clone/core-data-object/-/core-data-object-0.1.0.tgz#337042c7118ae0b0aab32b05d00256a21dbd6ab3"
-  integrity sha512-FKKIJFEXRHAJfDm7ZqDWNutfzZ0aEBxAdA1xDzVTttQH4O2zGor3xYvI/wR0XRuQRkAhIt3A2Fn0cXzrJIZQOA==
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@civ-clone/core-data-object/-/core-data-object-0.1.1.tgz#d8dc8ee2d805ec2410b7f8cbf0725f9199019d42"
+  integrity sha512-kkET5mHzWYLtvwf9CwnyrnYPjajshdMOE4fVOL6QWRAaE1CViefL1zdftRZJ4GDe3PQuBJeK5UgEuvubJF4HOQ==
   dependencies:
     "@civ-clone/core-registry" "^0.1.0"
+    ulid "^2.3.0"
 
 "@civ-clone/core-engine@^0.1.0":
   version "0.1.1"
@@ -1391,9 +1403,9 @@
     "@civ-clone/core-world-generator" "^0.1.0"
 
 "@civ-clone/core-player@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@civ-clone/core-player/-/core-player-0.1.0.tgz#c55432293d531a587bcfb49677f83e303aaeb088"
-  integrity sha512-siZJSEU6p3Cm/xCabcrYoQlfg23G9iPCk6GaJILcTbZVW5eSf3om4Zaf1Cak2HqNWAnh3RPfj3Tbd3TtLr/0Bg==
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@civ-clone/core-player/-/core-player-0.1.1.tgz#0f1060fe8d96a3c236a391d446b3a31dea85c7dd"
+  integrity sha512-YwFjN3yGFZG4+A5oCCx1Z3/2EWSmP1cKazG2ZJoEf9T+7cXD2oIig3SNIAWtHfJywRz/++6OpAqJtvhLtte2lA==
   dependencies:
     "@civ-clone/core-civilization" "^0.1.0"
     "@civ-clone/core-data-object" "^0.1.0"
@@ -2371,6 +2383,11 @@ typescript@^4.0.3:
   version "4.1.5"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.1.5.tgz#123a3b214aaff3be32926f0d8f1f6e704eb89a72"
   integrity sha512-6OSu9PTIzmn9TCDiovULTnET6BgXtDYL4Gg4szY+cGsc3JP1dQL8qvE8kShTRx1NIw4Q9IBHlwODjkjWEtMUyA==
+
+ulid@^2.3.0:
+  version "2.3.0"
+  resolved "https://registry.yarnpkg.com/ulid/-/ulid-2.3.0.tgz#93063522771a9774121a84d126ecd3eb9804071f"
+  integrity sha512-keqHubrlpvT6G2wH0OEfSW4mquYRcbe/J8NMmveoQOjUqmo+hXtO+ORCpWhdbZ7k72UtY61BL7haGxW6enBnjw==
 
 v8-to-istanbul@^7.1.0:
   version "7.1.0"
