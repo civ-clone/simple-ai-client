@@ -316,9 +316,9 @@ export class SimpleAIClient extends AIClient {
 
     let score = 0;
 
-    const [goodyHut] = this.#goodyHutRegistry.getByTile(tile);
+    const goodyHut = this.#goodyHutRegistry.getByTile(tile);
 
-    if (goodyHut) {
+    if (goodyHut !== null) {
       score += 60;
     }
 

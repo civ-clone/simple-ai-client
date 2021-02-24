@@ -149,8 +149,8 @@ class SimpleAIClient extends AIClient_1.default {
             return -1;
         }
         let score = 0;
-        const [goodyHut] = __classPrivateFieldGet(this, _goodyHutRegistry).getByTile(tile);
-        if (goodyHut) {
+        const goodyHut = __classPrivateFieldGet(this, _goodyHutRegistry).getByTile(tile);
+        if (goodyHut !== null) {
             score += 60;
         }
         if ((foundCity && __classPrivateFieldGet(this, _shouldBuildCity).call(this, tile)) ||
