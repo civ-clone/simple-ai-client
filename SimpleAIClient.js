@@ -218,6 +218,10 @@ class SimpleAIClient extends AIClient_1.default {
         while (unit.active() && unit.moves().value() >= 0.1) {
             if (loopCheck++ > 1e3) {
                 console.log('SimpleAIClient#moveUnit: loopCheck: aborting');
+                console.log(`${unit.player().civilization().name()} ${unit.constructor.name}`);
+                console.log(unit.actions());
+                console.log(unit.actionsForNeighbours());
+                unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit));
                 return;
             }
             const path = __classPrivateFieldGet(this, _unitPathData).get(unit);

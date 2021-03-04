@@ -16,11 +16,26 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 export declare class SimpleAIClient extends AIClient {
-    #private;
-    constructor(player: Player, cityRegistry?: CityRegistry, cityGrowthRegistry?: CityGrowthRegistry, goodyHutRegistry?: GoodyHutRegistry, leaderRegistry?: LeaderRegistry, pathFinderRegistry?: PathFinderRegistry, playerGovernmentRegistry?: PlayerGovernmentRegistry, playerResearchRegistry?: PlayerResearchRegistry, playerWorldRegistry?: PlayerWorldRegistry, ruleRegistry?: RuleRegistry, terrainFeatureRegistry?: TerrainFeatureRegistry, tileImprovementRegistry?: TileImprovementRegistry, unitImprovementRegistry?: UnitImprovementRegistry, unitRegistry?: UnitRegistry);
-    scoreUnitMove(unit: Unit, tile: Tile): number;
-    moveUnit(unit: Unit): void;
-    preProcessTurn(): void;
-    takeTurn(): Promise<void>;
+  #private;
+  constructor(
+    player: Player,
+    cityRegistry?: CityRegistry,
+    cityGrowthRegistry?: CityGrowthRegistry,
+    goodyHutRegistry?: GoodyHutRegistry,
+    leaderRegistry?: LeaderRegistry,
+    pathFinderRegistry?: PathFinderRegistry,
+    playerGovernmentRegistry?: PlayerGovernmentRegistry,
+    playerResearchRegistry?: PlayerResearchRegistry,
+    playerWorldRegistry?: PlayerWorldRegistry,
+    ruleRegistry?: RuleRegistry,
+    terrainFeatureRegistry?: TerrainFeatureRegistry,
+    tileImprovementRegistry?: TileImprovementRegistry,
+    unitImprovementRegistry?: UnitImprovementRegistry,
+    unitRegistry?: UnitRegistry
+  );
+  scoreUnitMove(unit: Unit, tile: Tile): number;
+  moveUnit(unit: Unit): void;
+  preProcessTurn(): void;
+  takeTurn(): Promise<void>;
 }
 export default SimpleAIClient;

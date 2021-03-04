@@ -50,10 +50,12 @@ import unitsToMove from '@civ-clone/civ1-unit/Rules/Player/action';
 import unitYield from '@civ-clone/civ1-unit/Rules/Unit/yield';
 import validateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
 import visibility from '@civ-clone/civ1-player/Rules/Unit/visibility';
+import CityNameRegistry from '@civ-clone/core-civilization/CityNameRegistry';
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
     cityGrowthRegistry = new CityGrowthRegistry(),
+    cityNameRegistry = new CityNameRegistry(),
     cityRegistry = new CityRegistry(),
     civilizationRegistry = new CivilizationRegistry(),
     goodyHutRegistry = new GoodyHutRegistry(),
@@ -136,6 +138,7 @@ describe('SimpleAIClient', (): void => {
 
   ruleRegistry.register(
     ...action(
+      cityNameRegistry,
       cityRegistry,
       ruleRegistry,
       tileImprovementRegistry,

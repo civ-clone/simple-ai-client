@@ -427,6 +427,12 @@ export class SimpleAIClient extends AIClient {
     while (unit.active() && unit.moves().value() >= 0.1) {
       if (loopCheck++ > 1e3) {
         console.log('SimpleAIClient#moveUnit: loopCheck: aborting');
+        console.log(
+          `${unit.player().civilization().name()} ${unit.constructor.name}`
+        );
+        console.log(unit.actions());
+        console.log(unit.actionsForNeighbours());
+        unit.action(new NoOrders(unit.tile(), unit.tile(), unit));
 
         return;
       }
