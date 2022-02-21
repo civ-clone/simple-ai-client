@@ -955,20 +955,19 @@ export class SimpleAIClient extends AIClient {
                   ],
                 getUnitByYield = (YieldType: typeof Yield) => {
                   const [[UnitType]] = availableUnits
-                    .map((UnitType: IConstructor<Unit>): [
-                      typeof Unit,
-                      Yield
-                    ] => {
-                      const unitYield = new YieldType();
+                    .map(
+                      (UnitType: IConstructor<Unit>): [typeof Unit, Yield] => {
+                        const unitYield = new YieldType();
 
-                      this.#ruleRegistry.process(
-                        BaseYield,
-                        UnitType,
-                        unitYield
-                      );
+                        this.#ruleRegistry.process(
+                          BaseYield,
+                          UnitType,
+                          unitYield
+                        );
 
-                      return [UnitType as typeof Unit, unitYield];
-                    })
+                        return [UnitType as typeof Unit, unitYield];
+                      }
+                    )
                     .sort(
                       (
                         [, unitYieldA]: [typeof Unit, Yield],
@@ -978,14 +977,16 @@ export class SimpleAIClient extends AIClient {
 
                   return UnitType;
                 },
-                getDefensiveUnit = ((
-                  UnitType?: typeof Unit
-                ): (() => typeof Unit) => (): typeof Unit =>
-                  UnitType || (UnitType = getUnitByYield(Defence)))(),
-                getOffensiveUnit = ((
-                  UnitType?: typeof Unit
-                ): (() => typeof Unit) => (): typeof Unit =>
-                  UnitType || (UnitType = getUnitByYield(Attack)))();
+                getDefensiveUnit = (
+                  (UnitType?: typeof Unit): (() => typeof Unit) =>
+                  (): typeof Unit =>
+                    UnitType || (UnitType = getUnitByYield(Defence))
+                )(),
+                getOffensiveUnit = (
+                  (UnitType?: typeof Unit): (() => typeof Unit) =>
+                  (): typeof Unit =>
+                    UnitType || (UnitType = getUnitByYield(Attack))
+                )();
 
               if (
                 !this.#unitRegistry.getByTile(tile).length &&
@@ -1059,7 +1060,19 @@ export class SimpleAIClient extends AIClient {
 
           resolve();
         } catch (e) {
-          reject(e);
+          if (typeof e === 'string') {
+            reject(new Error(e));
+
+            return;
+          }
+
+          if (e instanceof Error) {
+            reject(e);
+
+            return;
+          }
+
+          reject(new Error(`An unknown error occurred: ${e}`));
         }
       }
     );

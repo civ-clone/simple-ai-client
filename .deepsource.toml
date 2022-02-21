@@ -2,13 +2,20 @@ version = 1
 
 test_patterns = ["test/**/*.test.ts"]
 
+exclude_patterns = ["**/*.js"]
+
 [[analyzers]]
 name = "javascript"
 enabled = true
 
-  [analyzers.meta]
-  dialect = "typescript"
-  environment = [
-    "nodejs",
-    "mocha"
-  ]
+[analyzers.meta]
+dialect = "typescript"
+environment = [
+  "nodejs",
+  "mocha"
+]
+
+[[analyzers]]
+name = "test-coverage"
+enabled = true
+

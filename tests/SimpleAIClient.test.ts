@@ -93,48 +93,46 @@ describe('SimpleAIClient', (): void => {
       }
     },
     createClients = (world: World, n: number = 1): Client[] =>
-      new Array(n).fill(0).map(
-        (): Client => {
-          const player = new Player(ruleRegistry),
-            client = new SimpleAIClient(
-              player,
-              cityRegistry,
-              cityGrowthRegistry,
-              goodyHutRegistry,
-              leaderRegistry,
-              pathFinderRegistry,
-              playerGovernmentRegistry,
-              playerResearchRegistry,
-              playerWorldRegistry,
-              ruleRegistry,
-              terrainFeatureRegistry,
-              tileImprovementRegistry,
-              unitImprovementRegistry,
-              unitRegistry
-            ),
-            availableCivilizations = civilizationRegistry.entries();
+      new Array(n).fill(0).map((): Client => {
+        const player = new Player(ruleRegistry),
+          client = new SimpleAIClient(
+            player,
+            cityRegistry,
+            cityGrowthRegistry,
+            goodyHutRegistry,
+            leaderRegistry,
+            pathFinderRegistry,
+            playerGovernmentRegistry,
+            playerResearchRegistry,
+            playerWorldRegistry,
+            ruleRegistry,
+            terrainFeatureRegistry,
+            tileImprovementRegistry,
+            unitImprovementRegistry,
+            unitRegistry
+          ),
+          availableCivilizations = civilizationRegistry.entries();
 
-          client.chooseCivilization(availableCivilizations);
+        client.chooseCivilization(availableCivilizations);
 
-          civilizationRegistry.unregister(
-            player.civilization().constructor as typeof Civilization
-          );
+        civilizationRegistry.unregister(
+          player.civilization().constructor as typeof Civilization
+        );
 
-          playerRegistry.register(player);
+        playerRegistry.register(player);
 
-          playerWorldRegistry.register(new PlayerWorld(player, world));
+        playerWorldRegistry.register(new PlayerWorld(player, world));
 
-          playerGovernmentRegistry.register(
-            new PlayerGovernment(player, ruleRegistry)
-          );
+        playerGovernmentRegistry.register(
+          new PlayerGovernment(player, ruleRegistry)
+        );
 
-          playerResearchRegistry.register(
-            new PlayerResearch(player, advanceRegistry, ruleRegistry)
-          );
+        playerResearchRegistry.register(
+          new PlayerResearch(player, advanceRegistry, ruleRegistry)
+        );
 
-          return client;
-        }
-      );
+        return client;
+      });
 
   ruleRegistry.register(
     ...action(
