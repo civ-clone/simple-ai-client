@@ -36,6 +36,7 @@ const UnitRegistry_1 = require("@civ-clone/core-unit/UnitRegistry");
 const AIClient_1 = require("@civ-clone/core-ai-client/AIClient");
 const Yield_1 = require("@civ-clone/core-unit/Rules/Yield");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
+const EndTurn_1 = require("@civ-clone/base-player-action-end-turn/EndTurn");
 const UnitImprovements_1 = require("@civ-clone/civ1-unit/UnitImprovements");
 const Advances_1 = require("@civ-clone/civ1-science/Advances");
 const Governments_1 = require("@civ-clone/civ1-government/Governments");
@@ -370,7 +371,7 @@ class SimpleAIClient extends AIClient_1.default {
                     playerGovernment.set(new Governments_1.Monarchy());
                 }
                 while (this.player().hasMandatoryActions()) {
-                    const item = this.player().mandatoryAction().value();
+                    const action = this.player().mandatoryAction(), item = action.value();
                     // TODO: Remove this when it's working as expected
                     if (loopCheck++ > 1e3) {
                         // TODO: raise warning - notification?
@@ -564,6 +565,9 @@ class SimpleAIClient extends AIClient_1.default {
                             item.research(available[Math.floor(available.length * Math.random())]);
                         }
                         continue;
+                    }
+                    if (action instanceof EndTurn_1.default) {
+                        break;
                     }
                     console.log(`Can't process: '${item.constructor.name}'`);
                     break;

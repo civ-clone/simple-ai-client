@@ -89,6 +89,7 @@ import AIClient from '@civ-clone/core-ai-client/AIClient';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
+import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
 import { Monarchy as MonarchyAdvance } from '@civ-clone/civ1-science/Advances';
@@ -643,7 +644,8 @@ export class SimpleAIClient extends AIClient {
           }
 
           while (this.player().hasMandatoryActions()) {
-            const item = this.player().mandatoryAction().value();
+            const action = this.player().mandatoryAction(),
+              item = action.value();
 
             // TODO: Remove this when it's working as expected
             if (loopCheck++ > 1e3) {
@@ -1051,6 +1053,10 @@ export class SimpleAIClient extends AIClient {
               }
 
               continue;
+            }
+
+            if (action instanceof EndTurn) {
+              break;
             }
 
             console.log(`Can't process: '${item.constructor.name}'`);

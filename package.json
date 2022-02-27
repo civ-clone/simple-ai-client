@@ -38,6 +38,7 @@
     "typescript": "^4.0.0"
   },
   "dependencies": {
+    "@civ-clone/base-player-action-end-turn": "^0.1.0",
     "@civ-clone/base-unit-type-naval-transport": "^0.1.0",
     "@civ-clone/civ1-city": "github:civ-clone/civ1-city",
     "@civ-clone/civ1-city-improvement": "github:civ-clone/civ1-city-improvement",
