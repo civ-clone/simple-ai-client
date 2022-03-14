@@ -6,6 +6,7 @@ import {
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
 import BasePathFinder from '@civ-clone/simple-world-path/BasePathFinder';
 import CityGrowthRegistry from '@civ-clone/core-city-growth/CityGrowthRegistry';
+import CityNameRegistry from '@civ-clone/core-civilization/CityNameRegistry';
 import CityRegistry from '@civ-clone/core-city/CityRegistry';
 import Civilization from '@civ-clone/core-civilization/Civilization';
 import CivilizationRegistry from '@civ-clone/core-civilization/CivilizationRegistry';
@@ -46,14 +47,16 @@ import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleR
 import start from '@civ-clone/civ1-player/Rules/Turn/start';
 import turnYear from '@civ-clone/civ1-game-year/Rules/Turn/year';
 import unitCreated from '@civ-clone/civ1-player/Rules/Unit/created';
-import unitsToMove from '@civ-clone/civ1-unit/Rules/Player/action';
 import unitYield from '@civ-clone/civ1-unit/Rules/Unit/yield';
+import unitsToMove from '@civ-clone/civ1-unit/Rules/Player/action';
 import validateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
 import visibility from '@civ-clone/civ1-player/Rules/Unit/visibility';
-import CityNameRegistry from '@civ-clone/core-civilization/CityNameRegistry';
+import { CityBuildRegistry } from '@civ-clone/core-city-build/CityBuildRegistry';
+import { PlayerTreasuryRegistry } from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
+    cityBuildRegistry = new CityBuildRegistry(),
     cityGrowthRegistry = new CityGrowthRegistry(),
     cityNameRegistry = new CityNameRegistry(),
     cityRegistry = new CityRegistry(),
@@ -64,6 +67,7 @@ describe('SimpleAIClient', (): void => {
     playerGovernmentRegistry = new PlayerGovernmentRegistry(),
     playerRegistry = new PlayerRegistry(),
     playerResearchRegistry = new PlayerResearchRegistry(),
+    playerTreasuryRegistry = new PlayerTreasuryRegistry(),
     playerWorldRegistry = new PlayerWorldRegistry(),
     ruleRegistry = new RuleRegistry(),
     terrainFeatureRegistry = new TerrainFeatureRegistry(),
@@ -73,11 +77,11 @@ describe('SimpleAIClient', (): void => {
     unitImprovementRegistry = new UnitImprovementRegistry(),
     unitRegistry = new UnitRegistry(),
     simpleWorldLoader = simpleRLELoader(ruleRegistry),
-    takeTurns = (
+    takeTurns = async (
       client: Client,
       n: number = 1,
       callable: () => void = () => {}
-    ): void => {
+    ): Promise<void> => {
       while (n--) {
         const player = client.player();
 
@@ -85,54 +89,58 @@ describe('SimpleAIClient', (): void => {
 
         (ruleRegistry as ITurnStartRegistry).process(TurnStart, player);
 
-        client.takeTurn();
+        await client.takeTurn();
 
         callable();
 
         turn.increment();
       }
     },
-    createClients = (world: World, n: number = 1): Client[] =>
-      new Array(n).fill(0).map((): Client => {
-        const player = new Player(ruleRegistry),
-          client = new SimpleAIClient(
-            player,
-            cityRegistry,
-            cityGrowthRegistry,
-            goodyHutRegistry,
-            leaderRegistry,
-            pathFinderRegistry,
-            playerGovernmentRegistry,
-            playerResearchRegistry,
-            playerWorldRegistry,
-            ruleRegistry,
-            terrainFeatureRegistry,
-            tileImprovementRegistry,
-            unitImprovementRegistry,
-            unitRegistry
-          ),
-          availableCivilizations = civilizationRegistry.entries();
+    createClients = async (world: World, n: number = 1): Promise<Client[]> =>
+      Promise.all(
+        new Array(n).fill(0).map(async (): Promise<Client> => {
+          const player = new Player(ruleRegistry),
+            client = new SimpleAIClient(
+              player,
+              cityRegistry,
+              cityBuildRegistry,
+              cityGrowthRegistry,
+              goodyHutRegistry,
+              leaderRegistry,
+              pathFinderRegistry,
+              playerGovernmentRegistry,
+              playerResearchRegistry,
+              playerTreasuryRegistry,
+              playerWorldRegistry,
+              ruleRegistry,
+              terrainFeatureRegistry,
+              tileImprovementRegistry,
+              unitImprovementRegistry,
+              unitRegistry
+            ),
+            availableCivilizations = civilizationRegistry.entries();
 
-        client.chooseCivilization(availableCivilizations);
+          await client.chooseCivilization(availableCivilizations);
 
-        civilizationRegistry.unregister(
-          player.civilization().constructor as typeof Civilization
-        );
+          civilizationRegistry.unregister(
+            player.civilization().constructor as typeof Civilization
+          );
 
-        playerRegistry.register(player);
+          playerRegistry.register(player);
 
-        playerWorldRegistry.register(new PlayerWorld(player, world));
+          playerWorldRegistry.register(new PlayerWorld(player, world));
 
-        playerGovernmentRegistry.register(
-          new PlayerGovernment(player, ruleRegistry)
-        );
+          playerGovernmentRegistry.register(
+            new PlayerGovernment(player, ruleRegistry)
+          );
 
-        playerResearchRegistry.register(
-          new PlayerResearch(player, advanceRegistry, ruleRegistry)
-        );
+          playerResearchRegistry.register(
+            new PlayerResearch(player, advanceRegistry, ruleRegistry)
+          );
 
-        return client;
-      });
+          return client;
+        })
+      );
 
   ruleRegistry.register(
     ...action(
@@ -142,6 +150,7 @@ describe('SimpleAIClient', (): void => {
       tileImprovementRegistry,
       unitImprovementRegistry,
       unitRegistry,
+      terrainFeatureRegistry,
       transportRegistry,
       turn
     ),
@@ -149,7 +158,7 @@ describe('SimpleAIClient', (): void => {
     ...movementCost(tileImprovementRegistry, transportRegistry),
     ...validateMove(),
     ...created(unitRegistry),
-    ...moved(),
+    ...moved(transportRegistry),
     ...start(ruleRegistry, cityRegistry, playerRegistry, unitRegistry),
     ...turnYear(),
     ...unitCreated(),
@@ -163,42 +172,44 @@ describe('SimpleAIClient', (): void => {
 
   pathFinderRegistry.register(BasePathFinder);
 
-  it('should move land units around to explore the available map', (): void => {
-    const world = simpleWorldLoader('5O3GO3GO3G', 4, 4),
-      [client] = createClients(world),
+  it('should move land units around to explore the available map', async (): Promise<void> => {
+    const world = await simpleWorldLoader('5O3GO3GO3G', 4, 4),
+      [client] = await createClients(world),
       player = client.player(),
       playerWorld = playerWorldRegistry.getByPlayer(player);
 
-    expect(playerWorld.length).to.equal(0);
+    expect(world.entries().length).to.equal(16);
+    expect(playerWorld.entries().length).to.equal(0);
 
     const unit = new Warrior(null, player, world.get(1, 1), ruleRegistry);
 
+    expect(playerWorld.entries().length).to.equal(9);
+
     expect(unit.visibility().value()).to.equal(1);
-    expect(playerWorld.length).to.equal(9);
 
-    takeTurns(client, 3);
+    await takeTurns(client, 3);
 
-    expect(playerWorld.length).to.equal(16);
+    expect(playerWorld.entries().length).to.equal(16);
   });
 
-  it('should move naval units around to explore the available map', (): void => {
-    const world = simpleWorldLoader('16O', 4, 4),
-      [client] = createClients(world),
+  it('should move naval units around to explore the available map', async (): Promise<void> => {
+    const world = await simpleWorldLoader('16O', 4, 4),
+      [client] = await createClients(world),
       player = client.player(),
       playerWorld = playerWorldRegistry.getByPlayer(player);
 
     new Sail(null, player, world.get(1, 1), ruleRegistry, transportRegistry);
 
-    expect(playerWorld.length).to.equal(9);
+    expect(playerWorld.entries().length).to.equal(9);
 
-    takeTurns(client);
+    await takeTurns(client);
 
-    expect(playerWorld.length).to.equal(16);
+    expect(playerWorld.entries().length).to.equal(16);
   });
 
-  it('should embark land units onto naval transport units', (): void => {
-    const world = simpleWorldLoader('6OG18O', 5, 5),
-      [client] = createClients(world),
+  it('should embark land units onto naval transport units', async (): Promise<void> => {
+    const world = await simpleWorldLoader('6OG18O', 5, 5),
+      [client] = await createClients(world),
       player = client.player(),
       unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
       transport = new Sail(
@@ -209,15 +220,15 @@ describe('SimpleAIClient', (): void => {
         transportRegistry
       );
 
-    takeTurns(client);
+    await takeTurns(client);
 
     expect(unit.tile()).to.not.equal(world.get(1, 1));
     expect(transport.tile()).to.not.equal(world.get(2, 2));
   });
 
-  it('should disembark land units from naval transport units', (): void => {
-    const world = simpleWorldLoader('5OG10O', 4, 4),
-      [client] = createClients(world),
+  it('should disembark land units from naval transport units', async (): Promise<void> => {
+    const world = await simpleWorldLoader('5OG10O', 4, 4),
+      [client] = await createClients(world),
       player = client.player(),
       unit = new Warrior(null, player, world.get(2, 2), ruleRegistry),
       transport = new Sail(
@@ -230,14 +241,14 @@ describe('SimpleAIClient', (): void => {
 
     transport.stow(unit);
 
-    takeTurns(client);
+    await takeTurns(client);
 
     expect(unit.tile()).to.equal(world.get(1, 1));
   });
 
-  it('should set a path to a capturable enemy city', (): void => {
-    const world = simpleWorldLoader('7O4G6OG2O3G2OG6O4G', 6, 6),
-      [client] = createClients(world),
+  it('should set a path to a capturable enemy city', async (): Promise<void> => {
+    const world = await simpleWorldLoader('7O4G6OG2O3G2OG6O4G', 6, 6),
+      [client] = await createClients(world),
       player = client.player(),
       enemy = new Player(ruleRegistry),
       unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
@@ -245,7 +256,7 @@ describe('SimpleAIClient', (): void => {
 
     playerWorldRegistry.register(new PlayerWorld(enemy, world));
 
-    const city = setUpCity({
+    const city = await setUpCity({
       cityGrowthRegistry,
       player: enemy,
       playerWorldRegistry,
@@ -260,20 +271,20 @@ describe('SimpleAIClient', (): void => {
 
     cityRegistry.register(city);
 
-    takeTurns(client, 13);
+    await takeTurns(client, 13);
 
     expect(unit.tile()).to.equal(city.tile());
     expect(city.player()).to.equal(player);
   });
 
-  it('should path to and fortify a fortifiable unit in an undefended friendly city', (): void => {
-    const world = simpleWorldLoader('7O4G6OG2O3G2OG6O4G', 6, 6),
-      [client] = createClients(world),
+  it('should path to and fortify a fortifiable unit in an undefended friendly city', async (): Promise<void> => {
+    const world = await simpleWorldLoader('7O4G6OG2O3G2OG6O4G', 6, 6),
+      [client] = await createClients(world),
       player = client.player(),
       unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
       playerWorld = playerWorldRegistry.getByPlayer(player);
 
-    const city = setUpCity({
+    const city = await setUpCity({
       cityGrowthRegistry,
       player,
       playerWorldRegistry,
@@ -288,7 +299,7 @@ describe('SimpleAIClient', (): void => {
 
     cityRegistry.register(city);
 
-    takeTurns(client, 13);
+    await takeTurns(client, 13);
 
     expect(unit.tile()).to.equal(city.tile());
     expect(

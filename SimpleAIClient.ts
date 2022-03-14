@@ -14,13 +14,17 @@ import {
   Unload,
 } from '@civ-clone/civ1-unit/Actions';
 import {
-  CityRegistry,
-  instance as cityRegistryInstance,
-} from '@civ-clone/core-city/CityRegistry';
+  CityBuildRegistry,
+  instance as cityBuildRegistryInstance,
+} from '@civ-clone/core-city-build/CityBuildRegistry';
 import {
   CityGrowthRegistry,
   instance as cityGrowthRegistryInstance,
 } from '@civ-clone/core-city-growth/CityGrowthRegistry';
+import {
+  CityRegistry,
+  instance as cityRegistryInstance,
+} from '@civ-clone/core-city/CityRegistry';
 import {
   Desert,
   Grassland,
@@ -60,6 +64,10 @@ import {
   instance as playerResearchRegistryInstance,
 } from '@civ-clone/core-science/PlayerResearchRegistry';
 import {
+  PlayerTreasuryRegistry,
+  instance as playerTreasuryRegistryInstance,
+} from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
+import {
   PlayerWorldRegistry,
   instance as playerWorldRegistryInstance,
 } from '@civ-clone/core-player-world/PlayerWorldRegistry';
@@ -83,10 +91,11 @@ import {
   UnitRegistry,
   instance as unitRegistryInstance,
 } from '@civ-clone/core-unit/UnitRegistry';
-
 import Action from '@civ-clone/core-unit/Action';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
+import BuildItem from '@civ-clone/core-city-build/BuildItem';
+import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
@@ -105,8 +114,10 @@ import Tile from '@civ-clone/core-world/Tile';
 import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
 import Unit from '@civ-clone/core-unit/Unit';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
+import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
+import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 
 type ActionLookup = {
   attack?: AttackAction;
@@ -237,11 +248,13 @@ export class SimpleAIClient extends AIClient {
   #undefendedCities: Tile[] = [];
 
   #cityRegistry: CityRegistry;
+  #cityBuildRegistry: CityBuildRegistry;
   #cityGrowthRegistry: CityGrowthRegistry;
   #goodyHutRegistry: GoodyHutRegistry;
   #pathFinderRegistry: PathFinderRegistry;
   #playerGovernmentRegistry: PlayerGovernmentRegistry;
   #playerResearchRegistry: PlayerResearchRegistry;
+  #playerTreasuryRegistry: PlayerTreasuryRegistry;
   #playerWorldRegistry: PlayerWorldRegistry;
   #ruleRegistry: RuleRegistry;
   #terrainFeatureRegistry: TerrainFeatureRegistry;
@@ -252,12 +265,14 @@ export class SimpleAIClient extends AIClient {
   constructor(
     player: Player,
     cityRegistry: CityRegistry = cityRegistryInstance,
+    cityBuildRegistry: CityBuildRegistry = cityBuildRegistryInstance,
     cityGrowthRegistry: CityGrowthRegistry = cityGrowthRegistryInstance,
     goodyHutRegistry: GoodyHutRegistry = goodyHutRegistryInstance,
     leaderRegistry: LeaderRegistry = leaderRegistryInstance,
     pathFinderRegistry: PathFinderRegistry = pathFinderRegistryInstance,
     playerGovernmentRegistry: PlayerGovernmentRegistry = playerGovernmentRegistryInstance,
     playerResearchRegistry: PlayerResearchRegistry = playerResearchRegistryInstance,
+    playerTreasuryRegistry: PlayerTreasuryRegistry = playerTreasuryRegistryInstance,
     playerWorldRegistry: PlayerWorldRegistry = playerWorldRegistryInstance,
     ruleRegistry: RuleRegistry = ruleRegistryInstance,
     terrainFeatureRegistry: TerrainFeatureRegistry = terrainFeatureRegistryInstance,
@@ -268,11 +283,13 @@ export class SimpleAIClient extends AIClient {
     super(player, leaderRegistry);
 
     this.#cityRegistry = cityRegistry;
+    this.#cityBuildRegistry = cityBuildRegistry;
     this.#cityGrowthRegistry = cityGrowthRegistry;
     this.#goodyHutRegistry = goodyHutRegistry;
     this.#pathFinderRegistry = pathFinderRegistry;
     this.#playerGovernmentRegistry = playerGovernmentRegistry;
     this.#playerResearchRegistry = playerResearchRegistry;
+    this.#playerTreasuryRegistry = playerTreasuryRegistry;
     this.#playerWorldRegistry = playerWorldRegistry;
     this.#ruleRegistry = ruleRegistry;
     this.#terrainFeatureRegistry = terrainFeatureRegistry;
@@ -939,106 +956,7 @@ export class SimpleAIClient extends AIClient {
             }
 
             if (item instanceof CityBuild) {
-              const cityBuild = item,
-                tile = cityBuild.city().tile(),
-                available = cityBuild.available(),
-                restrictions: IConstructor[] = [Palace, Settlers],
-                availableFiltered = available.filter(
-                  (entity: IConstructor): boolean =>
-                    !restrictions.includes(entity)
-                ),
-                availableUnits: IConstructor<Unit>[] = availableFiltered.filter(
-                  (entity: IConstructor): boolean =>
-                    Object.prototype.isPrototypeOf.call(Unit, entity)
-                ),
-                randomSelection =
-                  availableFiltered[
-                    Math.floor(available.length * Math.random())
-                  ],
-                getUnitByYield = (YieldType: typeof Yield) => {
-                  const [[UnitType]] = availableUnits
-                    .map(
-                      (UnitType: IConstructor<Unit>): [typeof Unit, Yield] => {
-                        const unitYield = new YieldType();
-
-                        this.#ruleRegistry.process(
-                          BaseYield,
-                          UnitType,
-                          unitYield
-                        );
-
-                        return [UnitType as typeof Unit, unitYield];
-                      }
-                    )
-                    .sort(
-                      (
-                        [, unitYieldA]: [typeof Unit, Yield],
-                        [, unitYieldB]: [typeof Unit, Yield]
-                      ): number => unitYieldB.value() - unitYieldA.value()
-                    );
-
-                  return UnitType;
-                },
-                getDefensiveUnit = (
-                  (UnitType?: typeof Unit): (() => typeof Unit) =>
-                  (): typeof Unit =>
-                    UnitType || (UnitType = getUnitByYield(Defence))
-                )(),
-                getOffensiveUnit = (
-                  (UnitType?: typeof Unit): (() => typeof Unit) =>
-                  (): typeof Unit =>
-                    UnitType || (UnitType = getUnitByYield(Attack))
-                )();
-
-              if (
-                !this.#unitRegistry.getByTile(tile).length &&
-                getDefensiveUnit()
-              ) {
-                cityBuild.build(getDefensiveUnit());
-
-                continue;
-              }
-
-              const cityGrowth = this.#cityGrowthRegistry.getByCity(
-                cityBuild.city()
-              );
-
-              // Always Build Cities
-              if (
-                available.includes(Settlers) &&
-                !this.#unitRegistry
-                  .getByCity(cityBuild.city())
-                  .some((unit: Unit): boolean => unit instanceof Settlers) &&
-                // TODO: use expansionist leader trait
-                this.#unitRegistry
-                  .getByPlayer(this.player())
-                  .filter((unit: Unit): boolean => unit instanceof Settlers)
-                  .length < 3 &&
-                cityGrowth.size() > 1
-              ) {
-                cityBuild.build(Settlers);
-
-                continue;
-              }
-
-              if (
-                this.#enemyCitiesToAttack.length > 0 ||
-                this.#enemyUnitsToAttack.length > 4
-              ) {
-                cityBuild.build(getOffensiveUnit());
-
-                continue;
-              }
-
-              if (this.#undefendedCities.length) {
-                cityBuild.build(getDefensiveUnit());
-
-                continue;
-              }
-
-              if (randomSelection) {
-                cityBuild.build(randomSelection);
-              }
+              this.buildItemInCity(item.city());
 
               continue;
             }
@@ -1082,6 +1000,174 @@ export class SimpleAIClient extends AIClient {
         }
       }
     );
+  }
+
+  private buildItemInCity(city: City): void {
+    const tile = city.tile(),
+      cityBuild = this.#cityBuildRegistry.getByCity(city),
+      tileUnits = this.#unitRegistry.getByTile(tile),
+      available = cityBuild.available(),
+      restrictions: IConstructor[] = [Palace, Settlers],
+      availableFiltered = available.filter(
+        (buildItem: BuildItem): boolean =>
+          !restrictions.includes(buildItem.item()) &&
+          // TODO: Add auto-wonders or have more logic around this
+          !Object.prototype.isPrototypeOf.call(Wonder, buildItem.item())
+      ),
+      availableWonders = available.filter((buildItem: BuildItem): boolean =>
+        Object.prototype.isPrototypeOf.call(Wonder, buildItem.item())
+      ),
+      availableUnits = availableFiltered.filter(
+        (buildItem: BuildItem): boolean =>
+          Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
+      ),
+      randomSelection =
+        availableFiltered[
+          Math.floor(availableFiltered.length * Math.random())
+        ].item(),
+      getUnitByYield = (YieldType: typeof Yield) => {
+        const [[UnitType]] = availableUnits
+          .map((buildItem: BuildItem): [typeof Unit, Yield] => {
+            const UnitType = buildItem.item() as unknown as typeof Unit,
+              unitYield = new YieldType();
+
+            this.#ruleRegistry.process(BaseYield, UnitType, unitYield);
+
+            return [UnitType as typeof Unit, unitYield];
+          })
+          .sort(
+            (
+              [, unitYieldA]: [typeof Unit, Yield],
+              [, unitYieldB]: [typeof Unit, Yield]
+            ): number => unitYieldB.value() - unitYieldA.value()
+          );
+
+        return UnitType;
+      },
+      getDefensiveUnit = (
+        (UnitType?: typeof Unit): (() => typeof Unit) =>
+        (): typeof Unit =>
+          UnitType || (UnitType = getUnitByYield(Defence))
+      )(),
+      getOffensiveUnit = (
+        (UnitType?: typeof Unit): (() => typeof Unit) =>
+        (): typeof Unit =>
+          UnitType || (UnitType = getUnitByYield(Attack))
+      )();
+
+    if (this.#unitRegistry.getByTile(tile).length < 2 && getDefensiveUnit()) {
+      cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
+
+      return;
+    }
+
+    const cityGrowth = this.#cityGrowthRegistry.getByCity(cityBuild.city());
+
+    // Always Build Cities
+    if (
+      available.some(
+        (buildItem: BuildItem) =>
+          buildItem.item() === (Settlers as unknown as typeof Buildable)
+      ) &&
+      !this.#unitRegistry
+        .getByCity(cityBuild.city())
+        .some((unit: Unit): boolean => unit instanceof Settlers) &&
+      // TODO: use expansionist leader trait
+      this.#unitRegistry
+        .getByPlayer(this.player())
+        .filter((unit: Unit): boolean => unit instanceof Settlers).length < 3 &&
+      cityGrowth.size() > 1
+    ) {
+      cityBuild.build(Settlers as unknown as typeof Buildable);
+
+      return;
+    }
+
+    if (
+      this.#citiesToLiberate.length > 0 ||
+      this.#enemyCitiesToAttack.length > 0 ||
+      this.#enemyUnitsToAttack.length > 4
+    ) {
+      cityBuild.build(getOffensiveUnit() as unknown as typeof Buildable);
+
+      return;
+    }
+
+    if (
+      tileUnits.filter((unit) =>
+        this.#unitImprovementRegistry
+          .getByUnit(unit)
+          .filter((improvement) => improvement instanceof Fortified)
+      ).length < 2 ||
+      this.#undefendedCities.length
+    ) {
+      cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
+
+      return;
+    }
+
+    // If we have resources to burn, build a wonder
+    if (
+      cityBuild
+        .city()
+        .yields()
+        .filter((cityYield) => cityYield instanceof Production)
+        .some((cityYield) => cityYield.value() > 4)
+    ) {
+      const wonders = availableWonders.map((cityBuild) => cityBuild.item());
+
+      cityBuild.build(wonders[Math.floor(Math.random() * wonders.length)]);
+    }
+
+    if (randomSelection) {
+      cityBuild.build(randomSelection);
+    }
+  }
+
+  cityLost(city: City, player: Player | null, destroyed: boolean): void {
+    // Can't retaliate against ourselves, we deserved it...
+    if (!player) {
+      return;
+    }
+
+    const playerWorld = this.#playerWorldRegistry.getByPlayer(this.player());
+
+    if (destroyed) {
+      // REVENGE!
+      this.#enemyCitiesToAttack.push(
+        ...playerWorld
+          .entries()
+          .filter((tile: Tile) =>
+            this.#cityRegistry
+              .getByTile(tile)
+              .some((city) => city.player() === player)
+          )
+      );
+      this.#enemyUnitsToAttack.push(
+        ...playerWorld
+          .entries()
+          .filter((tile: Tile) =>
+            this.#unitRegistry
+              .getByTile(tile)
+              .some((unit) => unit.player() === player)
+          )
+      );
+
+      return;
+    }
+
+    this.#citiesToLiberate.push(city.tile());
+  }
+
+  unitDestroyed(unit: Unit, player: Player | null): void {
+    const [city] = this.#cityRegistry.getByTile(unit.tile()),
+      tileUnits = this.#unitRegistry.getByTile(unit.tile());
+
+    if (city && city.player() === this.player() && tileUnits.length < 2) {
+      this.buildItemInCity(city);
+
+      this.#playerTreasuryRegistry.getByPlayer(this.player()).buy(city);
+    }
   }
 }
 

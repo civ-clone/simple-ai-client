@@ -1,1 +1,2 @@
 import './registerAIClient';
+import './registerRules';

@@ -1,6 +1,6 @@
 {
   "name": "@civ-clone/simple-ai-client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "repository": "git@github.com:civ-clone/simple-ai-client.git",
   "keywords": [
     "typescript",
@@ -58,9 +58,11 @@
     "@civ-clone/core-terrain": "^0.1.0",
     "@civ-clone/core-terrain-feature": "^0.1.0",
     "@civ-clone/core-tile-improvement": "^0.1.0",
+    "@civ-clone/core-treasury": "^0.1.0",
     "@civ-clone/core-turn-based-game": "^0.1.0",
     "@civ-clone/core-unit": "^0.1.0",
     "@civ-clone/core-unit-improvement": "^0.1.0",
+    "@civ-clone/core-wonder": "^0.1.0",
     "@civ-clone/core-world": "^0.1.0",
     "@civ-clone/core-world-path": "^0.1.0",
     "@civ-clone/core-yield": "^0.1.0"
