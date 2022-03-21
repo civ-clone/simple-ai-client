@@ -305,8 +305,8 @@ class SimpleAIClient extends AIClient_1.default {
         __classPrivateFieldGet(this, _SimpleAIClient_seaTilesToExplore, "f").splice(0);
         __classPrivateFieldGet(this, _SimpleAIClient_undefendedCities, "f").splice(0);
         const playerWorld = __classPrivateFieldGet(this, _SimpleAIClient_playerWorldRegistry, "f").getByPlayer(this.player());
-        playerWorld.entries().forEach((tile) => {
-            const [tileCity] = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile), tileUnits = __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f").getBy('tile', tile), existingTarget = __classPrivateFieldGet(this, _SimpleAIClient_undefendedCities, "f").includes(tile) &&
+        playerWorld.entries().forEach((playerTile) => {
+            const tile = playerTile.tile(), [tileCity] = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile), tileUnits = __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f").getBy('tile', tile), existingTarget = __classPrivateFieldGet(this, _SimpleAIClient_undefendedCities, "f").includes(tile) &&
                 ![
                     ...__classPrivateFieldGet(this, _SimpleAIClient_unitTargetData, "f").values(),
                     ...[...__classPrivateFieldGet(this, _SimpleAIClient_unitPathData, "f").values()].map((path) => path.end()),
@@ -396,7 +396,9 @@ class SimpleAIClient extends AIClient_1.default {
                             console.log(item.moves().value());
                             console.log(__classPrivateFieldGet(this, _SimpleAIClient_unitImprovementRegistry, "f").getByUnit(item));
                         }
-                        reject(new Error("SimpleAIClient: Couldn't pick an action to do."));
+                        // Do nothing, but shout about it
+                        item.action(new Actions_1.NoOrders(item.tile(), item.tile(), item));
+                        console.error("SimpleAIClient: Couldn't pick an action to do.");
                         break;
                     }
                     if (item instanceof Unit_1.default) {
@@ -620,14 +622,16 @@ class SimpleAIClient extends AIClient_1.default {
             // REVENGE!
             __classPrivateFieldGet(this, _SimpleAIClient_enemyCitiesToAttack, "f").push(...playerWorld
                 .entries()
-                .filter((tile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f")
-                .getByTile(tile)
-                .some((city) => city.player() === player)));
+                .filter((playerTile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f")
+                .getByTile(playerTile.tile())
+                .some((city) => city.player() === player))
+                .map((playerTile) => playerTile.tile()));
             __classPrivateFieldGet(this, _SimpleAIClient_enemyUnitsToAttack, "f").push(...playerWorld
                 .entries()
-                .filter((tile) => __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f")
-                .getByTile(tile)
-                .some((unit) => unit.player() === player)));
+                .filter((playerTile) => __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f")
+                .getByTile(playerTile.tile())
+                .some((unit) => unit.player() === player))
+                .map((playerTile) => playerTile.tile()));
             return;
         }
         __classPrivateFieldGet(this, _SimpleAIClient_citiesToLiberate, "f").push(city.tile());

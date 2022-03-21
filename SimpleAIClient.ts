@@ -118,6 +118,7 @@ import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
+import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
 
 type ActionLookup = {
   attack?: AttackAction;
@@ -548,8 +549,9 @@ export class SimpleAIClient extends AIClient {
     this.#undefendedCities.splice(0);
     const playerWorld = this.#playerWorldRegistry.getByPlayer(this.player());
 
-    playerWorld.entries().forEach((tile: Tile): void => {
-      const [tileCity] = this.#cityRegistry.getByTile(tile),
+    playerWorld.entries().forEach((playerTile: PlayerTile): void => {
+      const tile = playerTile.tile(),
+        [tileCity] = this.#cityRegistry.getByTile(tile),
         tileUnits = this.#unitRegistry.getBy('tile', tile),
         existingTarget =
           this.#undefendedCities.includes(tile) &&
@@ -685,9 +687,10 @@ export class SimpleAIClient extends AIClient {
                 console.log(this.#unitImprovementRegistry.getByUnit(item));
               }
 
-              reject(
-                new Error("SimpleAIClient: Couldn't pick an action to do.")
-              );
+              // Do nothing, but shout about it
+              item.action(new NoOrders(item.tile(), item.tile(), item));
+
+              console.error("SimpleAIClient: Couldn't pick an action to do.");
 
               break;
             }
@@ -1137,20 +1140,22 @@ export class SimpleAIClient extends AIClient {
       this.#enemyCitiesToAttack.push(
         ...playerWorld
           .entries()
-          .filter((tile: Tile) =>
+          .filter((playerTile: PlayerTile) =>
             this.#cityRegistry
-              .getByTile(tile)
+              .getByTile(playerTile.tile())
               .some((city) => city.player() === player)
           )
+          .map((playerTile: PlayerTile) => playerTile.tile())
       );
       this.#enemyUnitsToAttack.push(
         ...playerWorld
           .entries()
-          .filter((tile: Tile) =>
+          .filter((playerTile: PlayerTile) =>
             this.#unitRegistry
-              .getByTile(tile)
+              .getByTile(playerTile.tile())
               .some((unit) => unit.player() === player)
           )
+          .map((playerTile: PlayerTile) => playerTile.tile())
       );
 
       return;

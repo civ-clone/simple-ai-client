@@ -19,14 +19,31 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 export declare class SimpleAIClient extends AIClient {
-    #private;
-    constructor(player: Player, cityRegistry?: CityRegistry, cityBuildRegistry?: CityBuildRegistry, cityGrowthRegistry?: CityGrowthRegistry, goodyHutRegistry?: GoodyHutRegistry, leaderRegistry?: LeaderRegistry, pathFinderRegistry?: PathFinderRegistry, playerGovernmentRegistry?: PlayerGovernmentRegistry, playerResearchRegistry?: PlayerResearchRegistry, playerTreasuryRegistry?: PlayerTreasuryRegistry, playerWorldRegistry?: PlayerWorldRegistry, ruleRegistry?: RuleRegistry, terrainFeatureRegistry?: TerrainFeatureRegistry, tileImprovementRegistry?: TileImprovementRegistry, unitImprovementRegistry?: UnitImprovementRegistry, unitRegistry?: UnitRegistry);
-    scoreUnitMove(unit: Unit, tile: Tile): number;
-    moveUnit(unit: Unit): void;
-    preProcessTurn(): void;
-    takeTurn(): Promise<void>;
-    private buildItemInCity;
-    cityLost(city: City, player: Player | null, destroyed: boolean): void;
-    unitDestroyed(unit: Unit, player: Player | null): void;
+  #private;
+  constructor(
+    player: Player,
+    cityRegistry?: CityRegistry,
+    cityBuildRegistry?: CityBuildRegistry,
+    cityGrowthRegistry?: CityGrowthRegistry,
+    goodyHutRegistry?: GoodyHutRegistry,
+    leaderRegistry?: LeaderRegistry,
+    pathFinderRegistry?: PathFinderRegistry,
+    playerGovernmentRegistry?: PlayerGovernmentRegistry,
+    playerResearchRegistry?: PlayerResearchRegistry,
+    playerTreasuryRegistry?: PlayerTreasuryRegistry,
+    playerWorldRegistry?: PlayerWorldRegistry,
+    ruleRegistry?: RuleRegistry,
+    terrainFeatureRegistry?: TerrainFeatureRegistry,
+    tileImprovementRegistry?: TileImprovementRegistry,
+    unitImprovementRegistry?: UnitImprovementRegistry,
+    unitRegistry?: UnitRegistry
+  );
+  scoreUnitMove(unit: Unit, tile: Tile): number;
+  moveUnit(unit: Unit): void;
+  preProcessTurn(): void;
+  takeTurn(): Promise<void>;
+  private buildItemInCity;
+  cityLost(city: City, player: Player | null, destroyed: boolean): void;
+  unitDestroyed(unit: Unit, player: Player | null): void;
 }
 export default SimpleAIClient;
