@@ -1,11 +1,135 @@
-import { Sail, Warrior } from '@civ-clone/civ1-unit/Units';
 import {
-  TurnStart,
-  ITurnStartRegistry,
-} from '@civ-clone/core-player/Rules/TurnStart';
+  AdvancedFlight,
+  Alphabet,
+  Astronomy,
+  AtomicTheory,
+  Automobile,
+  Banking,
+  BridgeBuilding,
+  BronzeWorking,
+  CeremonialBurial,
+  Chemistry,
+  Chivalry,
+  CodeOfLaws,
+  Combustion,
+  Communism,
+  Computers,
+  Conscription,
+  Construction,
+  Corporation,
+  Currency,
+  Democracy,
+  Electricity,
+  Electronics,
+  Engineering,
+  Explosives,
+  Feudalism,
+  Flight,
+  FusionPower,
+  GeneticEngineering,
+  Gunpowder,
+  HorsebackRiding,
+  Industrialization,
+  Invention,
+  IronWorking,
+  LaborUnion,
+  Literacy,
+  Magnetism,
+  MapMaking,
+  Masonry,
+  MassProduction,
+  Mathematics,
+  Medicine,
+  Metallurgy,
+  Monarchy,
+  Mysticism,
+  Navigation,
+  NuclearFission,
+  NuclearPower,
+  Philosophy,
+  Physics,
+  Plastics,
+  Pottery,
+  Railroad,
+  Recycling,
+  Refining,
+  Religion,
+  Robotics,
+  Rocketry,
+  SpaceFlight,
+  SteamEngine,
+  Steel,
+  Superconductor,
+  TheoryOfGravity,
+  TheRepublic,
+  TheWheel,
+  Trade,
+  University as UniversityAdvance,
+  Writing,
+} from '@civ-clone/civ1-science/Advances';
+import {
+  Aqueduct,
+  Bank,
+  Barracks,
+  Cathedral,
+  CityWalls,
+  Colosseum,
+  Courthouse,
+  Factory,
+  Granary,
+  HydroPlant,
+  Library,
+  ManufacturingPlant,
+  Marketplace,
+  MassTransit,
+  NuclearPlant,
+  Palace,
+  PowerPlant,
+  RecyclingCenter,
+  SdiDefence,
+  Temple,
+  University,
+} from '@civ-clone/civ1-city-improvement/CityImprovements';
+import {
+  Artillery,
+  Battleship,
+  Bomber,
+  Cannon,
+  Caravan,
+  Carrier,
+  Catapult,
+  Chariot,
+  Cruiser,
+  Diplomat,
+  Fighter,
+  Frigate,
+  Horseman,
+  Ironclad,
+  Knight,
+  MechanizedInfantry,
+  Musketman,
+  Nuclear,
+  Rifleman,
+  Sail,
+  Settlers,
+  Spearman,
+  Submarine,
+  Swordman,
+  Tank,
+  Transport,
+  Trireme,
+  Warrior,
+} from '@civ-clone/civ1-unit/Units';
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
+import AvailableCityBuildItemsRegistry from '@civ-clone/core-city-build/AvailableCityBuildItemsRegistry';
+import AvailableGovernmentRegistry from '@civ-clone/core-government/AvailableGovernmentRegistry';
 import BasePathFinder from '@civ-clone/simple-world-path/BasePathFinder';
+import BuildItem from '@civ-clone/core-city-build/BuildItem';
+import Buildable from '@civ-clone/core-city-build/Buildable';
+import City from '@civ-clone/core-city/City';
+import CityBuildRegistry from '@civ-clone/core-city-build/CityBuildRegistry';
 import CityGrowthRegistry from '@civ-clone/core-city-growth/CityGrowthRegistry';
+import CityImprovementRegistry from '@civ-clone/core-city-improvement/CityImprovementRegistry';
 import CityNameRegistry from '@civ-clone/core-civilization/CityNameRegistry';
 import CityRegistry from '@civ-clone/core-city/CityRegistry';
 import Civilization from '@civ-clone/core-civilization/Civilization';
@@ -21,43 +145,64 @@ import PlayerGovernmentRegistry from '@civ-clone/core-government/PlayerGovernmen
 import PlayerRegistry from '@civ-clone/core-player/PlayerRegistry';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerResearchRegistry from '@civ-clone/core-science/PlayerResearchRegistry';
+import PlayerTreasuryRegistry from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import PlayerWorldRegistry from '@civ-clone/core-player-world/PlayerWorldRegistry';
 import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
 import SimpleAIClient from '../SimpleAIClient';
-import Start from '@civ-clone/core-turn-based-game/Rules/Start';
 import TerrainFeatureRegistry from '@civ-clone/core-terrain-feature/TerrainFeatureRegistry';
 import TileImprovementRegistry from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
 import TransportRegistry from '@civ-clone/core-unit-transport/TransportRegistry';
 import Turn from '@civ-clone/core-turn-based-game/Turn';
+import TurnEnd from '@civ-clone/core-player/Rules/TurnEnd';
+import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import UnitImprovementRegistry from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
 import UnitRegistry from '@civ-clone/core-unit/UnitRegistry';
 import World from '@civ-clone/core-world/World';
-import action from '@civ-clone/civ1-unit/Rules/Unit/action';
-import activate from '@civ-clone/civ1-unit/Rules/Unit/activate';
-import created from '@civ-clone/civ1-unit/Rules/Unit/created';
+import cityBuild from '@civ-clone/civ1-city-improvement/Rules/City/build';
+import cityBuildCost from '@civ-clone/civ1-city-improvement/Rules/City/build-cost';
+import cityBuildUnit from '@civ-clone/civ1-unit/Rules/City/build';
+import cityBuildCostUnit from '@civ-clone/civ1-unit/Rules/City/buildCost';
+import cityCaptured from '@civ-clone/civ1-city/Rules/City/captured';
+import cityCost from '@civ-clone/civ1-city/Rules/City/cost';
+import cityCreated from '@civ-clone/civ1-city/Rules/City/created';
+import cityFoodStorage from '@civ-clone/civ1-city/Rules/City/food-storage';
+import cityGrow from '@civ-clone/civ1-city/Rules/City/grow';
+import cityGrowthCost from '@civ-clone/civ1-city/Rules/City/growth-cost';
+import cityProcessYield from '@civ-clone/civ1-city/Rules/City/process-yield';
+import cityYield from '@civ-clone/civ1-city/Rules/City/yield';
 import { expect } from 'chai';
-import moved from '@civ-clone/civ1-unit/Rules/Unit/moved';
-import movementCost from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
+import playerAction from '@civ-clone/civ1-unit/Rules/Player/action';
+import playerActionCity from '@civ-clone/civ1-city/Rules/Player/action';
+import playerActionResearch from '@civ-clone/civ1-science/Rules/Player/action';
+import playerTurnStart from '@civ-clone/civ1-player/Rules/Player/turn-start';
 import registerCivilizations from '@civ-clone/civ1-civilization/registerCivilizations';
 import registerLeaders from '@civ-clone/civ1-civilization/registerLeaders';
+import researchComplete from '@civ-clone/civ1-science/Rules/Research/complete';
+import researchCost from '@civ-clone/civ1-science/Rules/Research/cost';
+import researchRequirements from '@civ-clone/civ1-science/Rules/Research/requirements';
 import setUpCity from '@civ-clone/civ1-city/tests/lib/setUpCity';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
-import start from '@civ-clone/civ1-player/Rules/Turn/start';
+import tileYield from '@civ-clone/civ1-world/Rules/Tile/yield';
 import turnYear from '@civ-clone/civ1-game-year/Rules/Turn/year';
-import unitCreated from '@civ-clone/civ1-player/Rules/Unit/created';
+import unitAction from '@civ-clone/civ1-unit/Rules/Unit/action';
+import unitActivate from '@civ-clone/civ1-unit/Rules/Unit/activate';
+import unitCreated from '@civ-clone/civ1-unit/Rules/Unit/created';
+import unitDestroyed from '@civ-clone/civ1-unit/Rules/Unit/destroyed';
+import unitMoved from '@civ-clone/civ1-unit/Rules/Unit/moved';
+import unitMovementCost from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
+import unitValidateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
+import unitVisibility from '@civ-clone/civ1-player/Rules/Unit/visibility';
 import unitYield from '@civ-clone/civ1-unit/Rules/Unit/yield';
-import unitsToMove from '@civ-clone/civ1-unit/Rules/Player/action';
-import validateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
-import visibility from '@civ-clone/civ1-player/Rules/Unit/visibility';
-import { CityBuildRegistry } from '@civ-clone/core-city-build/CityBuildRegistry';
-import { PlayerTreasuryRegistry } from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
+    availableBuildItemsRegistry = new AvailableCityBuildItemsRegistry(),
+    availableGovernmentRegistry = new AvailableGovernmentRegistry(),
     cityBuildRegistry = new CityBuildRegistry(),
     cityGrowthRegistry = new CityGrowthRegistry(),
+    cityImprovementRegistry = new CityImprovementRegistry(),
     cityNameRegistry = new CityNameRegistry(),
     cityRegistry = new CityRegistry(),
     civilizationRegistry = new CivilizationRegistry(),
@@ -76,7 +221,7 @@ describe('SimpleAIClient', (): void => {
     turn = new Turn(),
     unitImprovementRegistry = new UnitImprovementRegistry(),
     unitRegistry = new UnitRegistry(),
-    simpleWorldLoader = simpleRLELoader(ruleRegistry),
+    simpleWorldLoader = simpleRLELoader(ruleRegistry, terrainFeatureRegistry),
     takeTurns = async (
       client: Client,
       n: number = 1,
@@ -85,11 +230,11 @@ describe('SimpleAIClient', (): void => {
       while (n--) {
         const player = client.player();
 
-        ruleRegistry.process(Start);
-
-        (ruleRegistry as ITurnStartRegistry).process(TurnStart, player);
+        ruleRegistry.process(TurnStart, player);
 
         await client.takeTurn();
+
+        ruleRegistry.process(TurnEnd, player);
 
         callable();
 
@@ -131,7 +276,11 @@ describe('SimpleAIClient', (): void => {
           playerWorldRegistry.register(new PlayerWorld(player, world));
 
           playerGovernmentRegistry.register(
-            new PlayerGovernment(player, ruleRegistry)
+            new PlayerGovernment(
+              player,
+              availableGovernmentRegistry,
+              ruleRegistry
+            )
           );
 
           playerResearchRegistry.register(
@@ -143,7 +292,50 @@ describe('SimpleAIClient', (): void => {
       );
 
   ruleRegistry.register(
-    ...action(
+    ...cityBuild(cityImprovementRegistry, playerResearchRegistry),
+    ...cityBuildCost(),
+    ...cityBuildUnit(playerResearchRegistry),
+    ...cityBuildCostUnit(),
+    ...cityCaptured(
+      cityRegistry,
+      unitRegistry,
+      cityGrowthRegistry,
+      cityBuildRegistry
+    ),
+    ...cityCost(cityGrowthRegistry, playerGovernmentRegistry, unitRegistry),
+    ...cityCreated(
+      tileImprovementRegistry,
+      cityBuildRegistry,
+      cityGrowthRegistry,
+      cityRegistry,
+      playerWorldRegistry,
+      ruleRegistry,
+      availableBuildItemsRegistry
+    ),
+    ...cityFoodStorage(ruleRegistry),
+    ...cityGrow(cityGrowthRegistry, playerWorldRegistry),
+    ...cityGrowthCost(),
+    ...cityProcessYield(
+      cityBuildRegistry,
+      cityGrowthRegistry,
+      unitRegistry,
+      ruleRegistry
+    ),
+    ...cityYield(),
+    ...playerAction(unitRegistry),
+    ...playerActionCity(cityBuildRegistry, cityRegistry),
+    ...playerActionResearch(playerResearchRegistry),
+    ...playerTurnStart(ruleRegistry, cityRegistry, unitRegistry),
+    ...researchComplete(),
+    ...researchCost(),
+    ...researchRequirements(),
+    ...tileYield(
+      tileImprovementRegistry,
+      terrainFeatureRegistry,
+      playerGovernmentRegistry
+    ),
+    ...turnYear(),
+    ...unitAction(
       cityNameRegistry,
       cityRegistry,
       ruleRegistry,
@@ -154,17 +346,146 @@ describe('SimpleAIClient', (): void => {
       transportRegistry,
       turn
     ),
-    ...activate(unitImprovementRegistry),
-    ...movementCost(tileImprovementRegistry, transportRegistry),
-    ...validateMove(),
-    ...created(unitRegistry),
-    ...moved(transportRegistry),
-    ...start(ruleRegistry, cityRegistry, playerRegistry, unitRegistry),
-    ...turnYear(),
-    ...unitCreated(),
-    ...unitsToMove(unitRegistry),
-    ...unitYield(unitImprovementRegistry, ruleRegistry),
-    ...visibility(playerWorldRegistry)
+    ...unitActivate(unitImprovementRegistry),
+    ...unitCreated(unitRegistry),
+    ...unitDestroyed(unitRegistry, unitImprovementRegistry),
+    ...unitMoved(
+      transportRegistry,
+      ruleRegistry,
+      () => Math.random(),
+      undefined,
+      cityRegistry
+    ),
+    ...unitMovementCost(tileImprovementRegistry, transportRegistry),
+    ...unitValidateMove(),
+    ...unitVisibility(playerWorldRegistry),
+    ...unitYield(unitImprovementRegistry, ruleRegistry)
+  );
+
+  advanceRegistry.register(
+    AdvancedFlight,
+    Alphabet,
+    Astronomy,
+    AtomicTheory,
+    Automobile,
+    Banking,
+    BridgeBuilding,
+    BronzeWorking,
+    CeremonialBurial,
+    Chemistry,
+    Chivalry,
+    CodeOfLaws,
+    Combustion,
+    Communism,
+    Computers,
+    Conscription,
+    Construction,
+    Corporation,
+    Currency,
+    Democracy,
+    Electricity,
+    Electronics,
+    Engineering,
+    Explosives,
+    Feudalism,
+    Flight,
+    FusionPower,
+    GeneticEngineering,
+    Gunpowder,
+    HorsebackRiding,
+    Industrialization,
+    Invention,
+    IronWorking,
+    LaborUnion,
+    Literacy,
+    Magnetism,
+    MapMaking,
+    Masonry,
+    MassProduction,
+    Mathematics,
+    Medicine,
+    Metallurgy,
+    Monarchy,
+    Mysticism,
+    Navigation,
+    NuclearFission,
+    NuclearPower,
+    Philosophy,
+    Physics,
+    Plastics,
+    Pottery,
+    Railroad,
+    Recycling,
+    Refining,
+    Religion,
+    Robotics,
+    Rocketry,
+    SpaceFlight,
+    SteamEngine,
+    Steel,
+    Superconductor,
+    TheRepublic,
+    TheWheel,
+    TheoryOfGravity,
+    Trade,
+    UniversityAdvance,
+    Writing
+  );
+
+  availableBuildItemsRegistry.register(
+    ...([
+      Artillery,
+      Battleship,
+      Bomber,
+      Cannon,
+      Caravan,
+      Carrier,
+      Catapult,
+      Chariot,
+      Cruiser,
+      Diplomat,
+      Fighter,
+      Frigate,
+      Horseman,
+      Ironclad,
+      Knight,
+      MechanizedInfantry,
+      Musketman,
+      Nuclear,
+      Rifleman,
+      Sail,
+      Settlers,
+      Spearman,
+      Submarine,
+      Swordman,
+      Tank,
+      Transport,
+      Trireme,
+      Warrior,
+    ] as unknown as typeof Buildable[]),
+    ...([
+      Aqueduct,
+      Bank,
+      Barracks,
+      Cathedral,
+      CityWalls,
+      Colosseum,
+      Courthouse,
+      Factory,
+      Granary,
+      HydroPlant,
+      Library,
+      ManufacturingPlant,
+      Marketplace,
+      MassTransit,
+      NuclearPlant,
+      Palace,
+      PowerPlant,
+      RecyclingCenter,
+      SdiDefence,
+      Temple,
+      University,
+    ] as unknown as typeof Buildable[])
   );
 
   registerCivilizations(civilizationRegistry);
@@ -173,6 +494,11 @@ describe('SimpleAIClient', (): void => {
   pathFinderRegistry.register(BasePathFinder);
 
   it('should move land units around to explore the available map', async (): Promise<void> => {
+    //   0123
+    // 0 ~~~~
+    // 1 ~###
+    // 2 ~###
+    // 3 ~###
     const world = await simpleWorldLoader('5O3GO3GO3G', 4, 4),
       [client] = await createClients(world),
       player = client.player(),
@@ -193,6 +519,11 @@ describe('SimpleAIClient', (): void => {
   });
 
   it('should move naval units around to explore the available map', async (): Promise<void> => {
+    //   0123
+    // 0 ~~~~
+    // 1 ~~~~
+    // 2 ~~~~
+    // 3 ~~~~
     const world = await simpleWorldLoader('16O', 4, 4),
       [client] = await createClients(world),
       player = client.player(),
@@ -208,6 +539,12 @@ describe('SimpleAIClient', (): void => {
   });
 
   it('should embark land units onto naval transport units', async (): Promise<void> => {
+    //   01234
+    // 0 ~~~~~
+    // 1 ~#~~~
+    // 2 ~~~~~
+    // 3 ~~~~~
+    // 4 ~~~~~
     const world = await simpleWorldLoader('6OG18O', 5, 5),
       [client] = await createClients(world),
       player = client.player(),
@@ -227,6 +564,11 @@ describe('SimpleAIClient', (): void => {
   });
 
   it('should disembark land units from naval transport units', async (): Promise<void> => {
+    //   0123
+    // 0 ~~~~
+    // 1 ~#~~
+    // 2 ~~~~
+    // 3 ~~~~
     const world = await simpleWorldLoader('5OG10O', 4, 4),
       [client] = await createClients(world),
       player = client.player(),
@@ -247,6 +589,13 @@ describe('SimpleAIClient', (): void => {
   });
 
   it('should set a path to a capturable enemy city', async (): Promise<void> => {
+    //   012345
+    // 0 ~~~~~~
+    // 1 ~####~
+    // 2 ~~~~~#
+    // 3 ~~###~
+    // 4 ~#~~~~
+    // 5 ~~####
     const world = await simpleWorldLoader('7O4G6OG2O3G2OG6O4G', 6, 6),
       [client] = await createClients(world),
       player = client.player(),
@@ -258,6 +607,7 @@ describe('SimpleAIClient', (): void => {
 
     const city = await setUpCity({
       cityGrowthRegistry,
+      improveTerrain: false,
       player: enemy,
       playerWorldRegistry,
       ruleRegistry: ruleRegistry,
@@ -271,13 +621,20 @@ describe('SimpleAIClient', (): void => {
 
     cityRegistry.register(city);
 
-    await takeTurns(client, 13);
+    await takeTurns(client, 12);
 
     expect(unit.tile()).to.equal(city.tile());
     expect(city.player()).to.equal(player);
   });
 
   it('should path to and fortify a fortifiable unit in an undefended friendly city', async (): Promise<void> => {
+    //   012345
+    // 0 ~~~~~~
+    // 1 ~####~
+    // 2 ~~~~~#
+    // 3 ~~###~
+    // 4 ~#~~~~
+    // 5 ~~####
     const world = await simpleWorldLoader('7O4G6OG2O3G2OG6O4G', 6, 6),
       [client] = await createClients(world),
       player = client.player(),
@@ -286,6 +643,7 @@ describe('SimpleAIClient', (): void => {
 
     const city = await setUpCity({
       cityGrowthRegistry,
+      improveTerrain: false,
       player,
       playerWorldRegistry,
       ruleRegistry: ruleRegistry,
@@ -299,7 +657,7 @@ describe('SimpleAIClient', (): void => {
 
     cityRegistry.register(city);
 
-    await takeTurns(client, 13);
+    await takeTurns(client, 14);
 
     expect(unit.tile()).to.equal(city.tile());
     expect(
@@ -310,5 +668,37 @@ describe('SimpleAIClient', (): void => {
             unitImprovement instanceof Fortified
         )
     ).to.true;
+  });
+
+  it('should build a city and defend it', async (): Promise<void> => {
+    //   01234
+    // 0 #####
+    // 1 #####
+    // 2 #####
+    // 3 #####
+    // 4 #####
+    const world = await simpleWorldLoader('25Gd', 5, 5),
+      [client] = await createClients(world),
+      player = client.player(),
+      unit = new Settlers(null, player, world.get(1, 1), ruleRegistry);
+
+    await takeTurns(client, 1);
+
+    const [city] = cityRegistry.getByPlayer(player);
+
+    expect(city).instanceof(City);
+    expect(unit.destroyed()).true;
+
+    const cityBuild = cityBuildRegistry.getByCity(city);
+
+    expect(cityBuild.building()).instanceof(BuildItem);
+    expect(cityBuild.building()!.item()).equal(Warrior);
+
+    await takeTurns(client, 5);
+
+    const [producedUnit] = unitRegistry.getByTile(city.tile());
+
+    expect(producedUnit).instanceof(Warrior);
+    expect(producedUnit.busy()).not.null;
   });
 });

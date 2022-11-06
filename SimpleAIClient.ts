@@ -107,6 +107,7 @@ import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
+import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import Terrain from '@civ-clone/core-terrain/Terrain';
 import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
@@ -117,8 +118,6 @@ import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
-import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
-import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
 
 type ActionLookup = {
   attack?: AttackAction;
@@ -132,6 +131,20 @@ type ActionLookup = {
   foundCity?: FoundCity;
   noOrders?: NoOrders;
   unload?: Unload;
+};
+
+const hasPlayerCity = (
+  tile: Tile,
+  player: Player,
+  cityRegistry: CityRegistry = cityRegistryInstance
+): boolean => {
+  const city = cityRegistry.getByTile(tile);
+
+  if (city === null) {
+    return false;
+  }
+
+  return city.player() === player;
 };
 
 export class SimpleAIClient extends AIClient {
@@ -158,7 +171,7 @@ export class SimpleAIClient extends AIClient {
       !tile
         .getSurroundingArea(4)
         .filter(
-          (tile: Tile): boolean => this.#cityRegistry.getByTile(tile).length > 0
+          (tile: Tile): boolean => this.#cityRegistry.getByTile(tile) !== null
         ).length
     );
   };
@@ -178,9 +191,7 @@ export class SimpleAIClient extends AIClient {
       tile
         .getSurroundingArea()
         .some((tile: Tile): boolean =>
-          this.#cityRegistry
-            .getByTile(tile)
-            .some((city: City): boolean => city.player() === this.player())
+          hasPlayerCity(tile, this.player(), this.#cityRegistry)
         ) &&
       [...tile.getAdjacent(), tile].some(
         (tile: Tile): boolean =>
@@ -192,7 +203,7 @@ export class SimpleAIClient extends AIClient {
               (improvement: TileImprovement): boolean =>
                 improvement instanceof Irrigation
             ) &&
-            !this.#cityRegistry.getByTile(tile).length)
+            this.#cityRegistry.getByTile(tile) === null)
       )
     );
   };
@@ -211,9 +222,7 @@ export class SimpleAIClient extends AIClient {
       tile
         .getSurroundingArea()
         .some((tile: Tile): boolean =>
-          this.#cityRegistry
-            .getByTile(tile)
-            .some((city: City): boolean => city.player() === this.player())
+          hasPlayerCity(tile, this.player(), this.#cityRegistry)
         )
     );
   };
@@ -228,9 +237,7 @@ export class SimpleAIClient extends AIClient {
       tile
         .getSurroundingArea()
         .some((tile: Tile): boolean =>
-          this.#cityRegistry
-            .getByTile(tile)
-            .some((city: City): boolean => city.player() === this.player())
+          hasPlayerCity(tile, this.player(), this.#cityRegistry)
         )
     );
   };
@@ -457,6 +464,7 @@ export class SimpleAIClient extends AIClient {
       }
 
       const path = this.#unitPathData.get(unit);
+
       if (path) {
         const target = path.shift(),
           [move] = unit
@@ -551,7 +559,7 @@ export class SimpleAIClient extends AIClient {
 
     playerWorld.entries().forEach((playerTile: PlayerTile): void => {
       const tile = playerTile.tile(),
-        [tileCity] = this.#cityRegistry.getByTile(tile),
+        tileCity = this.#cityRegistry.getByTile(tile),
         tileUnits = this.#unitRegistry.getBy('tile', tile),
         existingTarget =
           this.#undefendedCities.includes(tile) &&
@@ -777,7 +785,7 @@ export class SimpleAIClient extends AIClient {
                           improvement instanceof Fortified
                       ) && unit.defence() > tileUnit.defence()
                 ),
-                [city] = this.#cityRegistry.getByTile(tile);
+                city = this.#cityRegistry.getByTile(tile);
 
               if (
                 fortify &&
@@ -1141,9 +1149,7 @@ export class SimpleAIClient extends AIClient {
         ...playerWorld
           .entries()
           .filter((playerTile: PlayerTile) =>
-            this.#cityRegistry
-              .getByTile(playerTile.tile())
-              .some((city) => city.player() === player)
+            hasPlayerCity(playerTile.tile(), this.player(), this.#cityRegistry)
           )
           .map((playerTile: PlayerTile) => playerTile.tile())
       );
@@ -1165,7 +1171,7 @@ export class SimpleAIClient extends AIClient {
   }
 
   unitDestroyed(unit: Unit, player: Player | null): void {
-    const [city] = this.#cityRegistry.getByTile(unit.tile()),
+    const city = this.#cityRegistry.getByTile(unit.tile()),
       tileUnits = this.#unitRegistry.getByTile(unit.tile());
 
     if (city && city.player() === this.player() && tileUnits.length < 2) {

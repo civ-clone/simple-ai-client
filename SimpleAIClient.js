@@ -50,6 +50,13 @@ const Tile_1 = require("@civ-clone/core-world/Tile");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
 const Wonder_1 = require("@civ-clone/core-wonder/Wonder");
 const assignWorkers_1 = require("@civ-clone/civ1-city/lib/assignWorkers");
+const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
+    const city = cityRegistry.getByTile(tile);
+    if (city === null) {
+        return false;
+    }
+    return city.player() === player;
+};
 class SimpleAIClient extends AIClient_1.default {
     constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, leaderRegistry = LeaderRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance) {
         super(player, leaderRegistry);
@@ -67,7 +74,7 @@ class SimpleAIClient extends AIClient_1.default {
                 ]) >= 180 &&
                 !tile
                     .getSurroundingArea(4)
-                    .filter((tile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile).length > 0).length);
+                    .filter((tile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile) !== null).length);
         });
         _SimpleAIClient_shouldIrrigate.set(this, (tile) => {
             return ([Terrains_1.Desert, Terrains_1.Plains, Terrains_1.Grassland, Terrains_1.River].some((TerrainType) => tile.terrain() instanceof TerrainType) &&
@@ -77,15 +84,13 @@ class SimpleAIClient extends AIClient_1.default {
                     .some((improvement) => improvement instanceof TileImprovements_1.Irrigation) &&
                 tile
                     .getSurroundingArea()
-                    .some((tile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f")
-                    .getByTile(tile)
-                    .some((city) => city.player() === this.player())) &&
+                    .some((tile) => hasPlayerCity(tile, this.player(), __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f"))) &&
                 [...tile.getAdjacent(), tile].some((tile) => tile.terrain() instanceof Terrains_1.River ||
                     tile.isCoast() ||
                     (__classPrivateFieldGet(this, _SimpleAIClient_tileImprovementRegistry, "f")
                         .getByTile(tile)
                         .some((improvement) => improvement instanceof TileImprovements_1.Irrigation) &&
-                        !__classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile).length)));
+                        __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile) === null)));
         });
         _SimpleAIClient_shouldMine.set(this, (tile) => {
             return ([Terrains_1.Hills, Terrains_1.Mountains].some((TerrainType) => tile.terrain() instanceof TerrainType) &&
@@ -94,9 +99,7 @@ class SimpleAIClient extends AIClient_1.default {
                     .some((improvement) => improvement instanceof TileImprovements_1.Mine) &&
                 tile
                     .getSurroundingArea()
-                    .some((tile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f")
-                    .getByTile(tile)
-                    .some((city) => city.player() === this.player())));
+                    .some((tile) => hasPlayerCity(tile, this.player(), __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f"))));
         });
         _SimpleAIClient_shouldRoad.set(this, (tile) => {
             return (!__classPrivateFieldGet(this, _SimpleAIClient_tileImprovementRegistry, "f")
@@ -104,9 +107,7 @@ class SimpleAIClient extends AIClient_1.default {
                 .some((improvement) => improvement instanceof TileImprovements_1.Road) &&
                 tile
                     .getSurroundingArea()
-                    .some((tile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f")
-                    .getByTile(tile)
-                    .some((city) => city.player() === this.player())));
+                    .some((tile) => hasPlayerCity(tile, this.player(), __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f"))));
         });
         _SimpleAIClient_lastUnitMoves.set(this, new Map());
         _SimpleAIClient_unitPathData.set(this, new Map());
@@ -306,7 +307,7 @@ class SimpleAIClient extends AIClient_1.default {
         __classPrivateFieldGet(this, _SimpleAIClient_undefendedCities, "f").splice(0);
         const playerWorld = __classPrivateFieldGet(this, _SimpleAIClient_playerWorldRegistry, "f").getByPlayer(this.player());
         playerWorld.entries().forEach((playerTile) => {
-            const tile = playerTile.tile(), [tileCity] = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile), tileUnits = __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f").getBy('tile', tile), existingTarget = __classPrivateFieldGet(this, _SimpleAIClient_undefendedCities, "f").includes(tile) &&
+            const tile = playerTile.tile(), tileCity = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile), tileUnits = __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f").getBy('tile', tile), existingTarget = __classPrivateFieldGet(this, _SimpleAIClient_undefendedCities, "f").includes(tile) &&
                 ![
                     ...__classPrivateFieldGet(this, _SimpleAIClient_unitTargetData, "f").values(),
                     ...[...__classPrivateFieldGet(this, _SimpleAIClient_unitPathData, "f").values()].map((path) => path.end()),
@@ -444,7 +445,7 @@ class SimpleAIClient extends AIClient_1.default {
                         // TODO: check for defense values and activate weaker for disband/upgrade/scouting
                         const [cityUnitWithLowerDefence] = tileUnits.filter((tileUnit) => __classPrivateFieldGet(this, _SimpleAIClient_unitImprovementRegistry, "f")
                             .getByUnit(tileUnit)
-                            .some((improvement) => improvement instanceof UnitImprovements_1.Fortified) && unit.defence() > tileUnit.defence()), [city] = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile);
+                            .some((improvement) => improvement instanceof UnitImprovements_1.Fortified) && unit.defence() > tileUnit.defence()), city = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(tile);
                         if (fortify &&
                             city &&
                             (cityUnitWithLowerDefence ||
@@ -622,9 +623,7 @@ class SimpleAIClient extends AIClient_1.default {
             // REVENGE!
             __classPrivateFieldGet(this, _SimpleAIClient_enemyCitiesToAttack, "f").push(...playerWorld
                 .entries()
-                .filter((playerTile) => __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f")
-                .getByTile(playerTile.tile())
-                .some((city) => city.player() === player))
+                .filter((playerTile) => hasPlayerCity(playerTile.tile(), this.player(), __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f")))
                 .map((playerTile) => playerTile.tile()));
             __classPrivateFieldGet(this, _SimpleAIClient_enemyUnitsToAttack, "f").push(...playerWorld
                 .entries()
@@ -637,7 +636,7 @@ class SimpleAIClient extends AIClient_1.default {
         __classPrivateFieldGet(this, _SimpleAIClient_citiesToLiberate, "f").push(city.tile());
     }
     unitDestroyed(unit, player) {
-        const [city] = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(unit.tile()), tileUnits = __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f").getByTile(unit.tile());
+        const city = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(unit.tile()), tileUnits = __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f").getByTile(unit.tile());
         if (city && city.player() === this.player() && tileUnits.length < 2) {
             this.buildItemInCity(city);
             __classPrivateFieldGet(this, _SimpleAIClient_playerTreasuryRegistry, "f").getByPlayer(this.player()).buy(city);
