@@ -33,6 +33,10 @@ import {
   Plains,
   River,
 } from '@civ-clone/civ1-world/Terrains';
+import {
+  Engine,
+  instance as engineInstance,
+} from '@civ-clone/core-engine/Engine';
 import { Food, Production, Trade } from '@civ-clone/civ1-world/Yields';
 import {
   Fortifiable,
@@ -149,6 +153,13 @@ const hasPlayerCity = (
 
 export class SimpleAIClient extends AIClient {
   #shouldBuildCity = (tile: Tile): boolean => {
+    const isEarth = this.#engine.option('earth', false),
+      hasNoCities = this.#cityRegistry.getByPlayer(this.player()).length === 0;
+
+    if (isEarth && hasNoCities) {
+      return true;
+    }
+
     const terrainFeatures = this.#terrainFeatureRegistry.getByTerrain(
       tile.terrain()
     );
@@ -167,7 +178,7 @@ export class SimpleAIClient extends AIClient {
         [Food, 4],
         [Production, 2],
         [Trade, 1],
-      ]) >= 180 &&
+      ]) >= 160 &&
       !tile
         .getSurroundingArea(4)
         .filter(
@@ -269,6 +280,7 @@ export class SimpleAIClient extends AIClient {
   #tileImprovementRegistry: TileImprovementRegistry;
   #unitImprovementRegistry: UnitImprovementRegistry;
   #unitRegistry: UnitRegistry;
+  #engine: Engine;
 
   constructor(
     player: Player,
@@ -286,7 +298,8 @@ export class SimpleAIClient extends AIClient {
     terrainFeatureRegistry: TerrainFeatureRegistry = terrainFeatureRegistryInstance,
     tileImprovementRegistry: TileImprovementRegistry = tileImprovementRegistryInstance,
     unitImprovementRegistry: UnitImprovementRegistry = unitImprovementRegistryInstance,
-    unitRegistry: UnitRegistry = unitRegistryInstance
+    unitRegistry: UnitRegistry = unitRegistryInstance,
+    engine: Engine = engineInstance
   ) {
     super(player, leaderRegistry);
 
@@ -304,6 +317,7 @@ export class SimpleAIClient extends AIClient {
     this.#unitImprovementRegistry = unitImprovementRegistry;
     this.#tileImprovementRegistry = tileImprovementRegistry;
     this.#unitRegistry = unitRegistry;
+    this.#engine = engine;
   }
 
   scoreUnitMove(unit: Unit, tile: Tile): number {

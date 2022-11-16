@@ -1,6 +1,7 @@
 import { CityBuildRegistry } from '@civ-clone/core-city-build/CityBuildRegistry';
 import { CityGrowthRegistry } from '@civ-clone/core-city-growth/CityGrowthRegistry';
 import { CityRegistry } from '@civ-clone/core-city/CityRegistry';
+import { Engine } from '@civ-clone/core-engine/Engine';
 import { GoodyHutRegistry } from '@civ-clone/core-goody-hut/GoodyHutRegistry';
 import { LeaderRegistry } from '@civ-clone/core-civilization/LeaderRegistry';
 import { PathFinderRegistry } from '@civ-clone/core-world-path/PathFinderRegistry';
@@ -36,7 +37,8 @@ export declare class SimpleAIClient extends AIClient {
     terrainFeatureRegistry?: TerrainFeatureRegistry,
     tileImprovementRegistry?: TileImprovementRegistry,
     unitImprovementRegistry?: UnitImprovementRegistry,
-    unitRegistry?: UnitRegistry
+    unitRegistry?: UnitRegistry,
+    engine?: Engine
   );
   scoreUnitMove(unit: Unit, tile: Tile): number;
   moveUnit(unit: Unit): void;
