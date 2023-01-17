@@ -8,7 +8,6 @@
   ],
   "author": "dom111 <dom111@users.noreply.github.com>",
   "license": "MIT",
-  "private": false,
   "scripts": {
     "build": "npm run prettier:format && npm run ts:compile",
     "prettier:check": "prettier --config .prettierrc '**/*.ts'",
@@ -38,6 +37,7 @@
     "typescript": "^4.0.0"
   },
   "dependencies": {
+    "@civ-clone/base-city-yield-gold": "^0.1.0",
     "@civ-clone/base-player-action-end-turn": "^0.1.0",
     "@civ-clone/base-unit-type-naval-transport": "^0.1.0",
     "@civ-clone/civ1-city": "github:civ-clone/civ1-city",

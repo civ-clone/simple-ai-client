@@ -41,6 +41,7 @@ const Yield_1 = require("@civ-clone/core-unit/Rules/Yield");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
 const EndTurn_1 = require("@civ-clone/base-player-action-end-turn/EndTurn");
 const UnitImprovements_1 = require("@civ-clone/civ1-unit/UnitImprovements");
+const Gold_1 = require("@civ-clone/base-city-yield-gold/Gold");
 const Advances_1 = require("@civ-clone/civ1-science/Advances");
 const Governments_1 = require("@civ-clone/civ1-government/Governments");
 const CityImprovements_1 = require("@civ-clone/civ1-city-improvement/CityImprovements");
@@ -646,7 +647,9 @@ class SimpleAIClient extends AIClient_1.default {
         const city = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByTile(unit.tile()), tileUnits = __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f").getByTile(unit.tile());
         if (city && city.player() === this.player() && tileUnits.length < 2) {
             this.buildItemInCity(city);
-            __classPrivateFieldGet(this, _SimpleAIClient_playerTreasuryRegistry, "f").getByPlayer(this.player()).buy(city);
+            __classPrivateFieldGet(this, _SimpleAIClient_playerTreasuryRegistry, "f")
+                .getByPlayerAndType(this.player(), Gold_1.default)
+                .buy(city);
         }
     }
 }

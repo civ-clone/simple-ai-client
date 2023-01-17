@@ -104,6 +104,7 @@ import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
+import Gold from '@civ-clone/base-city-yield-gold/Gold';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
 import { Monarchy as MonarchyAdvance } from '@civ-clone/civ1-science/Advances';
 import { Monarchy as MonarchyGovernment } from '@civ-clone/civ1-government/Governments';
@@ -1191,7 +1192,9 @@ export class SimpleAIClient extends AIClient {
     if (city && city.player() === this.player() && tileUnits.length < 2) {
       this.buildItemInCity(city);
 
-      this.#playerTreasuryRegistry.getByPlayer(this.player()).buy(city);
+      this.#playerTreasuryRegistry
+        .getByPlayerAndType(this.player(), Gold)
+        .buy(city);
     }
   }
 }
