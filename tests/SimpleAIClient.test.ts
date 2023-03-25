@@ -125,19 +125,18 @@ import AvailableCityBuildItemsRegistry from '@civ-clone/core-city-build/Availabl
 import AvailableGovernmentRegistry from '@civ-clone/core-government/AvailableGovernmentRegistry';
 import BasePathFinder from '@civ-clone/simple-world-path/BasePathFinder';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
-import Buildable from '@civ-clone/core-city-build/Buildable';
+import { IBuildable } from '@civ-clone/core-city-build/Buildable';
+import ChoiceMeta from '@civ-clone/core-client/ChoiceMeta';
 import City from '@civ-clone/core-city/City';
 import CityBuildRegistry from '@civ-clone/core-city-build/CityBuildRegistry';
 import CityGrowthRegistry from '@civ-clone/core-city-growth/CityGrowthRegistry';
 import CityImprovementRegistry from '@civ-clone/core-city-improvement/CityImprovementRegistry';
 import CityNameRegistry from '@civ-clone/core-civilization/CityNameRegistry';
 import CityRegistry from '@civ-clone/core-city/CityRegistry';
-import Civilization from '@civ-clone/core-civilization/Civilization';
 import CivilizationRegistry from '@civ-clone/core-civilization/CivilizationRegistry';
 import Client from '@civ-clone/core-client/Client';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import GoodyHutRegistry from '@civ-clone/core-goody-hut/GoodyHutRegistry';
-import LeaderRegistry from '@civ-clone/core-civilization/LeaderRegistry';
 import PathFinderRegistry from '@civ-clone/core-world-path/PathFinderRegistry';
 import Player from '@civ-clone/core-player/Player';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
@@ -159,6 +158,7 @@ import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import UnitImprovementRegistry from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
 import UnitRegistry from '@civ-clone/core-unit/UnitRegistry';
+import WorkedTileRegistry from '@civ-clone/core-city/WorkedTileRegistry';
 import World from '@civ-clone/core-world/World';
 import cityBuild from '@civ-clone/civ1-city-improvement/Rules/City/build';
 import cityBuildCost from '@civ-clone/civ1-city-improvement/Rules/City/build-cost';
@@ -171,6 +171,7 @@ import cityFoodStorage from '@civ-clone/civ1-city/Rules/City/food-storage';
 import cityGrow from '@civ-clone/civ1-city/Rules/City/grow';
 import cityGrowthCost from '@civ-clone/civ1-city/Rules/City/growth-cost';
 import cityProcessYield from '@civ-clone/civ1-city/Rules/City/process-yield';
+import cityTiles from '@civ-clone/civ1-city/Rules/City/tiles';
 import cityYield from '@civ-clone/civ1-city/Rules/City/yield';
 import { expect } from 'chai';
 import playerAction from '@civ-clone/civ1-unit/Rules/Player/action';
@@ -178,12 +179,12 @@ import playerActionCity from '@civ-clone/civ1-city/Rules/Player/action';
 import playerActionResearch from '@civ-clone/civ1-science/Rules/Player/action';
 import playerTurnStart from '@civ-clone/civ1-player/Rules/Player/turn-start';
 import registerCivilizations from '@civ-clone/civ1-civilization/registerCivilizations';
-import registerLeaders from '@civ-clone/civ1-civilization/registerLeaders';
 import researchComplete from '@civ-clone/civ1-science/Rules/Research/complete';
 import researchCost from '@civ-clone/civ1-science/Rules/Research/cost';
 import researchRequirements from '@civ-clone/civ1-science/Rules/Research/requirements';
 import setUpCity from '@civ-clone/civ1-city/tests/lib/setUpCity';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
+import tileCanBeWorked from '@civ-clone/civ1-city/Rules/City/can-be-worked';
 import tileYield from '@civ-clone/civ1-world/Rules/Tile/yield';
 import turnYear from '@civ-clone/civ1-game-year/Rules/Turn/year';
 import unitAction from '@civ-clone/civ1-unit/Rules/Unit/action';
@@ -207,7 +208,6 @@ describe('SimpleAIClient', (): void => {
     cityRegistry = new CityRegistry(),
     civilizationRegistry = new CivilizationRegistry(),
     goodyHutRegistry = new GoodyHutRegistry(),
-    leaderRegistry = new LeaderRegistry(),
     pathFinderRegistry = new PathFinderRegistry(),
     playerGovernmentRegistry = new PlayerGovernmentRegistry(),
     playerRegistry = new PlayerRegistry(),
@@ -221,6 +221,7 @@ describe('SimpleAIClient', (): void => {
     turn = new Turn(),
     unitImprovementRegistry = new UnitImprovementRegistry(),
     unitRegistry = new UnitRegistry(),
+    workedTileRegistry = new WorkedTileRegistry(ruleRegistry),
     simpleWorldLoader = simpleRLELoader(ruleRegistry, terrainFeatureRegistry),
     takeTurns = async (
       client: Client,
@@ -251,7 +252,6 @@ describe('SimpleAIClient', (): void => {
               cityBuildRegistry,
               cityGrowthRegistry,
               goodyHutRegistry,
-              leaderRegistry,
               pathFinderRegistry,
               playerGovernmentRegistry,
               playerResearchRegistry,
@@ -265,11 +265,11 @@ describe('SimpleAIClient', (): void => {
             ),
             availableCivilizations = civilizationRegistry.entries();
 
-          await client.chooseCivilization(availableCivilizations);
-
-          civilizationRegistry.unregister(
-            player.civilization().constructor as typeof Civilization
+          const ChosenCivilization = await client.chooseFromList(
+            new ChoiceMeta(availableCivilizations, 'choose-civilization')
           );
+
+          player.setCivilization(new ChosenCivilization());
 
           playerRegistry.register(player);
 
@@ -300,7 +300,10 @@ describe('SimpleAIClient', (): void => {
       cityRegistry,
       unitRegistry,
       cityGrowthRegistry,
-      cityBuildRegistry
+      cityBuildRegistry,
+      undefined,
+      playerWorldRegistry,
+      workedTileRegistry
     ),
     ...cityCost(cityGrowthRegistry, playerGovernmentRegistry, unitRegistry),
     ...cityCreated(
@@ -310,10 +313,12 @@ describe('SimpleAIClient', (): void => {
       cityRegistry,
       playerWorldRegistry,
       ruleRegistry,
-      availableBuildItemsRegistry
+      availableBuildItemsRegistry,
+      undefined,
+      workedTileRegistry
     ),
     ...cityFoodStorage(ruleRegistry),
-    ...cityGrow(cityGrowthRegistry, playerWorldRegistry),
+    ...cityGrow(cityGrowthRegistry, playerWorldRegistry, workedTileRegistry),
     ...cityGrowthCost(),
     ...cityProcessYield(
       cityBuildRegistry,
@@ -321,7 +326,8 @@ describe('SimpleAIClient', (): void => {
       unitRegistry,
       ruleRegistry
     ),
-    ...cityYield(),
+    ...cityTiles(),
+    ...cityYield(cityImprovementRegistry, playerGovernmentRegistry),
     ...playerAction(unitRegistry),
     ...playerActionCity(cityBuildRegistry, cityRegistry),
     ...playerActionResearch(playerResearchRegistry),
@@ -329,6 +335,7 @@ describe('SimpleAIClient', (): void => {
     ...researchComplete(),
     ...researchCost(),
     ...researchRequirements(),
+    ...tileCanBeWorked(cityRegistry, unitRegistry, workedTileRegistry),
     ...tileYield(
       tileImprovementRegistry,
       terrainFeatureRegistry,
@@ -344,7 +351,9 @@ describe('SimpleAIClient', (): void => {
       unitRegistry,
       terrainFeatureRegistry,
       transportRegistry,
-      turn
+      turn,
+      undefined,
+      workedTileRegistry
     ),
     ...unitActivate(unitImprovementRegistry),
     ...unitCreated(unitRegistry),
@@ -352,7 +361,7 @@ describe('SimpleAIClient', (): void => {
     ...unitMoved(
       transportRegistry,
       ruleRegistry,
-      () => Math.random(),
+      undefined,
       undefined,
       cityRegistry
     ),
@@ -462,7 +471,7 @@ describe('SimpleAIClient', (): void => {
       Transport,
       Trireme,
       Warrior,
-    ] as unknown as typeof Buildable[]),
+    ] as IBuildable[]),
     ...([
       Aqueduct,
       Bank,
@@ -485,11 +494,10 @@ describe('SimpleAIClient', (): void => {
       SdiDefence,
       Temple,
       University,
-    ] as unknown as typeof Buildable[])
+    ] as IBuildable[])
   );
 
   registerCivilizations(civilizationRegistry);
-  registerLeaders(leaderRegistry);
 
   pathFinderRegistry.register(BasePathFinder);
 
@@ -610,10 +618,11 @@ describe('SimpleAIClient', (): void => {
       improveTerrain: false,
       player: enemy,
       playerWorldRegistry,
-      ruleRegistry: ruleRegistry,
+      ruleRegistry,
       size: 2,
       tile: world.get(5, 5),
       tileImprovementRegistry,
+      workedTileRegistry,
       world,
     });
 
@@ -641,19 +650,20 @@ describe('SimpleAIClient', (): void => {
       unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
       playerWorld = playerWorldRegistry.getByPlayer(player);
 
+    playerWorld.register(...world.entries());
+
     const city = await setUpCity({
       cityGrowthRegistry,
       improveTerrain: false,
       player,
       playerWorldRegistry,
-      ruleRegistry: ruleRegistry,
+      ruleRegistry,
       size: 2,
       tile: world.get(5, 5),
       tileImprovementRegistry,
+      workedTileRegistry,
       world,
     });
-
-    playerWorld.register(...world.entries());
 
     cityRegistry.register(city);
 
@@ -680,13 +690,17 @@ describe('SimpleAIClient', (): void => {
     const world = await simpleWorldLoader('25Gd', 5, 5),
       [client] = await createClients(world),
       player = client.player(),
-      unit = new Settlers(null, player, world.get(1, 1), ruleRegistry);
+      unit = new Settlers(null, player, world.get(1, 1), ruleRegistry),
+      playerWorld = playerWorldRegistry.getByPlayer(player);
 
-    await takeTurns(client, 1);
+    expect(playerWorld.entries()).length(9);
+
+    await takeTurns(client);
 
     const [city] = cityRegistry.getByPlayer(player);
 
     expect(city).instanceof(City);
+    expect(city.tilesWorked().entries()).length(2);
     expect(unit.destroyed()).true;
 
     const cityBuild = cityBuildRegistry.getByCity(city);
@@ -695,6 +709,8 @@ describe('SimpleAIClient', (): void => {
     expect(cityBuild.building()!.item()).equal(Warrior);
 
     await takeTurns(client, 5);
+
+    expect(cityBuild.progress().value()).equal(0);
 
     const [producedUnit] = unitRegistry.getByTile(city.tile());
 

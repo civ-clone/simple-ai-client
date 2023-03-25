@@ -10,22 +10,24 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _SimpleAIClient_shouldBuildCity, _SimpleAIClient_shouldIrrigate, _SimpleAIClient_shouldMine, _SimpleAIClient_shouldRoad, _SimpleAIClient_lastUnitMoves, _SimpleAIClient_unitPathData, _SimpleAIClient_unitTargetData, _SimpleAIClient_citiesToLiberate, _SimpleAIClient_enemyCitiesToAttack, _SimpleAIClient_enemyUnitsToAttack, _SimpleAIClient_goodSitesForCities, _SimpleAIClient_landTilesToExplore, _SimpleAIClient_seaTilesToExplore, _SimpleAIClient_undefendedCities, _SimpleAIClient_cityRegistry, _SimpleAIClient_cityBuildRegistry, _SimpleAIClient_cityGrowthRegistry, _SimpleAIClient_goodyHutRegistry, _SimpleAIClient_pathFinderRegistry, _SimpleAIClient_playerGovernmentRegistry, _SimpleAIClient_playerResearchRegistry, _SimpleAIClient_playerTreasuryRegistry, _SimpleAIClient_playerWorldRegistry, _SimpleAIClient_ruleRegistry, _SimpleAIClient_terrainFeatureRegistry, _SimpleAIClient_tileImprovementRegistry, _SimpleAIClient_unitImprovementRegistry, _SimpleAIClient_unitRegistry, _SimpleAIClient_engine;
+var _SimpleAIClient_shouldBuildCity, _SimpleAIClient_shouldIrrigate, _SimpleAIClient_shouldMine, _SimpleAIClient_shouldRoad, _SimpleAIClient_lastUnitMoves, _SimpleAIClient_unitPathData, _SimpleAIClient_unitTargetData, _SimpleAIClient_citiesToLiberate, _SimpleAIClient_enemyCitiesToAttack, _SimpleAIClient_enemyUnitsToAttack, _SimpleAIClient_goodSitesForCities, _SimpleAIClient_landTilesToExplore, _SimpleAIClient_seaTilesToExplore, _SimpleAIClient_undefendedCities, _SimpleAIClient_cityRegistry, _SimpleAIClient_cityBuildRegistry, _SimpleAIClient_cityGrowthRegistry, _SimpleAIClient_clientRegistry, _SimpleAIClient_goodyHutRegistry, _SimpleAIClient_interactionRegistry, _SimpleAIClient_pathFinderRegistry, _SimpleAIClient_playerGovernmentRegistry, _SimpleAIClient_playerResearchRegistry, _SimpleAIClient_playerTreasuryRegistry, _SimpleAIClient_playerWorldRegistry, _SimpleAIClient_ruleRegistry, _SimpleAIClient_terrainFeatureRegistry, _SimpleAIClient_tileImprovementRegistry, _SimpleAIClient_turn, _SimpleAIClient_unitImprovementRegistry, _SimpleAIClient_unitRegistry, _SimpleAIClient_engine;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SimpleAIClient = void 0;
 const Yields_1 = require("@civ-clone/core-unit/Yields");
 const Actions_1 = require("@civ-clone/civ1-unit/Actions");
+const ChoiceMeta_1 = require("@civ-clone/core-client/ChoiceMeta");
 const CityBuildRegistry_1 = require("@civ-clone/core-city-build/CityBuildRegistry");
 const CityGrowthRegistry_1 = require("@civ-clone/core-city-growth/CityGrowthRegistry");
 const CityRegistry_1 = require("@civ-clone/core-city/CityRegistry");
+const ClientRegistry_1 = require("@civ-clone/core-client/ClientRegistry");
 const Terrains_1 = require("@civ-clone/civ1-world/Terrains");
 const Engine_1 = require("@civ-clone/core-engine/Engine");
 const Yields_2 = require("@civ-clone/civ1-world/Yields");
 const Types_1 = require("@civ-clone/civ1-unit/Types");
 const TerrainFeatures_1 = require("@civ-clone/civ1-world/TerrainFeatures");
 const GoodyHutRegistry_1 = require("@civ-clone/core-goody-hut/GoodyHutRegistry");
+const InteractionRegistry_1 = require("@civ-clone/core-diplomacy/InteractionRegistry");
 const TileImprovements_1 = require("@civ-clone/civ1-world/TileImprovements");
-const LeaderRegistry_1 = require("@civ-clone/core-civilization/LeaderRegistry");
 const PathFinderRegistry_1 = require("@civ-clone/core-world-path/PathFinderRegistry");
 const PlayerGovernmentRegistry_1 = require("@civ-clone/core-government/PlayerGovernmentRegistry");
 const PlayerResearchRegistry_1 = require("@civ-clone/core-science/PlayerResearchRegistry");
@@ -34,19 +36,26 @@ const PlayerWorldRegistry_1 = require("@civ-clone/core-player-world/PlayerWorldR
 const RuleRegistry_1 = require("@civ-clone/core-rule/RuleRegistry");
 const TerrainFeatureRegistry_1 = require("@civ-clone/core-terrain-feature/TerrainFeatureRegistry");
 const TileImprovementRegistry_1 = require("@civ-clone/core-tile-improvement/TileImprovementRegistry");
+const Turn_1 = require("@civ-clone/core-turn-based-game/Turn");
 const UnitImprovementRegistry_1 = require("@civ-clone/core-unit-improvement/UnitImprovementRegistry");
 const UnitRegistry_1 = require("@civ-clone/core-unit/UnitRegistry");
+const Accept_1 = require("@civ-clone/core-diplomacy/Proposal/Accept");
 const AIClient_1 = require("@civ-clone/core-ai-client/AIClient");
 const Yield_1 = require("@civ-clone/core-unit/Rules/Yield");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
 const EndTurn_1 = require("@civ-clone/base-player-action-end-turn/EndTurn");
+const ExchangeKnowledge_1 = require("@civ-clone/library-diplomacy/Proposals/ExchangeKnowledge");
 const UnitImprovements_1 = require("@civ-clone/civ1-unit/UnitImprovements");
 const Gold_1 = require("@civ-clone/base-city-yield-gold/Gold");
+const Initiate_1 = require("@civ-clone/core-diplomacy/Negotiation/Initiate");
 const Advances_1 = require("@civ-clone/civ1-science/Advances");
 const Governments_1 = require("@civ-clone/civ1-government/Governments");
+const Negotiation_1 = require("@civ-clone/core-diplomacy/Negotiation");
+const OfferPeace_1 = require("@civ-clone/library-diplomacy/Proposals/OfferPeace");
 const CityImprovements_1 = require("@civ-clone/civ1-city-improvement/CityImprovements");
 const Path_1 = require("@civ-clone/core-world-path/Path");
 const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
+const Resolution_1 = require("@civ-clone/core-diplomacy/Proposal/Resolution");
 const Units_1 = require("@civ-clone/civ1-unit/Units");
 const Tile_1 = require("@civ-clone/core-world/Tile");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
@@ -58,10 +67,10 @@ const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => 
         return false;
     }
     return city.player() === player;
-};
+}, MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
 class SimpleAIClient extends AIClient_1.default {
-    constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, leaderRegistry = LeaderRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance, engine = Engine_1.instance) {
-        super(player, leaderRegistry);
+    constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance, engine = Engine_1.instance, clientRegistry = ClientRegistry_1.instance, interactionRegistry = InteractionRegistry_1.instance, turn = Turn_1.instance) {
+        super(player);
         _SimpleAIClient_shouldBuildCity.set(this, (tile) => {
             const isEarth = __classPrivateFieldGet(this, _SimpleAIClient_engine, "f").option('earth', false), hasNoCities = __classPrivateFieldGet(this, _SimpleAIClient_cityRegistry, "f").getByPlayer(this.player()).length === 0;
             if (isEarth && hasNoCities) {
@@ -129,7 +138,9 @@ class SimpleAIClient extends AIClient_1.default {
         _SimpleAIClient_cityRegistry.set(this, void 0);
         _SimpleAIClient_cityBuildRegistry.set(this, void 0);
         _SimpleAIClient_cityGrowthRegistry.set(this, void 0);
+        _SimpleAIClient_clientRegistry.set(this, void 0);
         _SimpleAIClient_goodyHutRegistry.set(this, void 0);
+        _SimpleAIClient_interactionRegistry.set(this, void 0);
         _SimpleAIClient_pathFinderRegistry.set(this, void 0);
         _SimpleAIClient_playerGovernmentRegistry.set(this, void 0);
         _SimpleAIClient_playerResearchRegistry.set(this, void 0);
@@ -138,13 +149,16 @@ class SimpleAIClient extends AIClient_1.default {
         _SimpleAIClient_ruleRegistry.set(this, void 0);
         _SimpleAIClient_terrainFeatureRegistry.set(this, void 0);
         _SimpleAIClient_tileImprovementRegistry.set(this, void 0);
+        _SimpleAIClient_turn.set(this, void 0);
         _SimpleAIClient_unitImprovementRegistry.set(this, void 0);
         _SimpleAIClient_unitRegistry.set(this, void 0);
         _SimpleAIClient_engine.set(this, void 0);
         __classPrivateFieldSet(this, _SimpleAIClient_cityRegistry, cityRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_cityBuildRegistry, cityBuildRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_cityGrowthRegistry, cityGrowthRegistry, "f");
+        __classPrivateFieldSet(this, _SimpleAIClient_clientRegistry, clientRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_goodyHutRegistry, goodyHutRegistry, "f");
+        __classPrivateFieldSet(this, _SimpleAIClient_interactionRegistry, interactionRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_pathFinderRegistry, pathFinderRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_playerGovernmentRegistry, playerGovernmentRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_playerResearchRegistry, playerResearchRegistry, "f");
@@ -152,16 +166,20 @@ class SimpleAIClient extends AIClient_1.default {
         __classPrivateFieldSet(this, _SimpleAIClient_playerWorldRegistry, playerWorldRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_ruleRegistry, ruleRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_terrainFeatureRegistry, terrainFeatureRegistry, "f");
+        __classPrivateFieldSet(this, _SimpleAIClient_turn, turn, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_unitImprovementRegistry, unitImprovementRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_tileImprovementRegistry, tileImprovementRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_unitRegistry, unitRegistry, "f");
         __classPrivateFieldSet(this, _SimpleAIClient_engine, engine, "f");
     }
     scoreUnitMove(unit, tile) {
-        const actions = unit.actions(tile), { attack, buildIrrigation, buildMine, buildRoad, captureCity, disembark, embark, fortify, foundCity, noOrders, } = actions.reduce((object, entity) => ({
+        const actions = unit.actions(tile), { attack, buildIrrigation, buildMine, buildRoad, captureCity, disembark, embark, fortify, foundCity, noOrders, sneakAttack, } = actions.reduce((object, entity) => ({
             ...object,
             [entity.constructor.name.replace(/^./, (char) => char.toLowerCase())]: entity,
         }), {});
+        if (sneakAttack && !this.shouldAttack(sneakAttack)) {
+            return -10;
+        }
         if (!actions.length ||
             (actions.length === 1 && noOrders) ||
             (unit instanceof Types_1.Fortifiable &&
@@ -236,7 +254,7 @@ class SimpleAIClient extends AIClient_1.default {
         }
         return score;
     }
-    moveUnit(unit) {
+    async moveUnit(unit) {
         let loopCheck = 0;
         while (unit.active() && unit.moves().value() >= 0.1) {
             if (loopCheck++ > 1e3) {
@@ -244,7 +262,7 @@ class SimpleAIClient extends AIClient_1.default {
                 console.log(`${unit.player().civilization().name()} ${unit.constructor.name}`);
                 console.log(unit.actions());
                 console.log(unit.actionsForNeighbours());
-                unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit));
+                this.noOrders(unit);
                 return;
             }
             const path = __classPrivateFieldGet(this, _SimpleAIClient_unitPathData, "f").get(unit);
@@ -257,7 +275,8 @@ class SimpleAIClient extends AIClient_1.default {
                     if (path.length === 0) {
                         __classPrivateFieldGet(this, _SimpleAIClient_unitPathData, "f").delete(unit);
                     }
-                    return;
+                    await this.canNegotiate(unit);
+                    continue;
                 }
                 if (path.length > 0) {
                     const newPath = Path_1.default.for(unit, unit.tile(), path.end());
@@ -283,13 +302,16 @@ class SimpleAIClient extends AIClient_1.default {
                 .map(([tile]) => tile);
             if (!target) {
                 // TODO: could do something a bit more intelligent here
-                unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit));
+                this.noOrders(unit);
                 return;
             }
             const actions = unit.actions(target), [action] = actions, lastMoves = __classPrivateFieldGet(this, _SimpleAIClient_lastUnitMoves, "f").get(unit) || [], currentTarget = __classPrivateFieldGet(this, _SimpleAIClient_unitTargetData, "f").get(unit);
-            if (!action) {
+            if (!action ||
+                ((action instanceof Actions_1.SneakAttack ||
+                    action instanceof Actions_1.SneakCaptureCity) &&
+                    !this.shouldAttack(action))) {
                 // TODO: could do something a bit more intelligent here
-                unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit));
+                this.noOrders(unit);
                 return;
             }
             if (currentTarget === target) {
@@ -299,10 +321,11 @@ class SimpleAIClient extends AIClient_1.default {
             __classPrivateFieldGet(this, _SimpleAIClient_lastUnitMoves, "f").set(unit, lastMoves.slice(-50));
             unit.action(action);
         }
+        await this.canNegotiate(unit);
         // If we're here, we still have some moves left, lets clear them up.
         // TODO: This might not be necessary, just remove all checks for >= .1 moves left...
         if (unit.moves().value() > 0) {
-            unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit));
+            this.noOrders(unit);
         }
     }
     preProcessTurn() {
@@ -376,8 +399,27 @@ class SimpleAIClient extends AIClient_1.default {
             }
         });
     }
+    async chooseFromList(meta) {
+        if (meta.key() !== 'negotiation.next-step') {
+            return super.chooseFromList(meta);
+        }
+        const score = (item) => item instanceof OfferPeace_1.default
+            ? 20
+            : item instanceof Accept_1.default
+                ? 20
+                : item instanceof ExchangeKnowledge_1.default
+                    ? 10
+                    : 0;
+        const [topChoice] = meta.choices().sort((actionA, actionB) => {
+            return (
+            // TODO: This isn't `unknown`...
+            score(actionB.value()) -
+                score(actionA.value()));
+        });
+        return topChoice.value();
+    }
     takeTurn() {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             try {
                 let loopCheck = 0;
                 this.preProcessTurn();
@@ -406,7 +448,7 @@ class SimpleAIClient extends AIClient_1.default {
                             console.log(__classPrivateFieldGet(this, _SimpleAIClient_unitImprovementRegistry, "f").getByUnit(item));
                         }
                         // Do nothing, but shout about it
-                        item.action(new Actions_1.NoOrders(item.tile(), item.tile(), item));
+                        this.noOrders(item);
                         console.error("SimpleAIClient: Couldn't pick an action to do.");
                         break;
                     }
@@ -447,7 +489,7 @@ class SimpleAIClient extends AIClient_1.default {
                             else if (!target && __classPrivateFieldGet(this, _SimpleAIClient_goodSitesForCities, "f").length) {
                                 __classPrivateFieldGet(this, _SimpleAIClient_unitTargetData, "f").set(unit, __classPrivateFieldGet(this, _SimpleAIClient_goodSitesForCities, "f").shift());
                             }
-                            this.moveUnit(unit);
+                            await this.moveUnit(unit);
                             continue;
                         }
                         // TODO: check for defense values and activate weaker for disband/upgrade/scouting
@@ -529,7 +571,7 @@ class SimpleAIClient extends AIClient_1.default {
                                 }
                             }
                         }
-                        this.moveUnit(unit);
+                        await this.moveUnit(unit);
                         continue;
                     }
                     if (item instanceof CityBuild_1.default) {
@@ -652,8 +694,57 @@ class SimpleAIClient extends AIClient_1.default {
                 .buy(city);
         }
     }
+    async canNegotiate(unit) {
+        const surroundingPlayers = Array.from(new Set(unit
+            .tile()
+            .getNeighbours()
+            .flatMap((tile) => __classPrivateFieldGet(this, _SimpleAIClient_unitRegistry, "f")
+            .getByTile(tile)
+            .map((tileUnit) => tileUnit.player())
+            .filter((player) => player !== this.player()))));
+        if (surroundingPlayers.length === 0) {
+            return;
+        }
+        await surroundingPlayers
+            .filter((player) => __classPrivateFieldGet(this, _SimpleAIClient_interactionRegistry, "f")
+            .getByPlayer(player)
+            .filter((interaction) => interaction instanceof Negotiation_1.default &&
+            interaction.isBetween(player, this.player()))
+            .every((interaction) => __classPrivateFieldGet(this, _SimpleAIClient_turn, "f").value() - interaction.when() >
+            MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION))
+            .reduce((promise, player) => promise.then(() => this.handleNegotiation(player)), Promise.resolve());
+    }
+    async handleNegotiation(player) {
+        const negotiation = new Negotiation_1.default(this.player(), player, __classPrivateFieldGet(this, _SimpleAIClient_ruleRegistry, "f"));
+        negotiation.proceed(new Initiate_1.default(this.player(), negotiation, __classPrivateFieldGet(this, _SimpleAIClient_ruleRegistry, "f")));
+        while (!negotiation.terminated()) {
+            const lastInteraction = negotiation.lastInteraction(), players = lastInteraction !== null
+                ? lastInteraction.for()
+                : negotiation.players().slice(1);
+            await players.reduce(async (promise, player) => promise.then(async () => {
+                const client = __classPrivateFieldGet(this, _SimpleAIClient_clientRegistry, "f").getByPlayer(player);
+                const interaction = await client.chooseFromList(new ChoiceMeta_1.ChoiceMeta(negotiation.nextSteps(), 'negotiation.next-step', negotiation));
+                negotiation.proceed(interaction);
+                if (interaction instanceof Resolution_1.default) {
+                    interaction.proposal().resolve(interaction);
+                }
+            }), Promise.resolve());
+            if (negotiation.terminated()) {
+                break;
+            }
+        }
+        __classPrivateFieldGet(this, _SimpleAIClient_interactionRegistry, "f").register(negotiation);
+        return negotiation;
+    }
+    noOrders(unit) {
+        unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit, __classPrivateFieldGet(this, _SimpleAIClient_ruleRegistry, "f")));
+    }
+    shouldAttack(sneakAttack) {
+        // TODO: Score the value of starting a war with the `Player`.
+        return false;
+    }
 }
 exports.SimpleAIClient = SimpleAIClient;
-_SimpleAIClient_shouldBuildCity = new WeakMap(), _SimpleAIClient_shouldIrrigate = new WeakMap(), _SimpleAIClient_shouldMine = new WeakMap(), _SimpleAIClient_shouldRoad = new WeakMap(), _SimpleAIClient_lastUnitMoves = new WeakMap(), _SimpleAIClient_unitPathData = new WeakMap(), _SimpleAIClient_unitTargetData = new WeakMap(), _SimpleAIClient_citiesToLiberate = new WeakMap(), _SimpleAIClient_enemyCitiesToAttack = new WeakMap(), _SimpleAIClient_enemyUnitsToAttack = new WeakMap(), _SimpleAIClient_goodSitesForCities = new WeakMap(), _SimpleAIClient_landTilesToExplore = new WeakMap(), _SimpleAIClient_seaTilesToExplore = new WeakMap(), _SimpleAIClient_undefendedCities = new WeakMap(), _SimpleAIClient_cityRegistry = new WeakMap(), _SimpleAIClient_cityBuildRegistry = new WeakMap(), _SimpleAIClient_cityGrowthRegistry = new WeakMap(), _SimpleAIClient_goodyHutRegistry = new WeakMap(), _SimpleAIClient_pathFinderRegistry = new WeakMap(), _SimpleAIClient_playerGovernmentRegistry = new WeakMap(), _SimpleAIClient_playerResearchRegistry = new WeakMap(), _SimpleAIClient_playerTreasuryRegistry = new WeakMap(), _SimpleAIClient_playerWorldRegistry = new WeakMap(), _SimpleAIClient_ruleRegistry = new WeakMap(), _SimpleAIClient_terrainFeatureRegistry = new WeakMap(), _SimpleAIClient_tileImprovementRegistry = new WeakMap(), _SimpleAIClient_unitImprovementRegistry = new WeakMap(), _SimpleAIClient_unitRegistry = new WeakMap(), _SimpleAIClient_engine = new WeakMap();
+_SimpleAIClient_shouldBuildCity = new WeakMap(), _SimpleAIClient_shouldIrrigate = new WeakMap(), _SimpleAIClient_shouldMine = new WeakMap(), _SimpleAIClient_shouldRoad = new WeakMap(), _SimpleAIClient_lastUnitMoves = new WeakMap(), _SimpleAIClient_unitPathData = new WeakMap(), _SimpleAIClient_unitTargetData = new WeakMap(), _SimpleAIClient_citiesToLiberate = new WeakMap(), _SimpleAIClient_enemyCitiesToAttack = new WeakMap(), _SimpleAIClient_enemyUnitsToAttack = new WeakMap(), _SimpleAIClient_goodSitesForCities = new WeakMap(), _SimpleAIClient_landTilesToExplore = new WeakMap(), _SimpleAIClient_seaTilesToExplore = new WeakMap(), _SimpleAIClient_undefendedCities = new WeakMap(), _SimpleAIClient_cityRegistry = new WeakMap(), _SimpleAIClient_cityBuildRegistry = new WeakMap(), _SimpleAIClient_cityGrowthRegistry = new WeakMap(), _SimpleAIClient_clientRegistry = new WeakMap(), _SimpleAIClient_goodyHutRegistry = new WeakMap(), _SimpleAIClient_interactionRegistry = new WeakMap(), _SimpleAIClient_pathFinderRegistry = new WeakMap(), _SimpleAIClient_playerGovernmentRegistry = new WeakMap(), _SimpleAIClient_playerResearchRegistry = new WeakMap(), _SimpleAIClient_playerTreasuryRegistry = new WeakMap(), _SimpleAIClient_playerWorldRegistry = new WeakMap(), _SimpleAIClient_ruleRegistry = new WeakMap(), _SimpleAIClient_terrainFeatureRegistry = new WeakMap(), _SimpleAIClient_tileImprovementRegistry = new WeakMap(), _SimpleAIClient_turn = new WeakMap(), _SimpleAIClient_unitImprovementRegistry = new WeakMap(), _SimpleAIClient_unitRegistry = new WeakMap(), _SimpleAIClient_engine = new WeakMap();
 exports.default = SimpleAIClient;
 //# sourceMappingURL=SimpleAIClient.js.map

@@ -11,8 +11,14 @@ import {
   FoundCity,
   Move,
   NoOrders,
+  SneakAttack,
+  SneakCaptureCity,
   Unload,
 } from '@civ-clone/civ1-unit/Actions';
+import {
+  ChoiceMeta,
+  DataForChoiceMeta,
+} from '@civ-clone/core-client/ChoiceMeta';
 import {
   CityBuildRegistry,
   instance as cityBuildRegistryInstance,
@@ -25,6 +31,10 @@ import {
   CityRegistry,
   instance as cityRegistryInstance,
 } from '@civ-clone/core-city/CityRegistry';
+import {
+  ClientRegistry,
+  instance as clientRegistryInstance,
+} from '@civ-clone/core-client/ClientRegistry';
 import {
   Desert,
   Grassland,
@@ -50,11 +60,15 @@ import {
   GoodyHutRegistry,
   instance as goodyHutRegistryInstance,
 } from '@civ-clone/core-goody-hut/GoodyHutRegistry';
-import { Irrigation, Mine, Road } from '@civ-clone/civ1-world/TileImprovements';
 import {
-  LeaderRegistry,
-  instance as leaderRegistryInstance,
-} from '@civ-clone/core-civilization/LeaderRegistry';
+  Interaction,
+  IInteraction,
+} from '@civ-clone/core-diplomacy/Interaction';
+import {
+  InteractionRegistry,
+  instance as interactionRegistryInstance,
+} from '@civ-clone/core-diplomacy/InteractionRegistry';
+import { Irrigation, Mine, Road } from '@civ-clone/civ1-world/TileImprovements';
 import {
   PathFinderRegistry,
   instance as pathFinderRegistryInstance,
@@ -88,6 +102,10 @@ import {
   instance as tileImprovementRegistryInstance,
 } from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
 import {
+  Turn,
+  instance as turnInstance,
+} from '@civ-clone/core-turn-based-game/Turn';
+import {
   UnitImprovementRegistry,
   instance as unitImprovementRegistryInstance,
 } from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
@@ -95,6 +113,7 @@ import {
   UnitRegistry,
   instance as unitRegistryInstance,
 } from '@civ-clone/core-unit/UnitRegistry';
+import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
 import Action from '@civ-clone/core-unit/Action';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
@@ -103,16 +122,22 @@ import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
+import ExchangeKnowledge from '@civ-clone/library-diplomacy/Proposals/ExchangeKnowledge';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import Gold from '@civ-clone/base-city-yield-gold/Gold';
+import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
+import Initiate from '@civ-clone/core-diplomacy/Negotiation/Initiate';
 import { Monarchy as MonarchyAdvance } from '@civ-clone/civ1-science/Advances';
 import { Monarchy as MonarchyGovernment } from '@civ-clone/civ1-government/Governments';
+import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
+import OfferPeace from '@civ-clone/library-diplomacy/Proposals/OfferPeace';
 import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
+import Resolution from '@civ-clone/core-diplomacy/Proposal/Resolution';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import Terrain from '@civ-clone/core-terrain/Terrain';
 import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
@@ -123,6 +148,12 @@ import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
+
+declare global {
+  interface ChoiceMetaDataMap {
+    'negotiation.next-step': IAction;
+  }
+}
 
 type ActionLookup = {
   attack?: AttackAction;
@@ -135,22 +166,24 @@ type ActionLookup = {
   fortify?: Fortify;
   foundCity?: FoundCity;
   noOrders?: NoOrders;
+  sneakAttack?: SneakAttack;
   unload?: Unload;
 };
 
 const hasPlayerCity = (
-  tile: Tile,
-  player: Player,
-  cityRegistry: CityRegistry = cityRegistryInstance
-): boolean => {
-  const city = cityRegistry.getByTile(tile);
+    tile: Tile,
+    player: Player,
+    cityRegistry: CityRegistry = cityRegistryInstance
+  ): boolean => {
+    const city = cityRegistry.getByTile(tile);
 
-  if (city === null) {
-    return false;
-  }
+    if (city === null) {
+      return false;
+    }
 
-  return city.player() === player;
-};
+    return city.player() === player;
+  },
+  MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
 
 export class SimpleAIClient extends AIClient {
   #shouldBuildCity = (tile: Tile): boolean => {
@@ -270,7 +303,9 @@ export class SimpleAIClient extends AIClient {
   #cityRegistry: CityRegistry;
   #cityBuildRegistry: CityBuildRegistry;
   #cityGrowthRegistry: CityGrowthRegistry;
+  #clientRegistry: ClientRegistry;
   #goodyHutRegistry: GoodyHutRegistry;
+  #interactionRegistry: InteractionRegistry;
   #pathFinderRegistry: PathFinderRegistry;
   #playerGovernmentRegistry: PlayerGovernmentRegistry;
   #playerResearchRegistry: PlayerResearchRegistry;
@@ -279,6 +314,7 @@ export class SimpleAIClient extends AIClient {
   #ruleRegistry: RuleRegistry;
   #terrainFeatureRegistry: TerrainFeatureRegistry;
   #tileImprovementRegistry: TileImprovementRegistry;
+  #turn: Turn;
   #unitImprovementRegistry: UnitImprovementRegistry;
   #unitRegistry: UnitRegistry;
   #engine: Engine;
@@ -289,7 +325,6 @@ export class SimpleAIClient extends AIClient {
     cityBuildRegistry: CityBuildRegistry = cityBuildRegistryInstance,
     cityGrowthRegistry: CityGrowthRegistry = cityGrowthRegistryInstance,
     goodyHutRegistry: GoodyHutRegistry = goodyHutRegistryInstance,
-    leaderRegistry: LeaderRegistry = leaderRegistryInstance,
     pathFinderRegistry: PathFinderRegistry = pathFinderRegistryInstance,
     playerGovernmentRegistry: PlayerGovernmentRegistry = playerGovernmentRegistryInstance,
     playerResearchRegistry: PlayerResearchRegistry = playerResearchRegistryInstance,
@@ -300,14 +335,19 @@ export class SimpleAIClient extends AIClient {
     tileImprovementRegistry: TileImprovementRegistry = tileImprovementRegistryInstance,
     unitImprovementRegistry: UnitImprovementRegistry = unitImprovementRegistryInstance,
     unitRegistry: UnitRegistry = unitRegistryInstance,
-    engine: Engine = engineInstance
+    engine: Engine = engineInstance,
+    clientRegistry: ClientRegistry = clientRegistryInstance,
+    interactionRegistry: InteractionRegistry = interactionRegistryInstance,
+    turn: Turn = turnInstance
   ) {
-    super(player, leaderRegistry);
+    super(player);
 
     this.#cityRegistry = cityRegistry;
     this.#cityBuildRegistry = cityBuildRegistry;
     this.#cityGrowthRegistry = cityGrowthRegistry;
+    this.#clientRegistry = clientRegistry;
     this.#goodyHutRegistry = goodyHutRegistry;
+    this.#interactionRegistry = interactionRegistry;
     this.#pathFinderRegistry = pathFinderRegistry;
     this.#playerGovernmentRegistry = playerGovernmentRegistry;
     this.#playerResearchRegistry = playerResearchRegistry;
@@ -315,6 +355,7 @@ export class SimpleAIClient extends AIClient {
     this.#playerWorldRegistry = playerWorldRegistry;
     this.#ruleRegistry = ruleRegistry;
     this.#terrainFeatureRegistry = terrainFeatureRegistry;
+    this.#turn = turn;
     this.#unitImprovementRegistry = unitImprovementRegistry;
     this.#tileImprovementRegistry = tileImprovementRegistry;
     this.#unitRegistry = unitRegistry;
@@ -334,6 +375,7 @@ export class SimpleAIClient extends AIClient {
         fortify,
         foundCity,
         noOrders,
+        sneakAttack,
       } = actions.reduce(
         (object: ActionLookup, entity: Action): ActionLookup => ({
           ...object,
@@ -343,6 +385,10 @@ export class SimpleAIClient extends AIClient {
         }),
         {}
       );
+
+    if (sneakAttack && !this.shouldAttack(sneakAttack)) {
+      return -10;
+    }
 
     if (
       !actions.length ||
@@ -462,7 +508,7 @@ export class SimpleAIClient extends AIClient {
     return score;
   }
 
-  moveUnit(unit: Unit): void {
+  async moveUnit(unit: Unit): Promise<void> {
     let loopCheck = 0;
 
     while (unit.active() && unit.moves().value() >= 0.1) {
@@ -473,7 +519,7 @@ export class SimpleAIClient extends AIClient {
         );
         console.log(unit.actions());
         console.log(unit.actionsForNeighbours());
-        unit.action(new NoOrders(unit.tile(), unit.tile(), unit));
+        this.noOrders(unit);
 
         return;
       }
@@ -485,6 +531,7 @@ export class SimpleAIClient extends AIClient {
           [move] = unit
             .actions(target)
             .filter((action) => action instanceof Move);
+
         if (move) {
           unit.action(move);
 
@@ -492,7 +539,9 @@ export class SimpleAIClient extends AIClient {
             this.#unitPathData.delete(unit);
           }
 
-          return;
+          await this.canNegotiate(unit);
+
+          continue;
         }
 
         if (path.length > 0) {
@@ -527,7 +576,7 @@ export class SimpleAIClient extends AIClient {
 
       if (!target) {
         // TODO: could do something a bit more intelligent here
-        unit.action(new NoOrders(unit.tile(), unit.tile(), unit));
+        this.noOrders(unit);
 
         return;
       }
@@ -537,9 +586,14 @@ export class SimpleAIClient extends AIClient {
         lastMoves = this.#lastUnitMoves.get(unit) || [],
         currentTarget = this.#unitTargetData.get(unit);
 
-      if (!action) {
+      if (
+        !action ||
+        ((action instanceof SneakAttack ||
+          action instanceof SneakCaptureCity) &&
+          !this.shouldAttack(action))
+      ) {
         // TODO: could do something a bit more intelligent here
-        unit.action(new NoOrders(unit.tile(), unit.tile(), unit));
+        this.noOrders(unit);
 
         return;
       }
@@ -552,13 +606,15 @@ export class SimpleAIClient extends AIClient {
 
       this.#lastUnitMoves.set(unit, lastMoves.slice(-50));
 
-      unit.action(action);
+      unit.action(action as Action);
     }
+
+    await this.canNegotiate(unit);
 
     // If we're here, we still have some moves left, lets clear them up.
     // TODO: This might not be necessary, just remove all checks for >= .1 moves left...
     if (unit.moves().value() > 0) {
-      unit.action(new NoOrders(unit.tile(), unit.tile(), unit));
+      this.noOrders(unit);
     }
   }
 
@@ -664,9 +720,39 @@ export class SimpleAIClient extends AIClient {
       });
   }
 
+  async chooseFromList<Name extends keyof ChoiceMetaDataMap>(
+    meta: ChoiceMeta<Name>
+  ): Promise<DataForChoiceMeta<ChoiceMeta<Name>>> {
+    if (meta.key() !== 'negotiation.next-step') {
+      return super.chooseFromList(meta);
+    }
+
+    const score = (item: Interaction) =>
+      item instanceof OfferPeace
+        ? 20
+        : item instanceof Accept
+        ? 20
+        : item instanceof ExchangeKnowledge
+        ? 10
+        : 0;
+
+    const [topChoice] = meta.choices().sort((actionA, actionB) => {
+      return (
+        // TODO: This isn't `unknown`...
+        score(actionB.value() as unknown as Interaction) -
+        score(actionA.value() as unknown as Interaction)
+      );
+    });
+
+    return topChoice.value();
+  }
+
   takeTurn(): Promise<void> {
     return new Promise(
-      (resolve: () => void, reject: (error: Error) => any): void => {
+      async (
+        resolve: () => void,
+        reject: (error: Error) => any
+      ): Promise<void> => {
         try {
           let loopCheck = 0;
 
@@ -711,7 +797,7 @@ export class SimpleAIClient extends AIClient {
               }
 
               // Do nothing, but shout about it
-              item.action(new NoOrders(item.tile(), item.tile(), item));
+              this.noOrders(item);
 
               console.error("SimpleAIClient: Couldn't pick an action to do.");
 
@@ -785,7 +871,7 @@ export class SimpleAIClient extends AIClient {
                   );
                 }
 
-                this.moveUnit(unit);
+                await this.moveUnit(unit);
 
                 continue;
               }
@@ -976,7 +1062,7 @@ export class SimpleAIClient extends AIClient {
                 }
               }
 
-              this.moveUnit(unit as Unit);
+              await this.moveUnit(unit as Unit);
 
               continue;
             }
@@ -1196,6 +1282,108 @@ export class SimpleAIClient extends AIClient {
         .getByPlayerAndType(this.player(), Gold)
         .buy(city);
     }
+  }
+
+  private async canNegotiate(unit: Unit): Promise<void> {
+    const surroundingPlayers = Array.from(
+      new Set(
+        unit
+          .tile()
+          .getNeighbours()
+          .flatMap((tile) =>
+            this.#unitRegistry
+              .getByTile(tile)
+              .map((tileUnit) => tileUnit.player())
+              .filter((player) => player !== this.player())
+          )
+      )
+    );
+
+    if (surroundingPlayers.length === 0) {
+      return;
+    }
+
+    await surroundingPlayers
+      .filter((player) =>
+        this.#interactionRegistry
+          .getByPlayer(player)
+          .filter(
+            (interaction) =>
+              interaction instanceof Negotiation &&
+              interaction.isBetween(player, this.player())
+          )
+          .every(
+            (interaction) =>
+              this.#turn.value() - interaction.when() >
+              MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION
+          )
+      )
+      .reduce(
+        (promise, player): Promise<any> =>
+          promise.then(() => this.handleNegotiation(player)),
+        Promise.resolve()
+      );
+  }
+
+  private async handleNegotiation(player: Player): Promise<Negotiation> {
+    const negotiation = new Negotiation(
+      this.player(),
+      player,
+      this.#ruleRegistry
+    );
+
+    negotiation.proceed(
+      new Initiate(this.player(), negotiation, this.#ruleRegistry) as IAction
+    );
+
+    while (!negotiation.terminated()) {
+      const lastInteraction = negotiation.lastInteraction(),
+        players =
+          lastInteraction !== null
+            ? lastInteraction.for()
+            : negotiation.players().slice(1);
+
+      await players.reduce(
+        async (promise, player) =>
+          promise.then(async () => {
+            const client = this.#clientRegistry.getByPlayer(player);
+
+            const interaction = await client.chooseFromList(
+              new ChoiceMeta(
+                negotiation.nextSteps(),
+                'negotiation.next-step',
+                negotiation
+              )
+            );
+
+            negotiation.proceed(interaction);
+
+            if (interaction instanceof Resolution) {
+              interaction.proposal().resolve(interaction);
+            }
+          }),
+        Promise.resolve()
+      );
+
+      if (negotiation.terminated()) {
+        break;
+      }
+    }
+
+    this.#interactionRegistry.register(negotiation as IInteraction);
+
+    return negotiation;
+  }
+
+  private noOrders(unit: Unit) {
+    unit.action(
+      new NoOrders(unit.tile(), unit.tile(), unit, this.#ruleRegistry)
+    );
+  }
+
+  private shouldAttack(sneakAttack: SneakAttack | SneakCaptureCity) {
+    // TODO: Score the value of starting a war with the `Player`.
+    return false;
   }
 }
 

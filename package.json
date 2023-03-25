@@ -51,6 +51,7 @@
     "@civ-clone/core-city-growth": "^0.1.0",
     "@civ-clone/core-city-improvement": "^0.1.0",
     "@civ-clone/core-client": "^0.1.0",
+    "@civ-clone/core-diplomacy": "^0.1.0",
     "@civ-clone/core-engine": "^0.1.0",
     "@civ-clone/core-goody-hut": "^0.1.0",
     "@civ-clone/core-government": "^0.1.0",
@@ -67,6 +68,8 @@
     "@civ-clone/core-wonder": "^0.1.0",
     "@civ-clone/core-world": "^0.1.0",
     "@civ-clone/core-world-path": "^0.1.0",
-    "@civ-clone/core-yield": "^0.1.0"
+    "@civ-clone/core-yield": "^0.1.0",
+    "@civ-clone/library-diplomacy": "^0.1.0",
+    "@civ-clone/library-unit": "^0.1.0"
   }
 }
