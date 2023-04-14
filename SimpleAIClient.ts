@@ -170,6 +170,11 @@ type ActionLookup = {
   unload?: Unload;
 };
 
+const awaitTimeout = (delay: number, reason?: any) =>
+  new Promise<void>((resolve, reject) =>
+    setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay)
+  );
+
 const hasPlayerCity = (
     tile: Tile,
     player: Player,
@@ -186,6 +191,10 @@ const hasPlayerCity = (
   MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
 
 export class SimpleAIClient extends AIClient {
+  #isACityTile = (tile: Tile) =>
+    this.#cityRegistry
+      .getByPlayer(this.player())
+      .some((city) => city.tiles().includes(tile));
   #shouldBuildCity = (tile: Tile): boolean => {
     const isEarth = this.#engine.option('earth', false),
       hasNoCities = this.#cityRegistry.getByPlayer(this.player()).length === 0;
@@ -233,11 +242,7 @@ export class SimpleAIClient extends AIClient {
           (improvement: TileImprovement): boolean =>
             improvement instanceof Irrigation
         ) &&
-      tile
-        .getSurroundingArea()
-        .some((tile: Tile): boolean =>
-          hasPlayerCity(tile, this.player(), this.#cityRegistry)
-        ) &&
+      this.#isACityTile(tile) &&
       [...tile.getAdjacent(), tile].some(
         (tile: Tile): boolean =>
           tile.terrain() instanceof River ||
@@ -264,11 +269,7 @@ export class SimpleAIClient extends AIClient {
         .some(
           (improvement: TileImprovement): boolean => improvement instanceof Mine
         ) &&
-      tile
-        .getSurroundingArea()
-        .some((tile: Tile): boolean =>
-          hasPlayerCity(tile, this.player(), this.#cityRegistry)
-        )
+      this.#isACityTile(tile)
     );
   };
 
@@ -278,12 +279,7 @@ export class SimpleAIClient extends AIClient {
         .getByTile(tile)
         .some(
           (improvement: TileImprovement): boolean => improvement instanceof Road
-        ) &&
-      tile
-        .getSurroundingArea()
-        .some((tile: Tile): boolean =>
-          hasPlayerCity(tile, this.player(), this.#cityRegistry)
-        )
+        ) && this.#isACityTile(tile)
     );
   };
 
@@ -728,11 +724,11 @@ export class SimpleAIClient extends AIClient {
     }
 
     const score = (item: Interaction) =>
-      item instanceof OfferPeace
+      item instanceof ExchangeKnowledge
+        ? 30
+        : item instanceof OfferPeace
         ? 20
         : item instanceof Accept
-        ? 20
-        : item instanceof ExchangeKnowledge
         ? 10
         : 0;
 
@@ -1345,23 +1341,46 @@ export class SimpleAIClient extends AIClient {
 
       await players.reduce(
         async (promise, player) =>
-          promise.then(async () => {
-            const client = this.#clientRegistry.getByPlayer(player);
+          promise
+            .then(async () => {
+              const client = this.#clientRegistry.getByPlayer(player),
+                nextSteps = negotiation.nextSteps(),
+                resultPromise = Promise.race([
+                  client.chooseFromList(
+                    new ChoiceMeta(
+                      nextSteps,
+                      'negotiation.next-step',
+                      negotiation
+                    )
+                  ),
+                  client instanceof AIClient
+                    ? awaitTimeout(
+                        500,
+                        new Error(
+                          `Timeout waiting for ${client.player().id()} (${
+                            client.player().civilization().sourceClass().name
+                          }) - sent ${nextSteps.length} options`
+                        )
+                      )
+                    : new Promise<void>(() => {}),
+                ]);
 
-            const interaction = await client.chooseFromList(
-              new ChoiceMeta(
-                negotiation.nextSteps(),
-                'negotiation.next-step',
-                negotiation
-              )
-            );
+              const interaction = await resultPromise;
 
-            negotiation.proceed(interaction);
+              if (!interaction) {
+                return;
+              }
 
-            if (interaction instanceof Resolution) {
-              interaction.proposal().resolve(interaction);
-            }
-          }),
+              negotiation.proceed(interaction);
+
+              if (interaction instanceof Resolution) {
+                await interaction.proposal().resolve(interaction);
+              }
+
+              // Sleep for a bit to ensure any other async actions have taken place
+              await awaitTimeout(20);
+            })
+            .catch((reason) => console.error(reason)),
         Promise.resolve()
       );
 
