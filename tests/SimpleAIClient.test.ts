@@ -120,9 +120,15 @@ import {
   Trireme,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
+import {
+  Luxuries as LuxuriesTradeRate,
+  Research as ResearchTradeRate,
+  Tax as TaxTradeRate,
+} from '@civ-clone/civ1-trade-rate/TradeRates';
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
 import AvailableCityBuildItemsRegistry from '@civ-clone/core-city-build/AvailableCityBuildItemsRegistry';
 import AvailableGovernmentRegistry from '@civ-clone/core-government/AvailableGovernmentRegistry';
+import AvailableTradeRateRegistry from '@civ-clone/core-trade-rate/AvailableTradeRateRegistry';
 import BasePathFinder from '@civ-clone/simple-world-path/BasePathFinder';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
@@ -144,6 +150,7 @@ import PlayerGovernmentRegistry from '@civ-clone/core-government/PlayerGovernmen
 import PlayerRegistry from '@civ-clone/core-player/PlayerRegistry';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerResearchRegistry from '@civ-clone/core-science/PlayerResearchRegistry';
+import PlayerTradeRatesRegistry from '@civ-clone/core-trade-rate/PlayerTradeRatesRegistry';
 import PlayerTreasuryRegistry from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import PlayerWorldRegistry from '@civ-clone/core-player-world/PlayerWorldRegistry';
@@ -171,12 +178,22 @@ import cityFoodStorage from '@civ-clone/civ1-city/Rules/City/food-storage';
 import cityGrow from '@civ-clone/civ1-city/Rules/City/grow';
 import cityGrowthCost from '@civ-clone/civ1-city/Rules/City/growth-cost';
 import cityProcessYield from '@civ-clone/civ1-city/Rules/City/process-yield';
+import cityProcessResearchYield from '@civ-clone/civ1-science/Rules/City/process-yield';
 import cityTiles from '@civ-clone/civ1-city/Rules/City/tiles';
+import cityTradeRateYield from '@civ-clone/civ1-trade-rate/Rules/City/yield';
+import cityProcessYieldTreasury from '@civ-clone/civ1-treasury/Rules/City/process-yield';
+import citySpend from '@civ-clone/civ1-treasury/Rules/City/spend';
 import cityYield from '@civ-clone/civ1-city/Rules/City/yield';
 import { expect } from 'chai';
 import playerAction from '@civ-clone/civ1-unit/Rules/Player/action';
 import playerActionCity from '@civ-clone/civ1-city/Rules/Player/action';
 import playerActionResearch from '@civ-clone/civ1-science/Rules/Player/action';
+import playerActionTreasury from '@civ-clone/civ1-treasury/Rules/Player/action';
+import playerAdded from '@civ-clone/civ1-trade-rate/Rules/Player/added';
+import playerAddedTreasury from '@civ-clone/civ1-treasury/Rules/Player/added';
+import playerTradeRateAction from '@civ-clone/civ1-trade-rate/Rules/Player/action';
+import playerTradeRateTurnStart from '@civ-clone/civ1-trade-rate/Rules/Player/turn-start';
+import playerTreasuryUpdated from '@civ-clone/civ1-treasury/Rules/Player/treasury-updated';
 import playerTurnStart from '@civ-clone/civ1-player/Rules/Player/turn-start';
 import registerCivilizations from '@civ-clone/civ1-civilization/registerCivilizations';
 import researchComplete from '@civ-clone/civ1-science/Rules/Research/complete';
@@ -201,6 +218,7 @@ describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
     availableBuildItemsRegistry = new AvailableCityBuildItemsRegistry(),
     availableGovernmentRegistry = new AvailableGovernmentRegistry(),
+    availableTradeRateRegistry = new AvailableTradeRateRegistry(),
     cityBuildRegistry = new CityBuildRegistry(),
     cityGrowthRegistry = new CityGrowthRegistry(),
     cityImprovementRegistry = new CityImprovementRegistry(),
@@ -212,6 +230,7 @@ describe('SimpleAIClient', (): void => {
     playerGovernmentRegistry = new PlayerGovernmentRegistry(),
     playerRegistry = new PlayerRegistry(),
     playerResearchRegistry = new PlayerResearchRegistry(),
+    playerTradeRatesRegistry = new PlayerTradeRatesRegistry(),
     playerTreasuryRegistry = new PlayerTreasuryRegistry(),
     playerWorldRegistry = new PlayerWorldRegistry(),
     ruleRegistry = new RuleRegistry(),
@@ -290,86 +309,6 @@ describe('SimpleAIClient', (): void => {
           return client;
         })
       );
-
-  ruleRegistry.register(
-    ...cityBuild(cityImprovementRegistry, playerResearchRegistry),
-    ...cityBuildCost(),
-    ...cityBuildUnit(playerResearchRegistry),
-    ...cityBuildCostUnit(),
-    ...cityCaptured(
-      cityRegistry,
-      unitRegistry,
-      cityGrowthRegistry,
-      cityBuildRegistry,
-      undefined,
-      playerWorldRegistry,
-      workedTileRegistry
-    ),
-    ...cityCost(cityGrowthRegistry, playerGovernmentRegistry, unitRegistry),
-    ...cityCreated(
-      tileImprovementRegistry,
-      cityBuildRegistry,
-      cityGrowthRegistry,
-      cityRegistry,
-      playerWorldRegistry,
-      ruleRegistry,
-      availableBuildItemsRegistry,
-      undefined,
-      workedTileRegistry
-    ),
-    ...cityFoodStorage(ruleRegistry),
-    ...cityGrow(cityGrowthRegistry, playerWorldRegistry, workedTileRegistry),
-    ...cityGrowthCost(),
-    ...cityProcessYield(
-      cityBuildRegistry,
-      cityGrowthRegistry,
-      unitRegistry,
-      ruleRegistry
-    ),
-    ...cityTiles(),
-    ...cityYield(cityImprovementRegistry, playerGovernmentRegistry),
-    ...playerAction(unitRegistry),
-    ...playerActionCity(cityBuildRegistry, cityRegistry),
-    ...playerActionResearch(playerResearchRegistry),
-    ...playerTurnStart(ruleRegistry, cityRegistry, unitRegistry),
-    ...researchComplete(),
-    ...researchCost(),
-    ...researchRequirements(),
-    ...tileCanBeWorked(cityRegistry, unitRegistry, workedTileRegistry),
-    ...tileYield(
-      tileImprovementRegistry,
-      terrainFeatureRegistry,
-      playerGovernmentRegistry
-    ),
-    ...turnYear(),
-    ...unitAction(
-      cityNameRegistry,
-      cityRegistry,
-      ruleRegistry,
-      tileImprovementRegistry,
-      unitImprovementRegistry,
-      unitRegistry,
-      terrainFeatureRegistry,
-      transportRegistry,
-      turn,
-      undefined,
-      workedTileRegistry
-    ),
-    ...unitActivate(unitImprovementRegistry),
-    ...unitCreated(unitRegistry),
-    ...unitDestroyed(unitRegistry, unitImprovementRegistry),
-    ...unitMoved(
-      transportRegistry,
-      ruleRegistry,
-      undefined,
-      undefined,
-      cityRegistry
-    ),
-    ...unitMovementCost(tileImprovementRegistry, transportRegistry),
-    ...unitValidateMove(),
-    ...unitVisibility(playerWorldRegistry),
-    ...unitYield(unitImprovementRegistry, ruleRegistry)
-  );
 
   advanceRegistry.register(
     AdvancedFlight,
@@ -497,7 +436,111 @@ describe('SimpleAIClient', (): void => {
     ] as IBuildable[])
   );
 
+  availableTradeRateRegistry.register(
+    LuxuriesTradeRate,
+    ResearchTradeRate,
+    TaxTradeRate
+  );
+
   registerCivilizations(civilizationRegistry);
+
+  ruleRegistry.register(
+    ...cityBuild(cityImprovementRegistry, playerResearchRegistry),
+    ...cityBuildCost(),
+    ...cityBuildUnit(playerResearchRegistry),
+    ...cityBuildCostUnit(),
+    ...cityCaptured(
+      cityRegistry,
+      unitRegistry,
+      cityGrowthRegistry,
+      cityBuildRegistry,
+      undefined,
+      playerWorldRegistry,
+      workedTileRegistry
+    ),
+    ...cityCost(cityGrowthRegistry, playerGovernmentRegistry, unitRegistry),
+    ...cityCreated(
+      tileImprovementRegistry,
+      cityBuildRegistry,
+      cityGrowthRegistry,
+      cityRegistry,
+      playerWorldRegistry,
+      ruleRegistry,
+      availableBuildItemsRegistry,
+      undefined,
+      workedTileRegistry
+    ),
+    ...cityFoodStorage(ruleRegistry),
+    ...cityGrow(cityGrowthRegistry, playerWorldRegistry, workedTileRegistry),
+    ...cityGrowthCost(),
+    ...cityProcessYieldTreasury(
+      playerTreasuryRegistry,
+      ruleRegistry,
+      cityImprovementRegistry
+    ),
+    ...cityProcessResearchYield(playerResearchRegistry, ruleRegistry),
+    ...cityProcessYield(
+      cityBuildRegistry,
+      cityGrowthRegistry,
+      unitRegistry,
+      ruleRegistry
+    ),
+    ...citySpend(),
+    ...cityTiles(),
+    ...cityTradeRateYield(availableTradeRateRegistry, playerTradeRatesRegistry),
+    ...cityYield(cityImprovementRegistry, playerGovernmentRegistry),
+    ...playerAction(unitRegistry),
+    ...playerActionCity(cityBuildRegistry, cityRegistry),
+    ...playerActionResearch(playerResearchRegistry),
+    ...playerActionTreasury(cityRegistry, cityBuildRegistry),
+    ...playerAdded(availableTradeRateRegistry, playerTradeRatesRegistry),
+    ...playerAddedTreasury(playerTreasuryRegistry),
+    ...playerTradeRateAction(playerTradeRatesRegistry),
+    ...playerTradeRateTurnStart(
+      ruleRegistry,
+      cityRegistry,
+      availableTradeRateRegistry
+    ),
+    ...playerTreasuryUpdated(),
+    ...playerTurnStart(ruleRegistry, cityRegistry, unitRegistry),
+    ...researchComplete(),
+    ...researchCost(),
+    ...researchRequirements(),
+    ...tileCanBeWorked(cityRegistry, unitRegistry, workedTileRegistry),
+    ...tileYield(
+      tileImprovementRegistry,
+      terrainFeatureRegistry,
+      playerGovernmentRegistry
+    ),
+    ...turnYear(),
+    ...unitAction(
+      cityNameRegistry,
+      cityRegistry,
+      ruleRegistry,
+      tileImprovementRegistry,
+      unitImprovementRegistry,
+      unitRegistry,
+      terrainFeatureRegistry,
+      transportRegistry,
+      turn,
+      undefined,
+      workedTileRegistry
+    ),
+    ...unitActivate(unitImprovementRegistry),
+    ...unitCreated(unitRegistry),
+    ...unitDestroyed(unitRegistry, unitImprovementRegistry),
+    ...unitMoved(
+      transportRegistry,
+      ruleRegistry,
+      undefined,
+      undefined,
+      cityRegistry
+    ),
+    ...unitMovementCost(tileImprovementRegistry, transportRegistry),
+    ...unitValidateMove(),
+    ...unitVisibility(playerWorldRegistry),
+    ...unitYield(unitImprovementRegistry, ruleRegistry)
+  );
 
   pathFinderRegistry.register(BasePathFinder);
 
