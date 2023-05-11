@@ -52,7 +52,8 @@ export declare class SimpleAIClient extends AIClient {
     engine?: Engine,
     clientRegistry?: ClientRegistry,
     interactionRegistry?: InteractionRegistry,
-    turn?: Turn
+    turn?: Turn,
+    randomNumberGenerator?: () => number
   );
   scoreUnitMove(unit: Unit, tile: Tile): number;
   moveUnit(unit: Unit): Promise<void>;

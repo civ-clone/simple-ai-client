@@ -148,6 +148,7 @@ import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
+import Decline from '@civ-clone/core-diplomacy/Proposal/Decline';
 
 declare global {
   interface ChoiceMetaDataMap {
@@ -314,6 +315,7 @@ export class SimpleAIClient extends AIClient {
   #unitImprovementRegistry: UnitImprovementRegistry;
   #unitRegistry: UnitRegistry;
   #engine: Engine;
+  #randomNumberGenerator: () => number;
 
   constructor(
     player: Player,
@@ -334,7 +336,8 @@ export class SimpleAIClient extends AIClient {
     engine: Engine = engineInstance,
     clientRegistry: ClientRegistry = clientRegistryInstance,
     interactionRegistry: InteractionRegistry = interactionRegistryInstance,
-    turn: Turn = turnInstance
+    turn: Turn = turnInstance,
+    randomNumberGenerator: () => number = () => Math.random()
   ) {
     super(player);
 
@@ -356,6 +359,7 @@ export class SimpleAIClient extends AIClient {
     this.#tileImprovementRegistry = tileImprovementRegistry;
     this.#unitRegistry = unitRegistry;
     this.#engine = engine;
+    this.#randomNumberGenerator = randomNumberGenerator;
   }
 
   scoreUnitMove(unit: Unit, tile: Tile): number {
@@ -382,7 +386,7 @@ export class SimpleAIClient extends AIClient {
         {}
       );
 
-    if (sneakAttack && !this.shouldAttack(sneakAttack)) {
+    if (sneakAttack && !this.shouldAttack(sneakAttack.enemy())) {
       return -10;
     }
 
@@ -528,8 +532,17 @@ export class SimpleAIClient extends AIClient {
             .actions(target)
             .filter((action) => action instanceof Move);
 
+        if (
+          move instanceof SneakCaptureCity &&
+          !this.shouldAttack(move.enemy())
+        ) {
+          this.#unitPathData.delete(unit);
+
+          continue;
+        }
+
         if (move) {
-          unit.action(move);
+          unit.action(move as Action);
 
           if (path.length === 0) {
             this.#unitPathData.delete(unit);
@@ -541,14 +554,8 @@ export class SimpleAIClient extends AIClient {
         }
 
         if (path.length > 0) {
-          const newPath = Path.for(unit, unit.tile(), path.end());
-
-          if (newPath) {
-            this.#unitPathData.set(unit, newPath);
-
-            // restart the loop
-            continue;
-          }
+          // restart the loop
+          continue;
         }
 
         this.#unitPathData.delete(unit);
@@ -566,7 +573,7 @@ export class SimpleAIClient extends AIClient {
           ([, a]: [Tile, number], [, b]: [Tile, number]): number =>
             b - a ||
             // if there's no difference, sort randomly
-            Math.floor(Math.random() * 3) - 1
+            Math.floor(this.#randomNumberGenerator() * 3) - 1
         )
         .map(([tile]: [Tile, number]): Tile => tile);
 
@@ -586,7 +593,7 @@ export class SimpleAIClient extends AIClient {
         !action ||
         ((action instanceof SneakAttack ||
           action instanceof SneakCaptureCity) &&
-          !this.shouldAttack(action))
+          !this.shouldAttack(action.enemy()))
       ) {
         // TODO: could do something a bit more intelligent here
         this.noOrders(unit);
@@ -723,14 +730,23 @@ export class SimpleAIClient extends AIClient {
       return super.chooseFromList(meta);
     }
 
-    const score = (item: Interaction) =>
-      item instanceof ExchangeKnowledge
+    const score = (item: Interaction) => {
+      const aggressive = this.shouldAttack(
+        item.players().filter((player) => player !== this.player())[0]
+      );
+
+      if (aggressive) {
+        return item instanceof Decline ? 10 : -1;
+      }
+
+      return item instanceof ExchangeKnowledge
         ? 30
         : item instanceof OfferPeace
         ? 20
         : item instanceof Accept
         ? 10
         : 0;
+    };
 
     const [topChoice] = meta.choices().sort((actionA, actionB) => {
       return (
@@ -1074,7 +1090,9 @@ export class SimpleAIClient extends AIClient {
 
               if (available.length) {
                 item.research(
-                  available[Math.floor(available.length * Math.random())]
+                  available[
+                    Math.floor(available.length * this.#randomNumberGenerator())
+                  ]
                 );
               }
 
@@ -1131,7 +1149,7 @@ export class SimpleAIClient extends AIClient {
       ),
       randomSelection =
         availableFiltered[
-          Math.floor(availableFiltered.length * Math.random())
+          Math.floor(availableFiltered.length * this.#randomNumberGenerator())
         ].item(),
       getUnitByYield = (YieldType: typeof Yield) => {
         const [[UnitType]] = availableUnits
@@ -1224,7 +1242,9 @@ export class SimpleAIClient extends AIClient {
     ) {
       const wonders = availableWonders.map((cityBuild) => cityBuild.item());
 
-      cityBuild.build(wonders[Math.floor(Math.random() * wonders.length)]);
+      cityBuild.build(
+        wonders[Math.floor(this.#randomNumberGenerator() * wonders.length)]
+      );
     }
 
     if (randomSelection) {
@@ -1400,9 +1420,27 @@ export class SimpleAIClient extends AIClient {
     );
   }
 
-  private shouldAttack(sneakAttack: SneakAttack | SneakCaptureCity) {
-    // TODO: Score the value of starting a war with the `Player`.
-    return false;
+  private shouldAttack(player: Player) {
+    // TODO: These scores should be cached, at lest for the duration of the Turn...
+    const ourPower = this.#unitRegistry
+        .getByPlayer(this.player())
+        .reduce(
+          (score, unit) =>
+            score + unit.attack().value() + unit.defence().value(),
+          0
+        ),
+      enemyPower = this.#unitRegistry
+        .getByPlayer(player)
+        .reduce(
+          (score, unit) =>
+            score + unit.attack().value() + unit.defence().value(),
+          0
+        ),
+      // TODO: use Traits
+      // confidence = this.player().civilization().leader()!.traits().some((trait) => trait instanceof Militaristic) ? 1.25 : 0.9;
+      confidence = 1;
+
+    return ourPower * confidence >= enemyPower;
   }
 }
 
