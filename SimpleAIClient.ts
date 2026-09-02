@@ -192,19 +192,19 @@ const hasPlayerCity = (
   MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
 
 export class SimpleAIClient extends AIClient {
-  #isACityTile = (tile: Tile) =>
-    this.#cityRegistry
+  private _isACityTile = (tile: Tile) =>
+    this._cityRegistry
       .getByPlayer(this.player())
       .some((city) => city.tiles().includes(tile));
-  #shouldBuildCity = (tile: Tile): boolean => {
-    const isEarth = this.#engine.option('earth', false),
-      hasNoCities = this.#cityRegistry.getByPlayer(this.player()).length === 0;
+  private _shouldBuildCity = (tile: Tile): boolean => {
+    const isEarth = this._engine.option('earth', false),
+      hasNoCities = this._cityRegistry.getByPlayer(this.player()).length === 0;
 
     if (isEarth && hasNoCities) {
       return true;
     }
 
-    const terrainFeatures = this.#terrainFeatureRegistry.getByTerrain(
+    const terrainFeatures = this._terrainFeatureRegistry.getByTerrain(
       tile.terrain()
     );
 
@@ -226,96 +226,95 @@ export class SimpleAIClient extends AIClient {
       !tile
         .getSurroundingArea(4)
         .filter(
-          (tile: Tile): boolean => this.#cityRegistry.getByTile(tile) !== null
+          (tile: Tile): boolean => this._cityRegistry.getByTile(tile) !== null
         ).length
     );
   };
 
-  #shouldIrrigate = (tile: Tile): boolean => {
+  private _shouldIrrigate = (tile: Tile): boolean => {
     return (
       [Desert, Plains, Grassland, River].some(
         (TerrainType) => tile.terrain() instanceof TerrainType
       ) &&
       // TODO: doing this a lot already, need to make improvements a value object with a helper method
-      !this.#tileImprovementRegistry
+      !this._tileImprovementRegistry
         .getByTile(tile)
         .some(
           (improvement: TileImprovement): boolean =>
             improvement instanceof Irrigation
         ) &&
-      this.#isACityTile(tile) &&
+      this._isACityTile(tile) &&
       [...tile.getAdjacent(), tile].some(
         (tile: Tile): boolean =>
           tile.terrain() instanceof River ||
           tile.isCoast() ||
-          (this.#tileImprovementRegistry
+          (this._tileImprovementRegistry
             .getByTile(tile)
             .some(
               (improvement: TileImprovement): boolean =>
                 improvement instanceof Irrigation
             ) &&
-            this.#cityRegistry.getByTile(tile) === null)
+            this._cityRegistry.getByTile(tile) === null)
       )
     );
   };
 
-  #shouldMine = (tile: Tile): boolean => {
+  private _shouldMine = (tile: Tile): boolean => {
     return (
       [Hills, Mountains].some(
         (TerrainType: typeof Terrain): boolean =>
           tile.terrain() instanceof TerrainType
       ) &&
-      !this.#tileImprovementRegistry
+      !this._tileImprovementRegistry
         .getByTile(tile)
         .some(
           (improvement: TileImprovement): boolean => improvement instanceof Mine
         ) &&
-      this.#isACityTile(tile)
+      this._isACityTile(tile)
     );
   };
 
-  #shouldRoad = (tile: Tile): boolean => {
+  private _shouldRoad = (tile: Tile): boolean => {
     return (
-      !this.#tileImprovementRegistry
+      !this._tileImprovementRegistry
         .getByTile(tile)
         .some(
           (improvement: TileImprovement): boolean => improvement instanceof Road
-        ) && this.#isACityTile(tile)
+        ) && this._isACityTile(tile)
     );
   };
 
-  #lastUnitMoves: Map<Unit, Tile[]> = new Map();
-  #unitPathData: Map<Unit, Path> = new Map();
-  #unitTargetData: Map<Unit, Tile> = new Map();
+  private _lastUnitMoves: Map<Unit, Tile[]> = new Map();
+  private _unitPathData: Map<Unit, Path> = new Map();
+  private _unitTargetData: Map<Unit, Tile> = new Map();
 
   // TODO: could be `City`/`Unit`s?
-  #citiesToLiberate: Tile[] = [];
-  #enemyCitiesToAttack: Tile[] = [];
-  #enemyUnitsToAttack: Tile[] = [];
-  #goodSitesForCities: Tile[] = [];
-  #landTilesToExplore: Tile[] = [];
-  #seaTilesToExplore: Tile[] = [];
-  #undefendedCities: Tile[] = [];
+  private _citiesToLiberate: Tile[] = [];
+  private _enemyCitiesToAttack: Tile[] = [];
+  private _enemyUnitsToAttack: Tile[] = [];
+  private _goodSitesForCities: Tile[] = [];
+  private _landTilesToExplore: Tile[] = [];
+  private _seaTilesToExplore: Tile[] = [];
+  private _undefendedCities: Tile[] = [];
 
-  #cityRegistry: CityRegistry;
-  #cityBuildRegistry: CityBuildRegistry;
-  #cityGrowthRegistry: CityGrowthRegistry;
-  #clientRegistry: ClientRegistry;
-  #goodyHutRegistry: GoodyHutRegistry;
-  #interactionRegistry: InteractionRegistry;
-  #pathFinderRegistry: PathFinderRegistry;
-  #playerGovernmentRegistry: PlayerGovernmentRegistry;
-  #playerResearchRegistry: PlayerResearchRegistry;
-  #playerTreasuryRegistry: PlayerTreasuryRegistry;
-  #playerWorldRegistry: PlayerWorldRegistry;
-  #ruleRegistry: RuleRegistry;
-  #terrainFeatureRegistry: TerrainFeatureRegistry;
-  #tileImprovementRegistry: TileImprovementRegistry;
-  #turn: Turn;
-  #unitImprovementRegistry: UnitImprovementRegistry;
-  #unitRegistry: UnitRegistry;
-  #engine: Engine;
-  #randomNumberGenerator: () => number;
+  private _cityRegistry: CityRegistry;
+  private _cityBuildRegistry: CityBuildRegistry;
+  private _cityGrowthRegistry: CityGrowthRegistry;
+  private _clientRegistry: ClientRegistry;
+  private _goodyHutRegistry: GoodyHutRegistry;
+  private _interactionRegistry: InteractionRegistry;
+  private _pathFinderRegistry: PathFinderRegistry;
+  private _playerGovernmentRegistry: PlayerGovernmentRegistry;
+  private _playerResearchRegistry: PlayerResearchRegistry;
+  private _playerTreasuryRegistry: PlayerTreasuryRegistry;
+  private _playerWorldRegistry: PlayerWorldRegistry;
+  private _ruleRegistry: RuleRegistry;
+  private _terrainFeatureRegistry: TerrainFeatureRegistry;
+  private _tileImprovementRegistry: TileImprovementRegistry;
+  private _turn: Turn;
+  private _unitImprovementRegistry: UnitImprovementRegistry;
+  private _unitRegistry: UnitRegistry;
+  private _engine: Engine;
 
   constructor(
     player: Player,
@@ -339,27 +338,30 @@ export class SimpleAIClient extends AIClient {
     turn: Turn = turnInstance,
     randomNumberGenerator: () => number = () => Math.random()
   ) {
-    super(player);
+    // The generator goes to `core-client`'s `Client`, which holds the one
+    // `protected _randomNumberGenerator`. This class declared a second
+    // `#randomNumberGenerator` shadowing it, which two `private` fields of the
+    // same name cannot express.
+    super(player, randomNumberGenerator);
 
-    this.#cityRegistry = cityRegistry;
-    this.#cityBuildRegistry = cityBuildRegistry;
-    this.#cityGrowthRegistry = cityGrowthRegistry;
-    this.#clientRegistry = clientRegistry;
-    this.#goodyHutRegistry = goodyHutRegistry;
-    this.#interactionRegistry = interactionRegistry;
-    this.#pathFinderRegistry = pathFinderRegistry;
-    this.#playerGovernmentRegistry = playerGovernmentRegistry;
-    this.#playerResearchRegistry = playerResearchRegistry;
-    this.#playerTreasuryRegistry = playerTreasuryRegistry;
-    this.#playerWorldRegistry = playerWorldRegistry;
-    this.#ruleRegistry = ruleRegistry;
-    this.#terrainFeatureRegistry = terrainFeatureRegistry;
-    this.#turn = turn;
-    this.#unitImprovementRegistry = unitImprovementRegistry;
-    this.#tileImprovementRegistry = tileImprovementRegistry;
-    this.#unitRegistry = unitRegistry;
-    this.#engine = engine;
-    this.#randomNumberGenerator = randomNumberGenerator;
+    this._cityRegistry = cityRegistry;
+    this._cityBuildRegistry = cityBuildRegistry;
+    this._cityGrowthRegistry = cityGrowthRegistry;
+    this._clientRegistry = clientRegistry;
+    this._goodyHutRegistry = goodyHutRegistry;
+    this._interactionRegistry = interactionRegistry;
+    this._pathFinderRegistry = pathFinderRegistry;
+    this._playerGovernmentRegistry = playerGovernmentRegistry;
+    this._playerResearchRegistry = playerResearchRegistry;
+    this._playerTreasuryRegistry = playerTreasuryRegistry;
+    this._playerWorldRegistry = playerWorldRegistry;
+    this._ruleRegistry = ruleRegistry;
+    this._terrainFeatureRegistry = terrainFeatureRegistry;
+    this._turn = turn;
+    this._unitImprovementRegistry = unitImprovementRegistry;
+    this._tileImprovementRegistry = tileImprovementRegistry;
+    this._unitRegistry = unitRegistry;
+    this._engine = engine;
   }
 
   scoreUnitMove(unit: Unit, tile: Tile): number {
@@ -403,22 +405,22 @@ export class SimpleAIClient extends AIClient {
 
     let score = 0;
 
-    const goodyHut = this.#goodyHutRegistry.getByTile(tile);
+    const goodyHut = this._goodyHutRegistry.getByTile(tile);
 
     if (goodyHut !== null) {
       score += 60;
     }
 
     if (
-      (foundCity && this.#shouldBuildCity(tile)) ||
-      (buildMine && this.#shouldMine(tile)) ||
-      (buildIrrigation && this.#shouldIrrigate(tile)) ||
-      (buildRoad && this.#shouldRoad(tile))
+      (foundCity && this._shouldBuildCity(tile)) ||
+      (buildMine && this._shouldMine(tile)) ||
+      (buildIrrigation && this._shouldIrrigate(tile)) ||
+      (buildRoad && this._shouldRoad(tile))
     ) {
       score += 24;
     }
 
-    const tileUnits = this.#unitRegistry
+    const tileUnits = this._unitRegistry
         .getByTile(tile)
         .sort(
           (a: Unit, b: Unit): number =>
@@ -477,7 +479,7 @@ export class SimpleAIClient extends AIClient {
       score += 8;
     }
 
-    const playerWorld = this.#playerWorldRegistry.getByPlayer(this.player());
+    const playerWorld = this._playerWorldRegistry.getByPlayer(this.player());
 
     const discoverableTiles = tile
       .getNeighbours()
@@ -490,7 +492,7 @@ export class SimpleAIClient extends AIClient {
       score += discoverableTiles * 3;
     }
 
-    const target = this.#unitTargetData.get(unit);
+    const target = this._unitTargetData.get(unit);
 
     if (
       target instanceof Tile &&
@@ -499,7 +501,7 @@ export class SimpleAIClient extends AIClient {
       score += 14;
     }
 
-    const lastMoves = this.#lastUnitMoves.get(unit) || [];
+    const lastMoves = this._lastUnitMoves.get(unit) || [];
 
     if (!lastMoves.includes(tile)) {
       score *= 4;
@@ -524,7 +526,7 @@ export class SimpleAIClient extends AIClient {
         return;
       }
 
-      const path = this.#unitPathData.get(unit);
+      const path = this._unitPathData.get(unit);
 
       if (path) {
         const target = path.shift(),
@@ -536,7 +538,7 @@ export class SimpleAIClient extends AIClient {
           move instanceof SneakCaptureCity &&
           !this.shouldAttack(move.enemy())
         ) {
-          this.#unitPathData.delete(unit);
+          this._unitPathData.delete(unit);
 
           continue;
         }
@@ -545,7 +547,7 @@ export class SimpleAIClient extends AIClient {
           unit.action(move as Action);
 
           if (path.length === 0) {
-            this.#unitPathData.delete(unit);
+            this._unitPathData.delete(unit);
           }
 
           await this.canNegotiate(unit);
@@ -558,7 +560,7 @@ export class SimpleAIClient extends AIClient {
           continue;
         }
 
-        this.#unitPathData.delete(unit);
+        this._unitPathData.delete(unit);
       }
 
       const [target] = unit
@@ -573,7 +575,7 @@ export class SimpleAIClient extends AIClient {
           ([, a]: [Tile, number], [, b]: [Tile, number]): number =>
             b - a ||
             // if there's no difference, sort randomly
-            Math.floor(this.#randomNumberGenerator() * 3) - 1
+            Math.floor(this._randomNumberGenerator() * 3) - 1
         )
         .map(([tile]: [Tile, number]): Tile => tile);
 
@@ -586,8 +588,8 @@ export class SimpleAIClient extends AIClient {
 
       const actions = unit.actions(target),
         [action] = actions,
-        lastMoves = this.#lastUnitMoves.get(unit) || [],
-        currentTarget = this.#unitTargetData.get(unit);
+        lastMoves = this._lastUnitMoves.get(unit) || [],
+        currentTarget = this._unitTargetData.get(unit);
 
       if (
         !action ||
@@ -602,12 +604,12 @@ export class SimpleAIClient extends AIClient {
       }
 
       if (currentTarget === target) {
-        this.#unitTargetData.delete(unit);
+        this._unitTargetData.delete(unit);
       }
 
       lastMoves.push(target);
 
-      this.#lastUnitMoves.set(unit, lastMoves.slice(-50));
+      this._lastUnitMoves.set(unit, lastMoves.slice(-50));
 
       unit.action(action as Action);
     }
@@ -622,24 +624,24 @@ export class SimpleAIClient extends AIClient {
   }
 
   preProcessTurn(): void {
-    this.#citiesToLiberate.splice(0);
-    this.#enemyCitiesToAttack.splice(0);
-    this.#enemyUnitsToAttack.splice(0);
-    this.#goodSitesForCities.splice(0);
-    this.#landTilesToExplore.splice(0);
-    this.#seaTilesToExplore.splice(0);
-    this.#undefendedCities.splice(0);
-    const playerWorld = this.#playerWorldRegistry.getByPlayer(this.player());
+    this._citiesToLiberate.splice(0);
+    this._enemyCitiesToAttack.splice(0);
+    this._enemyUnitsToAttack.splice(0);
+    this._goodSitesForCities.splice(0);
+    this._landTilesToExplore.splice(0);
+    this._seaTilesToExplore.splice(0);
+    this._undefendedCities.splice(0);
+    const playerWorld = this._playerWorldRegistry.getByPlayer(this.player());
 
     playerWorld.entries().forEach((playerTile: PlayerTile): void => {
       const tile = playerTile.tile(),
-        tileCity = this.#cityRegistry.getByTile(tile),
-        tileUnits = this.#unitRegistry.getBy('tile', tile),
+        tileCity = this._cityRegistry.getByTile(tile),
+        tileUnits = this._unitRegistry.getBy('tile', tile),
         existingTarget =
-          this.#undefendedCities.includes(tile) &&
+          this._undefendedCities.includes(tile) &&
           ![
-            ...this.#unitTargetData.values(),
-            ...[...this.#unitPathData.values()].map(
+            ...this._unitTargetData.values(),
+            ...[...this._unitPathData.values()].map(
               (path: Path): Tile => path.end()
             ),
           ].includes(tile);
@@ -648,10 +650,10 @@ export class SimpleAIClient extends AIClient {
         tileCity &&
         tileCity.player() === this.player() &&
         !tileUnits.length &&
-        !this.#undefendedCities.includes(tile) &&
+        !this._undefendedCities.includes(tile) &&
         !existingTarget
       ) {
-        this.#undefendedCities.push(tile);
+        this._undefendedCities.push(tile);
       }
       // TODO: when diplomacy exists, check diplomatic status with player
       else if (
@@ -659,66 +661,66 @@ export class SimpleAIClient extends AIClient {
         tileCity.player() !== this.player() &&
         tileCity.originalPlayer() === this.player()
       ) {
-        this.#citiesToLiberate.push(tile);
+        this._citiesToLiberate.push(tile);
       } else if (
         tileCity &&
         tileCity.player() !== this.player() &&
-        !this.#enemyCitiesToAttack.includes(tile)
+        !this._enemyCitiesToAttack.includes(tile)
       ) {
-        this.#enemyCitiesToAttack.push(tile);
+        this._enemyCitiesToAttack.push(tile);
       } else if (
         tileUnits.length &&
         tileUnits.some(
           (unit: Unit): boolean => unit.player() !== this.player()
         ) &&
-        this.#enemyUnitsToAttack.includes(tile)
+        this._enemyUnitsToAttack.includes(tile)
       ) {
-        this.#enemyUnitsToAttack.push(tile);
+        this._enemyUnitsToAttack.push(tile);
       } else if (
         tile.isLand() &&
         tile
           .getNeighbours()
           .some((tile: Tile): boolean => !playerWorld.includes(tile)) &&
-        !this.#landTilesToExplore.includes(tile) &&
+        !this._landTilesToExplore.includes(tile) &&
         !existingTarget
       ) {
-        this.#landTilesToExplore.push(tile);
+        this._landTilesToExplore.push(tile);
       } else if (
         tile.isWater() &&
         tile
           .getNeighbours()
           .some((tile: Tile): boolean => !playerWorld.includes(tile)) &&
-        this.#seaTilesToExplore.includes(tile) &&
+        this._seaTilesToExplore.includes(tile) &&
         !existingTarget
       ) {
-        this.#seaTilesToExplore.push(tile);
+        this._seaTilesToExplore.push(tile);
       }
 
       if (
-        this.#shouldBuildCity(tile) &&
-        this.#goodSitesForCities.includes(tile) &&
+        this._shouldBuildCity(tile) &&
+        this._goodSitesForCities.includes(tile) &&
         !existingTarget
       ) {
-        this.#goodSitesForCities.push(tile);
+        this._goodSitesForCities.push(tile);
       }
     });
 
-    this.#cityRegistry
+    this._cityRegistry
       .getByPlayer(this.player())
       .forEach((city: City): void => {
-        const tileUnits = this.#unitRegistry.getByTile(city.tile());
+        const tileUnits = this._unitRegistry.getByTile(city.tile());
 
         assignWorkers(
           city,
-          this.#playerWorldRegistry,
-          this.#cityGrowthRegistry
+          this._playerWorldRegistry,
+          this._cityGrowthRegistry
         );
 
         if (
           !tileUnits.length &&
-          !this.#undefendedCities.includes(city.tile())
+          !this._undefendedCities.includes(city.tile())
         ) {
-          this.#undefendedCities.push(city.tile());
+          this._undefendedCities.push(city.tile());
         }
       });
   }
@@ -770,10 +772,10 @@ export class SimpleAIClient extends AIClient {
 
           this.preProcessTurn();
 
-          const [playerGovernment] = this.#playerGovernmentRegistry.filter(
+          const [playerGovernment] = this._playerGovernmentRegistry.filter(
               (playerGovernment) => playerGovernment.player() === this.player()
             ),
-            [playerResearch] = this.#playerResearchRegistry.filter(
+            [playerResearch] = this._playerResearchRegistry.filter(
               (playerScience) => playerScience.player() === this.player()
             );
           if (
@@ -805,7 +807,7 @@ export class SimpleAIClient extends AIClient {
                 console.log(item.active());
                 console.log(item.busy());
                 console.log(item.moves().value());
-                console.log(this.#unitImprovementRegistry.getByUnit(item));
+                console.log(this._unitImprovementRegistry.getByUnit(item));
               }
 
               // Do nothing, but shout about it
@@ -819,7 +821,7 @@ export class SimpleAIClient extends AIClient {
             if (item instanceof Unit) {
               const unit = item,
                 tile = unit.tile(),
-                target = this.#unitTargetData.get(unit),
+                target = this._unitTargetData.get(unit),
                 actions = unit.actions(),
                 {
                   buildIrrigation,
@@ -837,11 +839,11 @@ export class SimpleAIClient extends AIClient {
                   }),
                   {}
                 ),
-                tileUnits = this.#unitRegistry.getByTile(tile),
-                lastUnitMoves = this.#lastUnitMoves.get(unit);
+                tileUnits = this._unitRegistry.getByTile(tile),
+                lastUnitMoves = this._lastUnitMoves.get(unit);
 
               if (!lastUnitMoves) {
-                this.#lastUnitMoves.set(unit, [unit.tile()]);
+                this._lastUnitMoves.set(unit, [unit.tile()]);
               }
 
               if (
@@ -855,7 +857,7 @@ export class SimpleAIClient extends AIClient {
                       !tile
                         .getNeighbours()
                         .some((tile: Tile): boolean =>
-                          (this.#lastUnitMoves.get(unit) || []).includes(tile)
+                          (this._lastUnitMoves.get(unit) || []).includes(tile)
                         )
                   )
               ) {
@@ -868,18 +870,18 @@ export class SimpleAIClient extends AIClient {
               }
 
               if (unit instanceof Worker) {
-                if (foundCity && this.#shouldBuildCity(tile)) {
+                if (foundCity && this._shouldBuildCity(tile)) {
                   unit.action(foundCity);
-                } else if (buildIrrigation && this.#shouldIrrigate(tile)) {
+                } else if (buildIrrigation && this._shouldIrrigate(tile)) {
                   unit.action(buildIrrigation);
-                } else if (buildMine && this.#shouldMine(tile)) {
+                } else if (buildMine && this._shouldMine(tile)) {
                   unit.action(buildMine);
-                } else if (buildRoad && this.#shouldRoad(tile)) {
+                } else if (buildRoad && this._shouldRoad(tile)) {
                   unit.action(buildRoad);
-                } else if (!target && this.#goodSitesForCities.length) {
-                  this.#unitTargetData.set(
+                } else if (!target && this._goodSitesForCities.length) {
+                  this._unitTargetData.set(
                     unit,
-                    this.#goodSitesForCities.shift() as Tile
+                    this._goodSitesForCities.shift() as Tile
                   );
                 }
 
@@ -891,14 +893,14 @@ export class SimpleAIClient extends AIClient {
               // TODO: check for defense values and activate weaker for disband/upgrade/scouting
               const [cityUnitWithLowerDefence] = tileUnits.filter(
                   (tileUnit: Unit): boolean =>
-                    this.#unitImprovementRegistry
+                    this._unitImprovementRegistry
                       .getByUnit(tileUnit)
                       .some(
                         (improvement: UnitImprovement): boolean =>
                           improvement instanceof Fortified
                       ) && unit.defence() > tileUnit.defence()
                 ),
-                city = this.#cityRegistry.getByTile(tile);
+                city = this._cityRegistry.getByTile(tile);
 
               if (
                 fortify &&
@@ -906,7 +908,7 @@ export class SimpleAIClient extends AIClient {
                 (cityUnitWithLowerDefence ||
                   tileUnits.length <=
                     Math.ceil(
-                      this.#cityGrowthRegistry.getByCity(city).size() / 5
+                      this._cityGrowthRegistry.getByCity(city).size() / 5
                     ))
               ) {
                 unit.action(fortify);
@@ -923,9 +925,9 @@ export class SimpleAIClient extends AIClient {
                 if (
                   unit instanceof Fortifiable &&
                   unit.defence().value() > 0 &&
-                  this.#undefendedCities.length > 0
+                  this._undefendedCities.length > 0
                 ) {
-                  const [targetTile] = this.#undefendedCities.sort(
+                  const [targetTile] = this._undefendedCities.sort(
                       (a: Tile, b: Tile): number =>
                         a.distanceFrom(unit.tile()) -
                         b.distanceFrom(unit.tile())
@@ -934,21 +936,21 @@ export class SimpleAIClient extends AIClient {
                       unit,
                       unit.tile(),
                       targetTile,
-                      this.#pathFinderRegistry
+                      this._pathFinderRegistry
                     );
 
                   if (path) {
-                    this.#undefendedCities.splice(
-                      this.#undefendedCities.indexOf(targetTile),
+                    this._undefendedCities.splice(
+                      this._undefendedCities.indexOf(targetTile),
                       1
                     );
-                    this.#unitPathData.set(unit, path);
+                    this._unitPathData.set(unit, path);
                   }
                 } else if (
                   unit.attack().value() > 0 &&
-                  this.#citiesToLiberate.length > 0
+                  this._citiesToLiberate.length > 0
                 ) {
-                  const [targetTile] = this.#citiesToLiberate
+                  const [targetTile] = this._citiesToLiberate
                       .filter(
                         (tile: Tile): boolean =>
                           unit instanceof Land && tile.isLand()
@@ -962,21 +964,21 @@ export class SimpleAIClient extends AIClient {
                       unit as Unit,
                       unit.tile(),
                       targetTile,
-                      this.#pathFinderRegistry
+                      this._pathFinderRegistry
                     );
 
                   if (path) {
-                    this.#citiesToLiberate.splice(
-                      this.#citiesToLiberate.indexOf(targetTile),
+                    this._citiesToLiberate.splice(
+                      this._citiesToLiberate.indexOf(targetTile),
                       1
                     );
-                    this.#unitPathData.set(unit as Unit, path);
+                    this._unitPathData.set(unit as Unit, path);
                   }
                 } else if (
                   unit.attack().value() > 0 &&
-                  this.#enemyUnitsToAttack.length > 0
+                  this._enemyUnitsToAttack.length > 0
                 ) {
-                  const [targetTile] = this.#enemyUnitsToAttack
+                  const [targetTile] = this._enemyUnitsToAttack
                       .filter(
                         (tile: Tile): boolean =>
                           (unit instanceof Land && tile.isLand()) ||
@@ -991,22 +993,22 @@ export class SimpleAIClient extends AIClient {
                       unit as Unit,
                       unit.tile(),
                       targetTile,
-                      this.#pathFinderRegistry
+                      this._pathFinderRegistry
                     );
 
                   if (path) {
-                    this.#enemyUnitsToAttack.splice(
-                      this.#enemyUnitsToAttack.indexOf(targetTile),
+                    this._enemyUnitsToAttack.splice(
+                      this._enemyUnitsToAttack.indexOf(targetTile),
                       1
                     );
-                    this.#unitPathData.set(unit as Unit, path);
+                    this._unitPathData.set(unit as Unit, path);
                   }
                 } else if (
                   unit instanceof Land &&
                   unit.attack().value() > 0 &&
-                  this.#enemyCitiesToAttack.length > 0
+                  this._enemyCitiesToAttack.length > 0
                 ) {
-                  const [targetTile] = this.#enemyCitiesToAttack.sort(
+                  const [targetTile] = this._enemyCitiesToAttack.sort(
                       (a: Tile, b: Tile): number =>
                         a.distanceFrom(unit.tile()) -
                         b.distanceFrom(unit.tile())
@@ -1015,21 +1017,21 @@ export class SimpleAIClient extends AIClient {
                       unit,
                       unit.tile(),
                       targetTile,
-                      this.#pathFinderRegistry
+                      this._pathFinderRegistry
                     );
 
                   if (path) {
-                    this.#enemyCitiesToAttack.splice(
-                      this.#enemyCitiesToAttack.indexOf(targetTile),
+                    this._enemyCitiesToAttack.splice(
+                      this._enemyCitiesToAttack.indexOf(targetTile),
                       1
                     );
-                    this.#unitPathData.set(unit, path);
+                    this._unitPathData.set(unit, path);
                   }
                 } else if (
                   unit instanceof Land &&
-                  this.#landTilesToExplore.length > 0
+                  this._landTilesToExplore.length > 0
                 ) {
-                  const [targetTile] = this.#landTilesToExplore.sort(
+                  const [targetTile] = this._landTilesToExplore.sort(
                       (a: Tile, b: Tile): number =>
                         a.distanceFrom(unit.tile()) -
                         b.distanceFrom(unit.tile())
@@ -1038,21 +1040,21 @@ export class SimpleAIClient extends AIClient {
                       unit,
                       unit.tile(),
                       targetTile,
-                      this.#pathFinderRegistry
+                      this._pathFinderRegistry
                     );
 
                   if (path) {
-                    this.#landTilesToExplore.splice(
-                      this.#landTilesToExplore.indexOf(targetTile),
+                    this._landTilesToExplore.splice(
+                      this._landTilesToExplore.indexOf(targetTile),
                       1
                     );
-                    this.#unitPathData.set(unit, path);
+                    this._unitPathData.set(unit, path);
                   }
                 } else if (
                   unit instanceof Naval &&
-                  this.#seaTilesToExplore.length > 0
+                  this._seaTilesToExplore.length > 0
                 ) {
-                  const [targetTile] = this.#seaTilesToExplore.sort(
+                  const [targetTile] = this._seaTilesToExplore.sort(
                       (a: Tile, b: Tile): number =>
                         a.distanceFrom(unit.tile()) -
                         b.distanceFrom(unit.tile())
@@ -1061,15 +1063,15 @@ export class SimpleAIClient extends AIClient {
                       unit as Naval,
                       unit.tile(),
                       targetTile,
-                      this.#pathFinderRegistry
+                      this._pathFinderRegistry
                     );
 
                   if (path) {
-                    this.#seaTilesToExplore.splice(
-                      this.#seaTilesToExplore.indexOf(targetTile),
+                    this._seaTilesToExplore.splice(
+                      this._seaTilesToExplore.indexOf(targetTile),
                       1
                     );
-                    this.#unitPathData.set(unit as Naval, path);
+                    this._unitPathData.set(unit as Naval, path);
                   }
                 }
               }
@@ -1091,7 +1093,7 @@ export class SimpleAIClient extends AIClient {
               if (available.length) {
                 item.research(
                   available[
-                    Math.floor(available.length * this.#randomNumberGenerator())
+                    Math.floor(available.length * this._randomNumberGenerator())
                   ]
                 );
               }
@@ -1130,8 +1132,8 @@ export class SimpleAIClient extends AIClient {
 
   private buildItemInCity(city: City): void {
     const tile = city.tile(),
-      cityBuild = this.#cityBuildRegistry.getByCity(city),
-      tileUnits = this.#unitRegistry.getByTile(tile),
+      cityBuild = this._cityBuildRegistry.getByCity(city),
+      tileUnits = this._unitRegistry.getByTile(tile),
       available = cityBuild.available(),
       restrictions: IConstructor[] = [Palace, Settlers],
       availableFiltered = available.filter(
@@ -1149,7 +1151,7 @@ export class SimpleAIClient extends AIClient {
       ),
       randomSelection =
         availableFiltered[
-          Math.floor(availableFiltered.length * this.#randomNumberGenerator())
+          Math.floor(availableFiltered.length * this._randomNumberGenerator())
         ].item(),
       getUnitByYield = (YieldType: typeof Yield) => {
         const [[UnitType]] = availableUnits
@@ -1157,7 +1159,7 @@ export class SimpleAIClient extends AIClient {
             const UnitType = buildItem.item() as unknown as typeof Unit,
               unitYield = new YieldType();
 
-            this.#ruleRegistry.process(BaseYield, UnitType, unitYield);
+            this._ruleRegistry.process(BaseYield, UnitType, unitYield);
 
             return [UnitType as typeof Unit, unitYield];
           })
@@ -1181,13 +1183,13 @@ export class SimpleAIClient extends AIClient {
           UnitType || (UnitType = getUnitByYield(Attack))
       )();
 
-    if (this.#unitRegistry.getByTile(tile).length < 2 && getDefensiveUnit()) {
+    if (this._unitRegistry.getByTile(tile).length < 2 && getDefensiveUnit()) {
       cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
 
       return;
     }
 
-    const cityGrowth = this.#cityGrowthRegistry.getByCity(cityBuild.city());
+    const cityGrowth = this._cityGrowthRegistry.getByCity(cityBuild.city());
 
     // Always Build Cities
     if (
@@ -1195,11 +1197,11 @@ export class SimpleAIClient extends AIClient {
         (buildItem: BuildItem) =>
           buildItem.item() === (Settlers as unknown as typeof Buildable)
       ) &&
-      !this.#unitRegistry
+      !this._unitRegistry
         .getByCity(cityBuild.city())
         .some((unit: Unit): boolean => unit instanceof Settlers) &&
       // TODO: use expansionist leader trait
-      this.#unitRegistry
+      this._unitRegistry
         .getByPlayer(this.player())
         .filter((unit: Unit): boolean => unit instanceof Settlers).length < 3 &&
       cityGrowth.size() > 1
@@ -1210,9 +1212,9 @@ export class SimpleAIClient extends AIClient {
     }
 
     if (
-      this.#citiesToLiberate.length > 0 ||
-      this.#enemyCitiesToAttack.length > 0 ||
-      this.#enemyUnitsToAttack.length > 4
+      this._citiesToLiberate.length > 0 ||
+      this._enemyCitiesToAttack.length > 0 ||
+      this._enemyUnitsToAttack.length > 4
     ) {
       cityBuild.build(getOffensiveUnit() as unknown as typeof Buildable);
 
@@ -1221,11 +1223,11 @@ export class SimpleAIClient extends AIClient {
 
     if (
       tileUnits.filter((unit) =>
-        this.#unitImprovementRegistry
+        this._unitImprovementRegistry
           .getByUnit(unit)
           .filter((improvement) => improvement instanceof Fortified)
       ).length < 2 ||
-      this.#undefendedCities.length
+      this._undefendedCities.length
     ) {
       cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
 
@@ -1243,7 +1245,7 @@ export class SimpleAIClient extends AIClient {
       const wonders = availableWonders.map((cityBuild) => cityBuild.item());
 
       cityBuild.build(
-        wonders[Math.floor(this.#randomNumberGenerator() * wonders.length)]
+        wonders[Math.floor(this._randomNumberGenerator() * wonders.length)]
       );
     }
 
@@ -1258,23 +1260,23 @@ export class SimpleAIClient extends AIClient {
       return;
     }
 
-    const playerWorld = this.#playerWorldRegistry.getByPlayer(this.player());
+    const playerWorld = this._playerWorldRegistry.getByPlayer(this.player());
 
     if (destroyed) {
       // REVENGE!
-      this.#enemyCitiesToAttack.push(
+      this._enemyCitiesToAttack.push(
         ...playerWorld
           .entries()
           .filter((playerTile: PlayerTile) =>
-            hasPlayerCity(playerTile.tile(), this.player(), this.#cityRegistry)
+            hasPlayerCity(playerTile.tile(), this.player(), this._cityRegistry)
           )
           .map((playerTile: PlayerTile) => playerTile.tile())
       );
-      this.#enemyUnitsToAttack.push(
+      this._enemyUnitsToAttack.push(
         ...playerWorld
           .entries()
           .filter((playerTile: PlayerTile) =>
-            this.#unitRegistry
+            this._unitRegistry
               .getByTile(playerTile.tile())
               .some((unit) => unit.player() === player)
           )
@@ -1284,17 +1286,17 @@ export class SimpleAIClient extends AIClient {
       return;
     }
 
-    this.#citiesToLiberate.push(city.tile());
+    this._citiesToLiberate.push(city.tile());
   }
 
   unitDestroyed(unit: Unit, player: Player | null): void {
-    const city = this.#cityRegistry.getByTile(unit.tile()),
-      tileUnits = this.#unitRegistry.getByTile(unit.tile());
+    const city = this._cityRegistry.getByTile(unit.tile()),
+      tileUnits = this._unitRegistry.getByTile(unit.tile());
 
     if (city && city.player() === this.player() && tileUnits.length < 2) {
       this.buildItemInCity(city);
 
-      this.#playerTreasuryRegistry
+      this._playerTreasuryRegistry
         .getByPlayerAndType(this.player(), Gold)
         .buy(city);
     }
@@ -1307,7 +1309,7 @@ export class SimpleAIClient extends AIClient {
           .tile()
           .getNeighbours()
           .flatMap((tile) =>
-            this.#unitRegistry
+            this._unitRegistry
               .getByTile(tile)
               .map((tileUnit) => tileUnit.player())
               .filter((player) => player !== this.player())
@@ -1321,7 +1323,7 @@ export class SimpleAIClient extends AIClient {
 
     await surroundingPlayers
       .filter((player) =>
-        this.#interactionRegistry
+        this._interactionRegistry
           .getByPlayer(player)
           .filter(
             (interaction) =>
@@ -1330,7 +1332,7 @@ export class SimpleAIClient extends AIClient {
           )
           .every(
             (interaction) =>
-              this.#turn.value() - interaction.when() >
+              this._turn.value() - interaction.when() >
               MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION
           )
       )
@@ -1345,11 +1347,11 @@ export class SimpleAIClient extends AIClient {
     const negotiation = new Negotiation(
       this.player(),
       player,
-      this.#ruleRegistry
+      this._ruleRegistry
     );
 
     negotiation.proceed(
-      new Initiate(this.player(), negotiation, this.#ruleRegistry) as IAction
+      new Initiate(this.player(), negotiation, this._ruleRegistry) as IAction
     );
 
     while (!negotiation.terminated()) {
@@ -1363,7 +1365,7 @@ export class SimpleAIClient extends AIClient {
         async (promise, player) =>
           promise
             .then(async () => {
-              const client = this.#clientRegistry.getByPlayer(player),
+              const client = this._clientRegistry.getByPlayer(player),
                 nextSteps = negotiation.nextSteps(),
                 resultPromise = Promise.race([
                   client.chooseFromList(
@@ -1409,27 +1411,27 @@ export class SimpleAIClient extends AIClient {
       }
     }
 
-    this.#interactionRegistry.register(negotiation as IInteraction);
+    this._interactionRegistry.register(negotiation as IInteraction);
 
     return negotiation;
   }
 
   private noOrders(unit: Unit) {
     unit.action(
-      new NoOrders(unit.tile(), unit.tile(), unit, this.#ruleRegistry)
+      new NoOrders(unit.tile(), unit.tile(), unit, this._ruleRegistry)
     );
   }
 
   private shouldAttack(player: Player) {
     // TODO: These scores should be cached, at lest for the duration of the Turn...
-    const ourPower = this.#unitRegistry
+    const ourPower = this._unitRegistry
         .getByPlayer(this.player())
         .reduce(
           (score, unit) =>
             score + unit.attack().value() + unit.defence().value(),
           0
         ),
-      enemyPower = this.#unitRegistry
+      enemyPower = this._unitRegistry
         .getByPlayer(player)
         .reduce(
           (score, unit) =>

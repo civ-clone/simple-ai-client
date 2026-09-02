@@ -32,7 +32,39 @@ declare global {
   }
 }
 export declare class SimpleAIClient extends AIClient {
-  #private;
+  private _isACityTile;
+  private _shouldBuildCity;
+  private _shouldIrrigate;
+  private _shouldMine;
+  private _shouldRoad;
+  private _lastUnitMoves;
+  private _unitPathData;
+  private _unitTargetData;
+  private _citiesToLiberate;
+  private _enemyCitiesToAttack;
+  private _enemyUnitsToAttack;
+  private _goodSitesForCities;
+  private _landTilesToExplore;
+  private _seaTilesToExplore;
+  private _undefendedCities;
+  private _cityRegistry;
+  private _cityBuildRegistry;
+  private _cityGrowthRegistry;
+  private _clientRegistry;
+  private _goodyHutRegistry;
+  private _interactionRegistry;
+  private _pathFinderRegistry;
+  private _playerGovernmentRegistry;
+  private _playerResearchRegistry;
+  private _playerTreasuryRegistry;
+  private _playerWorldRegistry;
+  private _ruleRegistry;
+  private _terrainFeatureRegistry;
+  private _tileImprovementRegistry;
+  private _turn;
+  private _unitImprovementRegistry;
+  private _unitRegistry;
+  private _engine;
   constructor(
     player: Player,
     cityRegistry?: CityRegistry,
