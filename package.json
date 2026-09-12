@@ -1,6 +1,6 @@
 {
   "name": "@civ-clone/simple-ai-client",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "repository": "git@github.com:civ-clone/simple-ai-client.git",
   "keywords": [
     "typescript",
