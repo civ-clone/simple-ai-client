@@ -149,6 +149,7 @@ import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
 import Decline from '@civ-clone/core-diplomacy/Proposal/Decline';
+import { instance as rngInstance } from '@civ-clone/core-random';
 
 declare global {
   interface ChoiceMetaDataMap {
@@ -336,7 +337,7 @@ export class SimpleAIClient extends AIClient {
     clientRegistry: ClientRegistry = clientRegistryInstance,
     interactionRegistry: InteractionRegistry = interactionRegistryInstance,
     turn: Turn = turnInstance,
-    randomNumberGenerator: () => number = () => Math.random()
+    randomNumberGenerator: () => number = rngInstance
   ) {
     // The generator goes to `core-client`'s `Client`, which holds the one
     // `protected _randomNumberGenerator`. This class declared a second
