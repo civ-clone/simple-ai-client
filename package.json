@@ -64,6 +64,7 @@
     "@civ-clone/core-client": "^0.1.0",
     "@civ-clone/core-diplomacy": "^0.1.0",
     "@civ-clone/core-engine": "^0.1.0",
+    "@civ-clone/core-game": "^0.1.1",
     "@civ-clone/core-goody-hut": "^0.1.0",
     "@civ-clone/core-government": "^0.1.0",
     "@civ-clone/core-random": "^0.1.0",
