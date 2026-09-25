@@ -443,7 +443,7 @@ export class SimpleAIClient extends AIClient {
     ].some((tile: Tile): boolean => movesBetween(from, tile) <= remaining);
   }
 
-  // Our `Carrier`s that `unit` could land on.
+  // Our `Carrier`s that `unit` could land on. One it's already aboard counts even when full: taking off frees its slot.
   private carriersFor(unit: Unit): Unit[] {
     return this._unitRegistry
       .getByPlayer(this.player())
@@ -451,7 +451,7 @@ export class SimpleAIClient extends AIClient {
         (tileUnit: Unit): boolean =>
           tileUnit instanceof NavalTransport &&
           !tileUnit.destroyed() &&
-          tileUnit.hasCapacity() &&
+          (tileUnit.hasCapacity() || tileUnit.cargo().includes(unit)) &&
           tileUnit.canStow(unit)
       );
   }

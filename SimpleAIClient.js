@@ -188,13 +188,13 @@ class SimpleAIClient extends AIClient_1.default {
             ...this.carriersFor(unit).map((carrier) => carrier.tile()),
         ].some((tile) => movesBetween(from, tile) <= remaining);
     }
-    // Our `Carrier`s that `unit` could land on.
+    // Our `Carrier`s that `unit` could land on. One it's already aboard counts even when full: taking off frees its slot.
     carriersFor(unit) {
         return this._unitRegistry
             .getByPlayer(this.player())
             .filter((tileUnit) => tileUnit instanceof Types_1.NavalTransport &&
             !tileUnit.destroyed() &&
-            tileUnit.hasCapacity() &&
+            (tileUnit.hasCapacity() || tileUnit.cargo().includes(unit)) &&
             tileUnit.canStow(unit));
     }
     scoreUnitMove(unit, tile) {

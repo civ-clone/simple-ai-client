@@ -1242,4 +1242,38 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
+  it('should let a Fighter take off from a full Carrier it can come back to, with no city to land in', async (): Promise<void> => {
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('400G', 20, 20),
+      player = client.player(),
+      carrier = new Carrier(
+        null,
+        player,
+        world.get(10, 10),
+        ruleRegistry,
+        transportRegistry
+      ),
+      aboard = new Array(8)
+        .fill(0)
+        .map(() => new Fighter(null, player, carrier.tile(), ruleRegistry)),
+      [fighter] = aboard;
+
+    aboard.forEach((unit: Unit): void => {
+      expect(carrier.stow(unit)).true;
+    });
+
+    expect(carrier.hasCapacity()).false;
+
+    fighter.moves().set(fighter.movement());
+
+    // Taking off frees its slot, so the Carrier is still somewhere to come back to.
+    expect(
+      (client as SimpleAIClient).scoreUnitMove(fighter, world.get(11, 10))
+    ).greaterThan(-1);
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
 });
