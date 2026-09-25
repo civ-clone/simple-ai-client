@@ -168,6 +168,7 @@ import TransportRegistry from '@civ-clone/core-unit-transport/TransportRegistry'
 import Turn from '@civ-clone/core-turn-based-game/Turn';
 import TurnEnd from '@civ-clone/core-player/Rules/TurnEnd';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
+import Moved from '@civ-clone/core-unit/Rules/Moved';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import UnitImprovementRegistry from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
 import UnitRegistry from '@civ-clone/core-unit/UnitRegistry';
@@ -1118,6 +1119,41 @@ describe('SimpleAIClient', (): void => {
     expect(producedUnit.busy()).not.null;
 
     cityRegistry.unregister(city);
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+
+  it("should keep moving its other units when one unit's move throws", async (): Promise<void> => {
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('400G', 20, 20),
+      player = client.player(),
+      brokenUnit = new Warrior(null, player, world.get(5, 5), ruleRegistry),
+      unit = new Warrior(null, player, world.get(15, 15), ruleRegistry),
+      start = unit.tile(),
+      brokenRule = new Moved(
+        new Effect((movedUnit: Unit): void => {
+          if (movedUnit === brokenUnit) {
+            throw new Error('A broken rule');
+          }
+        })
+      ),
+      consoleError = console.error;
+
+    ruleRegistry.register(brokenRule);
+    console.error = () => {};
+
+    try {
+      await takeTurns(client);
+    } finally {
+      console.error = consoleError;
+      ruleRegistry.unregister(brokenRule);
+    }
+
+    expect(unit.tile()).not.equal(start);
+    expect(brokenUnit.moves().value()).equal(0);
+
     clientRegistry.unregister(client);
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);

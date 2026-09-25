@@ -107,6 +107,7 @@ export declare class SimpleAIClient extends AIClient {
   unitDestroyed(unit: Unit, player: Player | null): void;
   private canNegotiate;
   private handleNegotiation;
+  private skipUnit;
   private noOrders;
   private shouldAttack;
 }
