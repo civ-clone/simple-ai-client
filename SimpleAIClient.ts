@@ -398,8 +398,8 @@ export class SimpleAIClient extends AIClient {
     this._engine = engine;
   }
 
-  // How many more moves an aircraft can make before it must be back in one of our `City`s, or `null` for any other
-  //  `Unit`. A `Carrier` doesn't count: an aircraft can't board one yet, so it would still be lost.
+  // How many more moves an aircraft can make before it must be back in one of our `City`s or `Carrier`s, or `null` for
+  //  any other `Unit`.
   private aircraftFuel(unit: Unit): number | null {
     const [, range] =
       aircraftRange.find(([UnitType]) => unit instanceof UnitType) ?? [];
@@ -435,10 +435,24 @@ export class SimpleAIClient extends AIClient {
           ? fuel - unit.moves().value()
           : fuel - 1;
 
-    return this._cityRegistry
+    return [
+      ...this._cityRegistry
+        .getByPlayer(this.player())
+        .map((city: City): Tile => city.tile()),
+      ...this.carriersFor(unit).map((carrier: Unit): Tile => carrier.tile()),
+    ].some((tile: Tile): boolean => movesBetween(from, tile) <= remaining);
+  }
+
+  // Our `Carrier`s that `unit` could land on.
+  private carriersFor(unit: Unit): Unit[] {
+    return this._unitRegistry
       .getByPlayer(this.player())
-      .some(
-        (city: City): boolean => movesBetween(from, city.tile()) <= remaining
+      .filter(
+        (tileUnit: Unit): boolean =>
+          tileUnit instanceof NavalTransport &&
+          !tileUnit.destroyed() &&
+          tileUnit.hasCapacity() &&
+          tileUnit.canStow(unit)
       );
   }
 
@@ -614,9 +628,17 @@ export class SimpleAIClient extends AIClient {
 
       if (path) {
         const target = path.shift(),
-          [move] = unit
+          moves = unit
             .actions(target)
-            .filter((action) => action instanceof Move);
+            .filter((action) => action instanceof Move),
+          // Passing through, fly over a `City` or `Carrier` rather than landing on it, which would end the turn.
+          [move] =
+            path.length > 0 && unit.moves().value() > 1
+              ? [
+                  ...moves.filter((action) => action.constructor === Move),
+                  ...moves,
+                ]
+              : moves;
 
         if (
           (move instanceof SneakCaptureCity &&
@@ -809,6 +831,21 @@ export class SimpleAIClient extends AIClient {
           this._undefendedCities.push(city.tile());
         }
       });
+
+    // An aircraft that has landed on one of our `Carrier`s stays aboard until it's given orders, so give it some.
+    this._unitRegistry
+      .getByPlayer(this.player())
+      .flatMap((unit: Unit): Unit[] =>
+        unit instanceof NavalTransport && !unit.destroyed() ? unit.cargo() : []
+      )
+      .filter(
+        (unit: Unit): boolean =>
+          this.aircraftFuel(unit) !== null && !unit.active()
+      )
+      .forEach((aircraft: Unit): void => {
+        aircraft.setBusy();
+        aircraft.setActive();
+      });
   }
 
   async chooseFromList<Name extends keyof ChoiceMetaDataMap>(
@@ -903,6 +940,26 @@ export class SimpleAIClient extends AIClient {
                 console.error("SimpleAIClient: Couldn't pick an action to do.");
 
                 break;
+              }
+
+              // Our `Carrier`s move first, so an aircraft only counts on one being where it'll be at the end of the turn.
+              if (
+                item instanceof Unit &&
+                !item.waiting() &&
+                this.aircraftFuel(item) !== null &&
+                this._unitRegistry
+                  .getByPlayer(this.player())
+                  .some(
+                    (carrier: Unit): boolean =>
+                      carrier instanceof NavalTransport &&
+                      carrier.canStow(item) &&
+                      carrier.active() &&
+                      carrier.moves().value() > 0
+                  )
+              ) {
+                item.setWaiting();
+
+                continue;
               }
 
               if (item instanceof Unit) {

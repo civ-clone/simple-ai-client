@@ -120,6 +120,7 @@ import {
   Trireme,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
+import { LandAircraft } from '@civ-clone/civ1-unit/Actions';
 import {
   Luxuries as LuxuriesTradeRate,
   Research as ResearchTradeRate,
@@ -320,6 +321,7 @@ import worldTileYieldModifier from '@civ-clone/civ1-world/Rules/Tile/yield-modif
 import Built from '@civ-clone/core-world/Rules/Built';
 import Effect from '@civ-clone/core-rule/Effect';
 import Unit from '@civ-clone/core-unit/Unit';
+import Tile from '@civ-clone/core-world/Tile';
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
@@ -1193,4 +1195,51 @@ describe('SimpleAIClient', (): void => {
       unitRegistry.unregister(...unitRegistry.getByPlayer(player));
     })
   );
+  it('should fly a Fighter from a Carrier and bring it back, with no city to land in', async (): Promise<void> => {
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('400G', 20, 20),
+      player = client.player(),
+      // On land, so the AI can't move it: the Fighter has to find it where it left it.
+      carrier = new Carrier(
+        null,
+        player,
+        world.get(10, 10),
+        ruleRegistry,
+        transportRegistry
+      ),
+      fighter = new Fighter(null, player, world.get(10, 11), ruleRegistry);
+
+    const [land] = fighter.actions(carrier.tile());
+
+    expect(land).instanceof(LandAircraft);
+
+    land.perform();
+
+    expect(transportRegistry.hasUnit(fighter)).true;
+
+    const flown: Tile[] = [],
+      recordFlight = new Moved(
+        new Effect((movedUnit: Unit): void => {
+          if (movedUnit === fighter) {
+            flown.push(fighter.tile());
+          }
+        })
+      );
+
+    ruleRegistry.register(recordFlight);
+
+    try {
+      await takeTurns(client, 3);
+    } finally {
+      ruleRegistry.unregister(recordFlight);
+    }
+
+    expect(flown.some((tile: Tile): boolean => tile !== carrier.tile())).true;
+    expect(fighter.destroyed()).false;
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
 });

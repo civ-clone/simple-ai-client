@@ -158,8 +158,8 @@ class SimpleAIClient extends AIClient_1.default {
         this._workedTileRegistry = workedTileRegistry;
         this._engine = engine;
     }
-    // How many more moves an aircraft can make before it must be back in one of our `City`s, or `null` for any other
-    //  `Unit`. A `Carrier` doesn't count: an aircraft can't board one yet, so it would still be lost.
+    // How many more moves an aircraft can make before it must be back in one of our `City`s or `Carrier`s, or `null` for
+    //  any other `Unit`.
     aircraftFuel(unit) {
         var _a, _b, _c;
         const [, range] = (_a = turnEnd_1.aircraftRange.find(([UnitType]) => unit instanceof UnitType)) !== null && _a !== void 0 ? _a : [];
@@ -181,9 +181,21 @@ class SimpleAIClient extends AIClient_1.default {
         const moving = action instanceof Actions_1.Move, from = moving ? action.to() : unit.tile(), remaining = !moving && unit instanceof Units_1.Bomber
             ? fuel - unit.moves().value()
             : fuel - 1;
-        return this._cityRegistry
+        return [
+            ...this._cityRegistry
+                .getByPlayer(this.player())
+                .map((city) => city.tile()),
+            ...this.carriersFor(unit).map((carrier) => carrier.tile()),
+        ].some((tile) => movesBetween(from, tile) <= remaining);
+    }
+    // Our `Carrier`s that `unit` could land on.
+    carriersFor(unit) {
+        return this._unitRegistry
             .getByPlayer(this.player())
-            .some((city) => movesBetween(from, city.tile()) <= remaining);
+            .filter((tileUnit) => tileUnit instanceof Types_1.NavalTransport &&
+            !tileUnit.destroyed() &&
+            tileUnit.hasCapacity() &&
+            tileUnit.canStow(unit));
     }
     scoreUnitMove(unit, tile) {
         const actions = unit.actions(tile), { attack, buildIrrigation, buildMine, buildRoad, captureCity, disembark, embark, fortify, foundCity, noOrders, sneakAttack, } = actions.reduce((object, entity) => ({
@@ -284,9 +296,16 @@ class SimpleAIClient extends AIClient_1.default {
             }
             const path = this._unitPathData.get(unit);
             if (path) {
-                const target = path.shift(), [move] = unit
+                const target = path.shift(), moves = unit
                     .actions(target)
-                    .filter((action) => action instanceof Actions_1.Move);
+                    .filter((action) => action instanceof Actions_1.Move), 
+                // Passing through, fly over a `City` or `Carrier` rather than landing on it, which would end the turn.
+                [move] = path.length > 0 && unit.moves().value() > 1
+                    ? [
+                        ...moves.filter((action) => action.constructor === Actions_1.Move),
+                        ...moves,
+                    ]
+                    : moves;
                 if ((move instanceof Actions_1.SneakCaptureCity &&
                     !this.shouldAttack(move.enemy())) ||
                     (move && !this.aircraftCanReturn(unit, move))) {
@@ -417,6 +436,15 @@ class SimpleAIClient extends AIClient_1.default {
                 this._undefendedCities.push(city.tile());
             }
         });
+        // An aircraft that has landed on one of our `Carrier`s stays aboard until it's given orders, so give it some.
+        this._unitRegistry
+            .getByPlayer(this.player())
+            .flatMap((unit) => unit instanceof Types_1.NavalTransport && !unit.destroyed() ? unit.cargo() : [])
+            .filter((unit) => this.aircraftFuel(unit) !== null && !unit.active())
+            .forEach((aircraft) => {
+            aircraft.setBusy();
+            aircraft.setActive();
+        });
     }
     async chooseFromList(meta) {
         if (meta.key() !== 'negotiation.next-step') {
@@ -477,6 +505,19 @@ class SimpleAIClient extends AIClient_1.default {
                             this.noOrders(item);
                             console.error("SimpleAIClient: Couldn't pick an action to do.");
                             break;
+                        }
+                        // Our `Carrier`s move first, so an aircraft only counts on one being where it'll be at the end of the turn.
+                        if (item instanceof Unit_1.default &&
+                            !item.waiting() &&
+                            this.aircraftFuel(item) !== null &&
+                            this._unitRegistry
+                                .getByPlayer(this.player())
+                                .some((carrier) => carrier instanceof Types_1.NavalTransport &&
+                                carrier.canStow(item) &&
+                                carrier.active() &&
+                                carrier.moves().value() > 0)) {
+                            item.setWaiting();
+                            continue;
                         }
                         if (item instanceof Unit_1.default) {
                             const unit = item, tile = unit.tile(), target = this._unitTargetData.get(unit), actions = unit.actions(), { buildIrrigation, buildMine, buildRoad, fortify, foundCity, unload, } = actions.reduce((object, entity) => ({
