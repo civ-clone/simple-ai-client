@@ -26,7 +26,10 @@ const TerrainFeatureRegistry_1 = require("@civ-clone/core-terrain-feature/Terrai
 const TileImprovementRegistry_1 = require("@civ-clone/core-tile-improvement/TileImprovementRegistry");
 const Turn_1 = require("@civ-clone/core-turn-based-game/Turn");
 const UnitImprovementRegistry_1 = require("@civ-clone/core-unit-improvement/UnitImprovementRegistry");
+const StrategyNoteRegistry_1 = require("@civ-clone/core-strategy/StrategyNoteRegistry");
 const UnitRegistry_1 = require("@civ-clone/core-unit/UnitRegistry");
+const WorkedTileRegistry_1 = require("@civ-clone/core-city/WorkedTileRegistry");
+const turnEnd_1 = require("@civ-clone/civ1-unit/Rules/Player/turnEnd");
 const Accept_1 = require("@civ-clone/core-diplomacy/Proposal/Accept");
 const AIClient_1 = require("@civ-clone/core-ai-client/AIClient");
 const Yield_1 = require("@civ-clone/core-unit/Rules/Yield");
@@ -52,7 +55,15 @@ const assignWorkers_1 = require("@civ-clone/civ1-city/lib/assignWorkers");
 const Decline_1 = require("@civ-clone/core-diplomacy/Proposal/Decline");
 const core_random_1 = require("@civ-clone/core-random");
 const awaitTimeout = (delay, reason) => new Promise((resolve, reject) => setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay));
-const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
+// How many moves an `Air` `Unit` needs to get from one `Tile` to the other: every step costs 1, diagonals included, and
+//  the map wraps as it does in `Tile#distanceFrom`.
+const movesBetween = (from, to) => {
+    const map = from.map(), onAxis = (delta, size) => {
+        const direct = Math.abs(delta);
+        return Math.min(direct, Math.abs(size - direct));
+    };
+    return Math.max(onAxis(from.x() - to.x(), map.width()), onAxis(from.y() - to.y(), map.height()));
+}, hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
     const city = cityRegistry.getByTile(tile);
     if (city === null) {
         return false;
@@ -60,7 +71,7 @@ const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => 
     return city.player() === player;
 }, MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
 class SimpleAIClient extends AIClient_1.default {
-    constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance, engine = Engine_1.instance, clientRegistry = ClientRegistry_1.instance, interactionRegistry = InteractionRegistry_1.instance, turn = Turn_1.instance, randomNumberGenerator = core_random_1.instance) {
+    constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance, engine = Engine_1.instance, clientRegistry = ClientRegistry_1.instance, interactionRegistry = InteractionRegistry_1.instance, turn = Turn_1.instance, randomNumberGenerator = core_random_1.instance, strategyNoteRegistry = StrategyNoteRegistry_1.instance, workedTileRegistry = WorkedTileRegistry_1.instance) {
         // The generator goes to `core-client`'s `Client`, which holds the one
         // `protected _randomNumberGenerator`. This class declared a second
         // `#randomNumberGenerator` shadowing it, which two `private` fields of the
@@ -138,12 +149,41 @@ class SimpleAIClient extends AIClient_1.default {
         this._playerTreasuryRegistry = playerTreasuryRegistry;
         this._playerWorldRegistry = playerWorldRegistry;
         this._ruleRegistry = ruleRegistry;
+        this._strategyNoteRegistry = strategyNoteRegistry;
         this._terrainFeatureRegistry = terrainFeatureRegistry;
         this._turn = turn;
         this._unitImprovementRegistry = unitImprovementRegistry;
         this._tileImprovementRegistry = tileImprovementRegistry;
         this._unitRegistry = unitRegistry;
+        this._workedTileRegistry = workedTileRegistry;
         this._engine = engine;
+    }
+    // How many more moves an aircraft can make before it must be back in one of our `City`s, or `null` for any other
+    //  `Unit`. A `Carrier` doesn't count: an aircraft can't board one yet, so it would still be lost.
+    aircraftFuel(unit) {
+        var _a, _b, _c;
+        const [, range] = (_a = turnEnd_1.aircraftRange.find(([UnitType]) => unit instanceof UnitType)) !== null && _a !== void 0 ? _a : [];
+        if (range === undefined) {
+            return null;
+        }
+        const turnsAloft = (_c = (_b = this._strategyNoteRegistry
+            .getByKey((0, turnEnd_1.turnsAloftKey)(unit))) === null || _b === void 0 ? void 0 : _b.value()) !== null && _c !== void 0 ? _c : 0;
+        return (unit.moves().value() +
+            Math.max(0, range - turnsAloft - 1) * unit.movement().value());
+    }
+    // Whether an aircraft can still get home after taking `action`: moving costs 1 and a `Fighter` pays 1 to attack from
+    //  where it is, but a `Bomber`'s attack ends its turn wherever it is.
+    aircraftCanReturn(unit, action) {
+        const fuel = this.aircraftFuel(unit);
+        if (fuel === null) {
+            return true;
+        }
+        const moving = action instanceof Actions_1.Move, from = moving ? action.to() : unit.tile(), remaining = !moving && unit instanceof Units_1.Bomber
+            ? fuel - unit.moves().value()
+            : fuel - 1;
+        return this._cityRegistry
+            .getByPlayer(this.player())
+            .some((city) => movesBetween(from, city.tile()) <= remaining);
     }
     scoreUnitMove(unit, tile) {
         const actions = unit.actions(tile), { attack, buildIrrigation, buildMine, buildRoad, captureCity, disembark, embark, fortify, foundCity, noOrders, sneakAttack, } = actions.reduce((object, entity) => ({
@@ -152,6 +192,10 @@ class SimpleAIClient extends AIClient_1.default {
         }), {});
         if (sneakAttack && !this.shouldAttack(sneakAttack.enemy())) {
             return -10;
+        }
+        const [firstAction] = actions;
+        if (firstAction && !this.aircraftCanReturn(unit, firstAction)) {
+            return -1;
         }
         if (!actions.length ||
             (actions.length === 1 && noOrders) ||
@@ -243,8 +287,9 @@ class SimpleAIClient extends AIClient_1.default {
                 const target = path.shift(), [move] = unit
                     .actions(target)
                     .filter((action) => action instanceof Actions_1.Move);
-                if (move instanceof Actions_1.SneakCaptureCity &&
-                    !this.shouldAttack(move.enemy())) {
+                if ((move instanceof Actions_1.SneakCaptureCity &&
+                    !this.shouldAttack(move.enemy())) ||
+                    (move && !this.aircraftCanReturn(unit, move))) {
                     this._unitPathData.delete(unit);
                     continue;
                 }
@@ -366,7 +411,7 @@ class SimpleAIClient extends AIClient_1.default {
             .getByPlayer(this.player())
             .forEach((city) => {
             const tileUnits = this._unitRegistry.getByTile(city.tile());
-            (0, assignWorkers_1.default)(city, this._playerWorldRegistry, this._cityGrowthRegistry);
+            (0, assignWorkers_1.default)(city, this._playerWorldRegistry, this._cityGrowthRegistry, this._workedTileRegistry);
             if (!tileUnits.length &&
                 !this._undefendedCities.includes(city.tile())) {
                 this._undefendedCities.push(city.tile());

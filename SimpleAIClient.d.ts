@@ -19,7 +19,9 @@ import { TerrainFeatureRegistry } from '@civ-clone/core-terrain-feature/TerrainF
 import { TileImprovementRegistry } from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
 import { Turn } from '@civ-clone/core-turn-based-game/Turn';
 import { UnitImprovementRegistry } from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
+import { StrategyNoteRegistry } from '@civ-clone/core-strategy/StrategyNoteRegistry';
 import { UnitRegistry } from '@civ-clone/core-unit/UnitRegistry';
+import { WorkedTileRegistry } from '@civ-clone/core-city/WorkedTileRegistry';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
 import City from '@civ-clone/core-city/City';
 import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
@@ -59,11 +61,13 @@ export declare class SimpleAIClient extends AIClient {
   private _playerTreasuryRegistry;
   private _playerWorldRegistry;
   private _ruleRegistry;
+  private _strategyNoteRegistry;
   private _terrainFeatureRegistry;
   private _tileImprovementRegistry;
   private _turn;
   private _unitImprovementRegistry;
   private _unitRegistry;
+  private _workedTileRegistry;
   private _engine;
   constructor(
     player: Player,
@@ -85,8 +89,12 @@ export declare class SimpleAIClient extends AIClient {
     clientRegistry?: ClientRegistry,
     interactionRegistry?: InteractionRegistry,
     turn?: Turn,
-    randomNumberGenerator?: () => number
+    randomNumberGenerator?: () => number,
+    strategyNoteRegistry?: StrategyNoteRegistry,
+    workedTileRegistry?: WorkedTileRegistry
   );
+  private aircraftFuel;
+  private aircraftCanReturn;
   scoreUnitMove(unit: Unit, tile: Tile): number;
   moveUnit(unit: Unit): Promise<void>;
   preProcessTurn(): void;

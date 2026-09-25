@@ -110,9 +110,21 @@ import {
   instance as unitImprovementRegistryInstance,
 } from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
 import {
+  StrategyNoteRegistry,
+  instance as strategyNoteRegistryInstance,
+} from '@civ-clone/core-strategy/StrategyNoteRegistry';
+import {
   UnitRegistry,
   instance as unitRegistryInstance,
 } from '@civ-clone/core-unit/UnitRegistry';
+import {
+  WorkedTileRegistry,
+  instance as workedTileRegistryInstance,
+} from '@civ-clone/core-city/WorkedTileRegistry';
+import {
+  aircraftRange,
+  turnsAloftKey,
+} from '@civ-clone/civ1-unit/Rules/Player/turnEnd';
 import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
 import Action from '@civ-clone/core-unit/Action';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
@@ -138,7 +150,7 @@ import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
 import Resolution from '@civ-clone/core-diplomacy/Proposal/Resolution';
-import { Settlers } from '@civ-clone/civ1-unit/Units';
+import { Bomber, Settlers } from '@civ-clone/civ1-unit/Units';
 import Terrain from '@civ-clone/core-terrain/Terrain';
 import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
 import Tile from '@civ-clone/core-world/Tile';
@@ -177,7 +189,22 @@ const awaitTimeout = (delay: number, reason?: any) =>
     setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay)
   );
 
-const hasPlayerCity = (
+// How many moves an `Air` `Unit` needs to get from one `Tile` to the other: every step costs 1, diagonals included, and
+//  the map wraps as it does in `Tile#distanceFrom`.
+const movesBetween = (from: Tile, to: Tile): number => {
+    const map = from.map(),
+      onAxis = (delta: number, size: number): number => {
+        const direct = Math.abs(delta);
+
+        return Math.min(direct, Math.abs(size - direct));
+      };
+
+    return Math.max(
+      onAxis(from.x() - to.x(), map.width()),
+      onAxis(from.y() - to.y(), map.height())
+    );
+  },
+  hasPlayerCity = (
     tile: Tile,
     player: Player,
     cityRegistry: CityRegistry = cityRegistryInstance
@@ -310,11 +337,13 @@ export class SimpleAIClient extends AIClient {
   private _playerTreasuryRegistry: PlayerTreasuryRegistry;
   private _playerWorldRegistry: PlayerWorldRegistry;
   private _ruleRegistry: RuleRegistry;
+  private _strategyNoteRegistry: StrategyNoteRegistry;
   private _terrainFeatureRegistry: TerrainFeatureRegistry;
   private _tileImprovementRegistry: TileImprovementRegistry;
   private _turn: Turn;
   private _unitImprovementRegistry: UnitImprovementRegistry;
   private _unitRegistry: UnitRegistry;
+  private _workedTileRegistry: WorkedTileRegistry;
   private _engine: Engine;
 
   constructor(
@@ -337,7 +366,9 @@ export class SimpleAIClient extends AIClient {
     clientRegistry: ClientRegistry = clientRegistryInstance,
     interactionRegistry: InteractionRegistry = interactionRegistryInstance,
     turn: Turn = turnInstance,
-    randomNumberGenerator: () => number = rngInstance
+    randomNumberGenerator: () => number = rngInstance,
+    strategyNoteRegistry: StrategyNoteRegistry = strategyNoteRegistryInstance,
+    workedTileRegistry: WorkedTileRegistry = workedTileRegistryInstance
   ) {
     // The generator goes to `core-client`'s `Client`, which holds the one
     // `protected _randomNumberGenerator`. This class declared a second
@@ -357,12 +388,58 @@ export class SimpleAIClient extends AIClient {
     this._playerTreasuryRegistry = playerTreasuryRegistry;
     this._playerWorldRegistry = playerWorldRegistry;
     this._ruleRegistry = ruleRegistry;
+    this._strategyNoteRegistry = strategyNoteRegistry;
     this._terrainFeatureRegistry = terrainFeatureRegistry;
     this._turn = turn;
     this._unitImprovementRegistry = unitImprovementRegistry;
     this._tileImprovementRegistry = tileImprovementRegistry;
     this._unitRegistry = unitRegistry;
+    this._workedTileRegistry = workedTileRegistry;
     this._engine = engine;
+  }
+
+  // How many more moves an aircraft can make before it must be back in one of our `City`s, or `null` for any other
+  //  `Unit`. A `Carrier` doesn't count: an aircraft can't board one yet, so it would still be lost.
+  private aircraftFuel(unit: Unit): number | null {
+    const [, range] =
+      aircraftRange.find(([UnitType]) => unit instanceof UnitType) ?? [];
+
+    if (range === undefined) {
+      return null;
+    }
+
+    const turnsAloft =
+      this._strategyNoteRegistry
+        .getByKey<number>(turnsAloftKey(unit))
+        ?.value() ?? 0;
+
+    return (
+      unit.moves().value() +
+      Math.max(0, range - turnsAloft - 1) * unit.movement().value()
+    );
+  }
+
+  // Whether an aircraft can still get home after taking `action`: moving costs 1 and a `Fighter` pays 1 to attack from
+  //  where it is, but a `Bomber`'s attack ends its turn wherever it is.
+  private aircraftCanReturn(unit: Unit, action: Action): boolean {
+    const fuel = this.aircraftFuel(unit);
+
+    if (fuel === null) {
+      return true;
+    }
+
+    const moving = action instanceof Move,
+      from = moving ? action.to() : unit.tile(),
+      remaining =
+        !moving && unit instanceof Bomber
+          ? fuel - unit.moves().value()
+          : fuel - 1;
+
+    return this._cityRegistry
+      .getByPlayer(this.player())
+      .some(
+        (city: City): boolean => movesBetween(from, city.tile()) <= remaining
+      );
   }
 
   scoreUnitMove(unit: Unit, tile: Tile): number {
@@ -391,6 +468,12 @@ export class SimpleAIClient extends AIClient {
 
     if (sneakAttack && !this.shouldAttack(sneakAttack.enemy())) {
       return -10;
+    }
+
+    const [firstAction] = actions;
+
+    if (firstAction && !this.aircraftCanReturn(unit, firstAction)) {
+      return -1;
     }
 
     if (
@@ -536,8 +619,9 @@ export class SimpleAIClient extends AIClient {
             .filter((action) => action instanceof Move);
 
         if (
-          move instanceof SneakCaptureCity &&
-          !this.shouldAttack(move.enemy())
+          (move instanceof SneakCaptureCity &&
+            !this.shouldAttack(move.enemy())) ||
+          (move && !this.aircraftCanReturn(unit, move as Action))
         ) {
           this._unitPathData.delete(unit);
 
@@ -714,7 +798,8 @@ export class SimpleAIClient extends AIClient {
         assignWorkers(
           city,
           this._playerWorldRegistry,
-          this._cityGrowthRegistry
+          this._cityGrowthRegistry,
+          this._workedTileRegistry
         );
 
         if (

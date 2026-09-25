@@ -289,6 +289,7 @@ import unitLostAtSea from '@civ-clone/civ1-unit/Rules/Unit/lostAtSea';
 import unitMoved from '@civ-clone/civ1-unit/Rules/Unit/moved';
 import unitMovementCost from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
 import unitPlayerAction from '@civ-clone/civ1-unit/Rules/Player/action';
+import unitPlayerTurnEnd from '@civ-clone/civ1-unit/Rules/Player/turnEnd';
 import unitStowed from '@civ-clone/civ1-unit/Rules/Unit/stowed';
 import unitUnsupported from '@civ-clone/civ1-unit/Rules/Unit/unsupported';
 import unitValidateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
@@ -399,7 +400,10 @@ describe('SimpleAIClient', (): void => {
               undefined,
               clientRegistry,
               interactionRegistry,
-              turn
+              turn,
+              undefined,
+              strategyNoteRegistry,
+              workedTileRegistry
             ),
             availableCivilizations = civilizationRegistry.entries();
 
@@ -813,6 +817,13 @@ describe('SimpleAIClient', (): void => {
     ),
     ...unitMovementCost(tileImprovementRegistry, transportRegistry),
     ...unitPlayerAction(unitRegistry),
+    ...unitPlayerTurnEnd(
+      unitRegistry,
+      cityRegistry,
+      transportRegistry,
+      strategyNoteRegistry,
+      ruleRegistry
+    ),
     ...unitStowed(),
     ...unitUnsupported(),
     ...unitValidateMove(),
@@ -1112,4 +1123,38 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
+
+  (
+    [
+      [Fighter, 3],
+      [Bomber, 6],
+    ] as [typeof Fighter | typeof Bomber, number][]
+  ).forEach(([UnitType, turns]) =>
+    it(`should bring a ${UnitType.name} home before it runs out of fuel`, async (): Promise<void> => {
+      const [client] = await createClients(),
+        world = await simpleWorldLoader('400G', 20, 20),
+        player = client.player(),
+        playerWorld = playerWorldRegistry.getByPlayer(player),
+        city = new City(
+          player,
+          world.get(10, 10),
+          '',
+          ruleRegistry,
+          workedTileRegistry
+        ),
+        unit = new UnitType(null, player, world.get(10, 10), ruleRegistry),
+        seen = playerWorld.entries().length;
+
+      await takeTurns(client, turns);
+
+      expect(unit.destroyed()).false;
+      expect(playerWorld.entries().length).greaterThan(seen);
+
+      cityRegistry.unregister(city);
+      clientRegistry.unregister(client);
+      currentPlayerRegistry.unregister(player);
+      playerRegistry.unregister(player);
+      unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+    })
+  );
 });
