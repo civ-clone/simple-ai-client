@@ -455,166 +455,177 @@ class SimpleAIClient extends AIClient_1.default {
                 }
                 while (this.player().hasMandatoryActions()) {
                     const action = this.player().mandatoryAction(), item = action.value();
-                    // TODO: Remove this when it's working as expected
-                    if (loopCheck++ > 1e3) {
-                        // TODO: raise warning - notification?
-                        console.log('');
-                        console.log('');
-                        console.log(item);
+                    try {
+                        // TODO: Remove this when it's working as expected
+                        if (loopCheck++ > 1e3) {
+                            // TODO: raise warning - notification?
+                            console.log('');
+                            console.log('');
+                            console.log(item);
+                            if (item instanceof Unit_1.default) {
+                                console.log(item.actions());
+                                item
+                                    .tile()
+                                    .getNeighbours()
+                                    .forEach((tile) => console.log(item.actions(tile)));
+                                console.log(item.active());
+                                console.log(item.busy());
+                                console.log(item.moves().value());
+                                console.log(this._unitImprovementRegistry.getByUnit(item));
+                            }
+                            // Do nothing, but shout about it
+                            this.noOrders(item);
+                            console.error("SimpleAIClient: Couldn't pick an action to do.");
+                            break;
+                        }
                         if (item instanceof Unit_1.default) {
-                            console.log(item.actions());
-                            item
-                                .tile()
-                                .getNeighbours()
-                                .forEach((tile) => console.log(item.actions(tile)));
-                            console.log(item.active());
-                            console.log(item.busy());
-                            console.log(item.moves().value());
-                            console.log(this._unitImprovementRegistry.getByUnit(item));
-                        }
-                        // Do nothing, but shout about it
-                        this.noOrders(item);
-                        console.error("SimpleAIClient: Couldn't pick an action to do.");
-                        break;
-                    }
-                    if (item instanceof Unit_1.default) {
-                        const unit = item, tile = unit.tile(), target = this._unitTargetData.get(unit), actions = unit.actions(), { buildIrrigation, buildMine, buildRoad, fortify, foundCity, unload, } = actions.reduce((object, entity) => ({
-                            ...object,
-                            [entity.constructor.name.replace(/^./, (char) => char.toLowerCase())]: entity,
-                        }), {}), tileUnits = this._unitRegistry.getByTile(tile), lastUnitMoves = this._lastUnitMoves.get(unit);
-                        if (!lastUnitMoves) {
-                            this._lastUnitMoves.set(unit, [unit.tile()]);
-                        }
-                        if (unit instanceof Types_1.NavalTransport &&
-                            unload &&
-                            tile.isCoast() &&
-                            unit
-                                .cargo()
-                                .some((unit) => !tile
-                                .getNeighbours()
-                                .some((tile) => (this._lastUnitMoves.get(unit) || []).includes(tile)))) {
-                            unit.action(unload);
-                            unit.setWaiting();
-                            // skip out to allow the unloaded units to be moved.
-                            continue;
-                        }
-                        if (unit instanceof Types_1.Worker) {
-                            if (foundCity && this._shouldBuildCity(tile)) {
-                                unit.action(foundCity);
+                            const unit = item, tile = unit.tile(), target = this._unitTargetData.get(unit), actions = unit.actions(), { buildIrrigation, buildMine, buildRoad, fortify, foundCity, unload, } = actions.reduce((object, entity) => ({
+                                ...object,
+                                [entity.constructor.name.replace(/^./, (char) => char.toLowerCase())]: entity,
+                            }), {}), tileUnits = this._unitRegistry.getByTile(tile), lastUnitMoves = this._lastUnitMoves.get(unit);
+                            if (!lastUnitMoves) {
+                                this._lastUnitMoves.set(unit, [unit.tile()]);
                             }
-                            else if (buildIrrigation && this._shouldIrrigate(tile)) {
-                                unit.action(buildIrrigation);
+                            if (unit instanceof Types_1.NavalTransport &&
+                                unload &&
+                                tile.isCoast() &&
+                                unit
+                                    .cargo()
+                                    .some((unit) => !tile
+                                    .getNeighbours()
+                                    .some((tile) => (this._lastUnitMoves.get(unit) || []).includes(tile)))) {
+                                unit.action(unload);
+                                unit.setWaiting();
+                                // skip out to allow the unloaded units to be moved.
+                                continue;
                             }
-                            else if (buildMine && this._shouldMine(tile)) {
-                                unit.action(buildMine);
+                            if (unit instanceof Types_1.Worker) {
+                                if (foundCity && this._shouldBuildCity(tile)) {
+                                    unit.action(foundCity);
+                                }
+                                else if (buildIrrigation && this._shouldIrrigate(tile)) {
+                                    unit.action(buildIrrigation);
+                                }
+                                else if (buildMine && this._shouldMine(tile)) {
+                                    unit.action(buildMine);
+                                }
+                                else if (buildRoad && this._shouldRoad(tile)) {
+                                    unit.action(buildRoad);
+                                }
+                                else if (!target && this._goodSitesForCities.length) {
+                                    this._unitTargetData.set(unit, this._goodSitesForCities.shift());
+                                }
+                                await this.moveUnit(unit);
+                                continue;
                             }
-                            else if (buildRoad && this._shouldRoad(tile)) {
-                                unit.action(buildRoad);
+                            // TODO: check for defense values and activate weaker for disband/upgrade/scouting
+                            const [cityUnitWithLowerDefence] = tileUnits.filter((tileUnit) => this._unitImprovementRegistry
+                                .getByUnit(tileUnit)
+                                .some((improvement) => improvement instanceof UnitImprovements_1.Fortified) && unit.defence() > tileUnit.defence()), city = this._cityRegistry.getByTile(tile);
+                            if (fortify &&
+                                city &&
+                                (cityUnitWithLowerDefence ||
+                                    tileUnits.length <=
+                                        Math.ceil(this._cityGrowthRegistry.getByCity(city).size() / 5))) {
+                                unit.action(fortify);
+                                if (cityUnitWithLowerDefence) {
+                                    cityUnitWithLowerDefence.activate();
+                                }
+                                continue;
                             }
-                            else if (!target && this._goodSitesForCities.length) {
-                                this._unitTargetData.set(unit, this._goodSitesForCities.shift());
+                            if (!target) {
+                                // TODO: all the repetition - sort this.
+                                if (unit instanceof Types_1.Fortifiable &&
+                                    unit.defence().value() > 0 &&
+                                    this._undefendedCities.length > 0) {
+                                    const [targetTile] = this._undefendedCities.sort((a, b) => a.distanceFrom(unit.tile()) -
+                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
+                                    if (path) {
+                                        this._undefendedCities.splice(this._undefendedCities.indexOf(targetTile), 1);
+                                        this._unitPathData.set(unit, path);
+                                    }
+                                }
+                                else if (unit.attack().value() > 0 &&
+                                    this._citiesToLiberate.length > 0) {
+                                    const [targetTile] = this._citiesToLiberate
+                                        .filter((tile) => unit instanceof Types_1.Land && tile.isLand())
+                                        .sort((a, b) => a.distanceFrom(unit.tile()) -
+                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
+                                    if (path) {
+                                        this._citiesToLiberate.splice(this._citiesToLiberate.indexOf(targetTile), 1);
+                                        this._unitPathData.set(unit, path);
+                                    }
+                                }
+                                else if (unit.attack().value() > 0 &&
+                                    this._enemyUnitsToAttack.length > 0) {
+                                    const [targetTile] = this._enemyUnitsToAttack
+                                        .filter((tile) => (unit instanceof Types_1.Land && tile.isLand()) ||
+                                        (unit instanceof Types_1.Naval && tile.isWater()))
+                                        .sort((a, b) => a.distanceFrom(unit.tile()) -
+                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
+                                    if (path) {
+                                        this._enemyUnitsToAttack.splice(this._enemyUnitsToAttack.indexOf(targetTile), 1);
+                                        this._unitPathData.set(unit, path);
+                                    }
+                                }
+                                else if (unit instanceof Types_1.Land &&
+                                    unit.attack().value() > 0 &&
+                                    this._enemyCitiesToAttack.length > 0) {
+                                    const [targetTile] = this._enemyCitiesToAttack.sort((a, b) => a.distanceFrom(unit.tile()) -
+                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
+                                    if (path) {
+                                        this._enemyCitiesToAttack.splice(this._enemyCitiesToAttack.indexOf(targetTile), 1);
+                                        this._unitPathData.set(unit, path);
+                                    }
+                                }
+                                else if (unit instanceof Types_1.Land &&
+                                    this._landTilesToExplore.length > 0) {
+                                    const [targetTile] = this._landTilesToExplore.sort((a, b) => a.distanceFrom(unit.tile()) -
+                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
+                                    if (path) {
+                                        this._landTilesToExplore.splice(this._landTilesToExplore.indexOf(targetTile), 1);
+                                        this._unitPathData.set(unit, path);
+                                    }
+                                }
+                                else if (unit instanceof Types_1.Naval &&
+                                    this._seaTilesToExplore.length > 0) {
+                                    const [targetTile] = this._seaTilesToExplore.sort((a, b) => a.distanceFrom(unit.tile()) -
+                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
+                                    if (path) {
+                                        this._seaTilesToExplore.splice(this._seaTilesToExplore.indexOf(targetTile), 1);
+                                        this._unitPathData.set(unit, path);
+                                    }
+                                }
                             }
                             await this.moveUnit(unit);
                             continue;
                         }
-                        // TODO: check for defense values and activate weaker for disband/upgrade/scouting
-                        const [cityUnitWithLowerDefence] = tileUnits.filter((tileUnit) => this._unitImprovementRegistry
-                            .getByUnit(tileUnit)
-                            .some((improvement) => improvement instanceof UnitImprovements_1.Fortified) && unit.defence() > tileUnit.defence()), city = this._cityRegistry.getByTile(tile);
-                        if (fortify &&
-                            city &&
-                            (cityUnitWithLowerDefence ||
-                                tileUnits.length <=
-                                    Math.ceil(this._cityGrowthRegistry.getByCity(city).size() / 5))) {
-                            unit.action(fortify);
-                            if (cityUnitWithLowerDefence) {
-                                cityUnitWithLowerDefence.activate();
+                        if (item instanceof CityBuild_1.default) {
+                            this.buildItemInCity(item.city());
+                            continue;
+                        }
+                        if (item instanceof PlayerResearch_1.default) {
+                            const available = item.available();
+                            if (available.length) {
+                                item.research(available[Math.floor(available.length * this._randomNumberGenerator())]);
                             }
                             continue;
                         }
-                        if (!target) {
-                            // TODO: all the repetition - sort this.
-                            if (unit instanceof Types_1.Fortifiable &&
-                                unit.defence().value() > 0 &&
-                                this._undefendedCities.length > 0) {
-                                const [targetTile] = this._undefendedCities.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                    b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
-                                if (path) {
-                                    this._undefendedCities.splice(this._undefendedCities.indexOf(targetTile), 1);
-                                    this._unitPathData.set(unit, path);
-                                }
-                            }
-                            else if (unit.attack().value() > 0 &&
-                                this._citiesToLiberate.length > 0) {
-                                const [targetTile] = this._citiesToLiberate
-                                    .filter((tile) => unit instanceof Types_1.Land && tile.isLand())
-                                    .sort((a, b) => a.distanceFrom(unit.tile()) -
-                                    b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
-                                if (path) {
-                                    this._citiesToLiberate.splice(this._citiesToLiberate.indexOf(targetTile), 1);
-                                    this._unitPathData.set(unit, path);
-                                }
-                            }
-                            else if (unit.attack().value() > 0 &&
-                                this._enemyUnitsToAttack.length > 0) {
-                                const [targetTile] = this._enemyUnitsToAttack
-                                    .filter((tile) => (unit instanceof Types_1.Land && tile.isLand()) ||
-                                    (unit instanceof Types_1.Naval && tile.isWater()))
-                                    .sort((a, b) => a.distanceFrom(unit.tile()) -
-                                    b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
-                                if (path) {
-                                    this._enemyUnitsToAttack.splice(this._enemyUnitsToAttack.indexOf(targetTile), 1);
-                                    this._unitPathData.set(unit, path);
-                                }
-                            }
-                            else if (unit instanceof Types_1.Land &&
-                                unit.attack().value() > 0 &&
-                                this._enemyCitiesToAttack.length > 0) {
-                                const [targetTile] = this._enemyCitiesToAttack.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                    b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
-                                if (path) {
-                                    this._enemyCitiesToAttack.splice(this._enemyCitiesToAttack.indexOf(targetTile), 1);
-                                    this._unitPathData.set(unit, path);
-                                }
-                            }
-                            else if (unit instanceof Types_1.Land &&
-                                this._landTilesToExplore.length > 0) {
-                                const [targetTile] = this._landTilesToExplore.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                    b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
-                                if (path) {
-                                    this._landTilesToExplore.splice(this._landTilesToExplore.indexOf(targetTile), 1);
-                                    this._unitPathData.set(unit, path);
-                                }
-                            }
-                            else if (unit instanceof Types_1.Naval &&
-                                this._seaTilesToExplore.length > 0) {
-                                const [targetTile] = this._seaTilesToExplore.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                    b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._pathFinderRegistry);
-                                if (path) {
-                                    this._seaTilesToExplore.splice(this._seaTilesToExplore.indexOf(targetTile), 1);
-                                    this._unitPathData.set(unit, path);
-                                }
-                            }
+                        if (action instanceof EndTurn_1.default) {
+                            break;
                         }
-                        await this.moveUnit(unit);
-                        continue;
-                    }
-                    if (item instanceof CityBuild_1.default) {
-                        this.buildItemInCity(item.city());
-                        continue;
-                    }
-                    if (item instanceof PlayerResearch_1.default) {
-                        const available = item.available();
-                        if (available.length) {
-                            item.research(available[Math.floor(available.length * this._randomNumberGenerator())]);
-                        }
-                        continue;
-                    }
-                    if (action instanceof EndTurn_1.default) {
+                        console.log(`Can't process: '${item.constructor.name}'`);
                         break;
                     }
-                    console.log(`Can't process: '${item.constructor.name}'`);
-                    break;
+                    catch (e) {
+                        if (!(item instanceof Unit_1.default)) {
+                            throw e;
+                        }
+                        // One unit's failed move shouldn't cost the player the rest of their turn, so log it, stop that unit for
+                        //  this turn and carry on with the others (civ-clone/web-renderer#79).
+                        console.error(`SimpleAIClient: ${item.constructor.name} ${item.id()} couldn't act and was skipped this turn:`, e);
+                        this.skipUnit(item);
+                    }
                 }
                 resolve();
             }
@@ -772,6 +783,16 @@ class SimpleAIClient extends AIClient_1.default {
         }
         this._interactionRegistry.register(negotiation);
         return negotiation;
+    }
+    skipUnit(unit) {
+        try {
+            this.noOrders(unit);
+        }
+        catch (e) {
+            // `NoOrders` is only a fallback here, so if it fails too, make sure the unit stops being a mandatory action.
+            unit.moves().set(0);
+            unit.setActive(false);
+        }
     }
     noOrders(unit) {
         unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit, this._ruleRegistry));
