@@ -95,6 +95,7 @@ export declare class SimpleAIClient extends AIClient {
   );
   private aircraftFuel;
   private aircraftCanReturn;
+  private carriersFor;
   scoreUnitMove(unit: Unit, tile: Tile): number;
   moveUnit(unit: Unit): Promise<void>;
   preProcessTurn(): void;
