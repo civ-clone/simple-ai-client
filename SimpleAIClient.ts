@@ -141,7 +141,20 @@ import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
 import Initiate from '@civ-clone/core-diplomacy/Negotiation/Initiate';
 import { Monarchy as MonarchyAdvance } from '@civ-clone/civ1-science/Advances';
-import { Monarchy as MonarchyGovernment } from '@civ-clone/civ1-government/Governments';
+import {
+  Anarchy as AnarchyGovernment,
+  Monarchy as MonarchyGovernment,
+} from '@civ-clone/civ1-government/Governments';
+import {
+  PendingEffectRegistry,
+  instance as pendingEffectRegistryInstance,
+} from '@civ-clone/core-pending-effect';
+import {
+  chooseGovernment,
+  pendingRevolution,
+  revolution,
+} from '@civ-clone/civ1-government/lib/revolution';
+import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
 import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
 import OfferPeace from '@civ-clone/library-diplomacy/Proposals/OfferPeace';
 import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
@@ -332,6 +345,7 @@ export class SimpleAIClient extends AIClient {
   private _goodyHutRegistry: GoodyHutRegistry;
   private _interactionRegistry: InteractionRegistry;
   private _pathFinderRegistry: PathFinderRegistry;
+  private _pendingEffectRegistry: PendingEffectRegistry;
   private _playerGovernmentRegistry: PlayerGovernmentRegistry;
   private _playerResearchRegistry: PlayerResearchRegistry;
   private _playerTreasuryRegistry: PlayerTreasuryRegistry;
@@ -368,7 +382,8 @@ export class SimpleAIClient extends AIClient {
     turn: Turn = turnInstance,
     randomNumberGenerator: () => number = rngInstance,
     strategyNoteRegistry: StrategyNoteRegistry = strategyNoteRegistryInstance,
-    workedTileRegistry: WorkedTileRegistry = workedTileRegistryInstance
+    workedTileRegistry: WorkedTileRegistry = workedTileRegistryInstance,
+    pendingEffectRegistry: PendingEffectRegistry = pendingEffectRegistryInstance
   ) {
     // The generator goes to `core-client`'s `Client`, which holds the one
     // `protected _randomNumberGenerator`. This class declared a second
@@ -383,6 +398,7 @@ export class SimpleAIClient extends AIClient {
     this._goodyHutRegistry = goodyHutRegistry;
     this._interactionRegistry = interactionRegistry;
     this._pathFinderRegistry = pathFinderRegistry;
+    this._pendingEffectRegistry = pendingEffectRegistry;
     this._playerGovernmentRegistry = playerGovernmentRegistry;
     this._playerResearchRegistry = playerResearchRegistry;
     this._playerTreasuryRegistry = playerTreasuryRegistry;
@@ -901,11 +917,20 @@ export class SimpleAIClient extends AIClient {
             [playerResearch] = this._playerResearchRegistry.filter(
               (playerScience) => playerScience.player() === this.player()
             );
+          // Through a revolution, like a human player: Anarchy first, then
+          // `ChooseGovernment` below once it's over.
           if (
             playerResearch.completed(MonarchyAdvance) &&
-            !playerGovernment.is(MonarchyGovernment)
+            !playerGovernment.is(MonarchyGovernment, AnarchyGovernment) &&
+            pendingRevolution(playerGovernment, this._pendingEffectRegistry) ===
+              null
           ) {
-            playerGovernment.set(new MonarchyGovernment());
+            revolution(
+              playerGovernment,
+              this._pendingEffectRegistry,
+              this._ruleRegistry,
+              this._turn
+            );
           }
 
           while (this.player().hasMandatoryActions()) {
@@ -1243,6 +1268,21 @@ export class SimpleAIClient extends AIClient {
                     ]
                   );
                 }
+
+                continue;
+              }
+
+              if (item instanceof PlayerGovernment) {
+                const available = item.available();
+
+                chooseGovernment(
+                  item,
+                  available.includes(MonarchyGovernment)
+                    ? MonarchyGovernment
+                    : available[0],
+                  this._pendingEffectRegistry,
+                  this._turn
+                );
 
                 continue;
               }

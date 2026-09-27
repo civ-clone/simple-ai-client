@@ -41,6 +41,9 @@ const Gold_1 = require("@civ-clone/base-city-yield-gold/Gold");
 const Initiate_1 = require("@civ-clone/core-diplomacy/Negotiation/Initiate");
 const Advances_1 = require("@civ-clone/civ1-science/Advances");
 const Governments_1 = require("@civ-clone/civ1-government/Governments");
+const core_pending_effect_1 = require("@civ-clone/core-pending-effect");
+const revolution_1 = require("@civ-clone/civ1-government/lib/revolution");
+const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment");
 const Negotiation_1 = require("@civ-clone/core-diplomacy/Negotiation");
 const OfferPeace_1 = require("@civ-clone/library-diplomacy/Proposals/OfferPeace");
 const CityImprovements_1 = require("@civ-clone/civ1-city-improvement/CityImprovements");
@@ -71,7 +74,7 @@ const movesBetween = (from, to) => {
     return city.player() === player;
 }, MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
 class SimpleAIClient extends AIClient_1.default {
-    constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance, engine = Engine_1.instance, clientRegistry = ClientRegistry_1.instance, interactionRegistry = InteractionRegistry_1.instance, turn = Turn_1.instance, randomNumberGenerator = core_random_1.instance, strategyNoteRegistry = StrategyNoteRegistry_1.instance, workedTileRegistry = WorkedTileRegistry_1.instance) {
+    constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance, engine = Engine_1.instance, clientRegistry = ClientRegistry_1.instance, interactionRegistry = InteractionRegistry_1.instance, turn = Turn_1.instance, randomNumberGenerator = core_random_1.instance, strategyNoteRegistry = StrategyNoteRegistry_1.instance, workedTileRegistry = WorkedTileRegistry_1.instance, pendingEffectRegistry = core_pending_effect_1.instance) {
         // The generator goes to `core-client`'s `Client`, which holds the one
         // `protected _randomNumberGenerator`. This class declared a second
         // `#randomNumberGenerator` shadowing it, which two `private` fields of the
@@ -144,6 +147,7 @@ class SimpleAIClient extends AIClient_1.default {
         this._goodyHutRegistry = goodyHutRegistry;
         this._interactionRegistry = interactionRegistry;
         this._pathFinderRegistry = pathFinderRegistry;
+        this._pendingEffectRegistry = pendingEffectRegistry;
         this._playerGovernmentRegistry = playerGovernmentRegistry;
         this._playerResearchRegistry = playerResearchRegistry;
         this._playerTreasuryRegistry = playerTreasuryRegistry;
@@ -477,9 +481,13 @@ class SimpleAIClient extends AIClient_1.default {
                 let loopCheck = 0;
                 this.preProcessTurn();
                 const [playerGovernment] = this._playerGovernmentRegistry.filter((playerGovernment) => playerGovernment.player() === this.player()), [playerResearch] = this._playerResearchRegistry.filter((playerScience) => playerScience.player() === this.player());
+                // Through a revolution, like a human player: Anarchy first, then
+                // `ChooseGovernment` below once it's over.
                 if (playerResearch.completed(Advances_1.Monarchy) &&
-                    !playerGovernment.is(Governments_1.Monarchy)) {
-                    playerGovernment.set(new Governments_1.Monarchy());
+                    !playerGovernment.is(Governments_1.Monarchy, Governments_1.Anarchy) &&
+                    (0, revolution_1.pendingRevolution)(playerGovernment, this._pendingEffectRegistry) ===
+                        null) {
+                    (0, revolution_1.revolution)(playerGovernment, this._pendingEffectRegistry, this._ruleRegistry, this._turn);
                 }
                 while (this.player().hasMandatoryActions()) {
                     const action = this.player().mandatoryAction(), item = action.value();
@@ -650,6 +658,13 @@ class SimpleAIClient extends AIClient_1.default {
                             if (available.length) {
                                 item.research(available[Math.floor(available.length * this._randomNumberGenerator())]);
                             }
+                            continue;
+                        }
+                        if (item instanceof PlayerGovernment_1.default) {
+                            const available = item.available();
+                            (0, revolution_1.chooseGovernment)(item, available.includes(Governments_1.Monarchy)
+                                ? Governments_1.Monarchy
+                                : available[0], this._pendingEffectRegistry, this._turn);
                             continue;
                         }
                         if (action instanceof EndTurn_1.default) {

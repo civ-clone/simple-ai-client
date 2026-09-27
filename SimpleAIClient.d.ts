@@ -25,6 +25,7 @@ import { WorkedTileRegistry } from '@civ-clone/core-city/WorkedTileRegistry';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
 import City from '@civ-clone/core-city/City';
 import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
+import { PendingEffectRegistry } from '@civ-clone/core-pending-effect';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -56,6 +57,7 @@ export declare class SimpleAIClient extends AIClient {
   private _goodyHutRegistry;
   private _interactionRegistry;
   private _pathFinderRegistry;
+  private _pendingEffectRegistry;
   private _playerGovernmentRegistry;
   private _playerResearchRegistry;
   private _playerTreasuryRegistry;
@@ -91,7 +93,8 @@ export declare class SimpleAIClient extends AIClient {
     turn?: Turn,
     randomNumberGenerator?: () => number,
     strategyNoteRegistry?: StrategyNoteRegistry,
-    workedTileRegistry?: WorkedTileRegistry
+    workedTileRegistry?: WorkedTileRegistry,
+    pendingEffectRegistry?: PendingEffectRegistry
   );
   private aircraftFuel;
   private aircraftCanReturn;
