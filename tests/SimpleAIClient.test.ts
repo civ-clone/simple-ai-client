@@ -226,6 +226,14 @@ import goodyHutDistribution from '@civ-clone/civ1-goody-hut/Rules/GoodyHut/distr
 import goodyHutUnit from '@civ-clone/civ1-goody-hut/Rules/GoodyHut/unit';
 import goodyHutUnitMoved from '@civ-clone/civ1-goody-hut/Rules/Unit/moved';
 import goodyHutWorldBuilt from '@civ-clone/civ1-goody-hut/Rules/World/built';
+import {
+  Anarchy as AnarchyGovernment,
+  Despotism as DespotismGovernment,
+  Monarchy as MonarchyGovernment,
+} from '@civ-clone/civ1-government/Governments';
+import PendingEffectRegistry from '@civ-clone/core-pending-effect/PendingEffectRegistry';
+import { pendingRevolution } from '@civ-clone/civ1-government/lib/revolution';
+import governmentAnarchyDuration from '@civ-clone/civ1-government/Rules/Player/anarchy-duration';
 import governmentAvailability from '@civ-clone/civ1-government/Rules/Governments/availability';
 import governmentPlayerAction from '@civ-clone/civ1-government/Rules/Player/action';
 import governmentPlayerAdded from '@civ-clone/civ1-government/Rules/Player/added';
@@ -341,6 +349,7 @@ describe('SimpleAIClient', (): void => {
     layoutRegistry = new LayoutRegistry(),
     leaderRegistry = new LeaderRegistry(),
     pathFinderRegistry = new PathFinderRegistry(),
+    pendingEffectRegistry = new PendingEffectRegistry(),
     playerGovernmentRegistry = new PlayerGovernmentRegistry(),
     playerRegistry = new PlayerRegistry(),
     playerResearchRegistry = new PlayerResearchRegistry(),
@@ -406,7 +415,8 @@ describe('SimpleAIClient', (): void => {
               turn,
               undefined,
               strategyNoteRegistry,
-              workedTileRegistry
+              workedTileRegistry,
+              pendingEffectRegistry
             ),
             availableCivilizations = civilizationRegistry.entries();
 
@@ -431,6 +441,12 @@ describe('SimpleAIClient', (): void => {
           return client;
         })
       );
+
+  availableGovernmentRegistry.register(
+    AnarchyGovernment,
+    DespotismGovernment,
+    MonarchyGovernment
+  );
 
   advanceRegistry.register(
     AdvancedFlight,
@@ -682,7 +698,13 @@ describe('SimpleAIClient', (): void => {
     ...goodyHutUnitMoved(goodyHutRegistry),
     // ...goodyHutWorldBuilt(goodyHutRegistry, ruleRegistry), // To add in as needed when testing `Player`s proclivity for `GoodyHut`s.
     ...governmentAvailability(playerResearchRegistry),
-    ...governmentPlayerAction(playerGovernmentRegistry),
+    // Two turns of Anarchy, whatever the draw, so the test knows when it ends.
+    ...governmentAnarchyDuration(() => 0.25),
+    ...governmentPlayerAction(
+      playerGovernmentRegistry,
+      pendingEffectRegistry,
+      turn
+    ),
     ...governmentPlayerAdded(
       availableGovernmentRegistry,
       playerGovernmentRegistry,
@@ -1275,5 +1297,33 @@ describe('SimpleAIClient', (): void => {
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+  it('should go through Anarchy to Monarchy once it knows Monarchy', async (): Promise<void> => {
+    const [client] = await createClients(),
+      player = client.player(),
+      playerGovernment = playerGovernmentRegistry.getByPlayer(player);
+
+    await simpleWorldLoader('4G', 2, 2);
+
+    playerResearchRegistry.getByPlayer(player).addAdvance(Monarchy);
+
+    expect(playerGovernment.is(DespotismGovernment)).true;
+
+    await takeTurns(client);
+
+    expect(playerGovernment.is(AnarchyGovernment)).true;
+
+    await takeTurns(client);
+
+    expect(playerGovernment.is(AnarchyGovernment)).true;
+
+    await takeTurns(client);
+
+    expect(playerGovernment.is(MonarchyGovernment)).true;
+    expect(pendingRevolution(playerGovernment, pendingEffectRegistry)).null;
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
   });
 });

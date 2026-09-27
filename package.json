@@ -68,6 +68,7 @@
     "@civ-clone/core-game": "^0.1.1",
     "@civ-clone/core-goody-hut": "^0.1.0",
     "@civ-clone/core-government": "^0.1.0",
+    "@civ-clone/core-pending-effect": "^0.1.2",
     "@civ-clone/core-random": "^0.1.0",
     "@civ-clone/core-registry": "^0.1.0",
     "@civ-clone/core-rule": "^0.1.0",
