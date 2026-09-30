@@ -24,6 +24,22 @@ export interface Memory {
   unitTargetData: Map<Unit, Tile>;
 }
 
+// The tiles some unit of the player's is already heading for: its target, or where its path ends.
+export const claimedTiles = (memory: Memory): Set<Tile> =>
+  new Set<Tile>([
+    ...memory.unitTargetData.values(),
+    ...[...memory.unitPathData.values()].map((path: Path): Tile => path.end()),
+  ]);
+
+// Drops the targets and paths of units that have since been destroyed, so they neither leak nor claim tiles.
+export const forgetDestroyedUnits = (memory: Memory): void =>
+  [memory.unitTargetData, memory.unitPathData].forEach(
+    (map: Map<Unit, unknown>): void =>
+      [...map.keys()]
+        .filter((unit: Unit): boolean => unit.destroyed())
+        .forEach((unit: Unit): boolean => map.delete(unit))
+  );
+
 export const createMemory = (): Memory => ({
   lastUnitMoves: new Map(),
   targets: {

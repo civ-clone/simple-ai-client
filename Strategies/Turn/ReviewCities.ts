@@ -15,7 +15,7 @@ export class ReviewCities extends AIStrategy {
     reviewCities(
       this.dependencies(),
       player,
-      this.memoryFor(player).targets,
+      this.memoryFor(player),
       this.knowledge()
     );
 

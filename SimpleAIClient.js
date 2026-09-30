@@ -127,7 +127,7 @@ class SimpleAIClient extends StrategyAIClient_1.default {
     //  wants it outside a turn.
     preProcessTurn() {
         (0, surveyTargets_1.default)(this._dependencies, this.player(), this.memory(), this._knowledge);
-        (0, reviewCities_1.default)(this._dependencies, this.player(), this.memory().targets, this._knowledge);
+        (0, reviewCities_1.default)(this._dependencies, this.player(), this.memory(), this._knowledge);
         (0, wakeCarrierAircraft_1.default)(this._dependencies, this.player(), this._knowledge);
     }
     // One unit's failed move shouldn't cost the player the rest of their turn, so log it, stop that unit for this turn

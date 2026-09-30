@@ -252,7 +252,7 @@ export class SimpleAIClient extends StrategyAIClient {
     reviewCities(
       this._dependencies,
       this.player(),
-      this.memory().targets,
+      this.memory(),
       this._knowledge
     );
     wakeCarrierAircraft(this._dependencies, this.player(), this._knowledge);

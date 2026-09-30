@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MissionAndMove = void 0;
-// Generic: the fallback for any unit: a unit with no target takes the first mission it qualifies for, then the move
-//  executor runs. Always handles a unit.
+// Generic: the fallback for any unit: a unit with no target and no path to follow takes the first mission it
+//  qualifies for, then the move executor runs. Always handles a unit.
 const AIStrategy_1 = require("../lib/AIStrategy");
 const assignMission_1 = require("../../lib/Unit/assignMission");
 const isUnitAction_1 = require("../lib/isUnitAction");
@@ -14,7 +14,9 @@ class MissionAndMove extends AIStrategy_1.default {
     }
     async attempt(action) {
         const player = action.player(), unit = action.value(), memory = this.memoryFor(player), { target } = (0, unitTurnContextFor_1.default)(this.dependencies(), action);
-        if (!target) {
+        // A unit already on its way somewhere keeps going: its path ends where the last mission sent it, and the survey
+        //  no longer offers that tile to anyone else.
+        if (!target && !memory.unitPathData.has(unit)) {
             (0, assignMission_1.default)(this.dependencies(), memory, unit);
         }
         await (0, moveUnit_1.default)(this.dependencies(), player, memory, this.knowledge(), unit);
