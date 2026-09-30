@@ -179,13 +179,14 @@ export const exploreSea: Mission = (dependencies, memory, unit) => {
   return true;
 };
 
-// In priority order.
+// In priority order. Hunting enemy units comes after exploring land: ahead of it (as it was written, when the list was
+//  always empty), units chase enemies instead of exploring, and the AI explores and researches measurably less.
 export const missions: Mission[] = [
   defendUndefendedCity,
   liberateCity,
-  attackEnemyUnits,
   attackEnemyCity,
   exploreLand,
+  attackEnemyUnits,
   exploreSea,
 ];
 
