@@ -162,7 +162,6 @@ import SimpleAIClient from '../SimpleAIClient';
 import SpaceshipRegistry from '@civ-clone/core-spaceship/SpaceshipRegistry';
 import StrategyNoteRegistry from '@civ-clone/core-strategy/StrategyNoteRegistry';
 import StrategyRegistry from '@civ-clone/core-strategy/StrategyRegistry';
-import { createDependencies } from '../lib/Dependencies';
 import { createStrategies } from '../registerStrategies';
 import Path from '@civ-clone/core-world-path/Path';
 import assignMission, { attackEnemyUnits } from '../lib/Unit/assignMission';
@@ -340,6 +339,9 @@ import Unit from '@civ-clone/core-unit/Unit';
 import Tile from '@civ-clone/core-world/Tile';
 import { Fortify, LandAircraft } from '@civ-clone/civ1-unit/Actions';
 import garrison from '../lib/Unit/garrison';
+import Dependencies, { createDependencies } from '../lib/Dependencies';
+import buildItemInCity from '../lib/Civ1/buildItemInCity';
+import { createMemory } from '../lib/Memory';
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
@@ -1699,6 +1701,55 @@ describe('SimpleAIClient', (): void => {
       )
     ).true;
     expect(warrior.active()).true;
+
+    cityRegistry.unregister(city);
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+  // The last of anything a random pick could choose, so a test can tell the pick apart from a deliberate choice.
+  const lastPick = (): Dependencies =>
+    createDependencies({
+      ...dependencies,
+      randomNumberGenerator: (): number => 0.999,
+    });
+
+  it('should build another defender in a city whose units are not fortified', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player();
+
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const city = new City(
+        player,
+        world.get(2, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      units = [
+        new Warrior(null, player, city.tile(), ruleRegistry),
+        new Warrior(null, player, city.tile(), ruleRegistry),
+      ];
+
+    expect(
+      units.some((unit: Unit): boolean =>
+        unitImprovementRegistry
+          .getByUnit(unit)
+          .some(
+            (improvement: UnitImprovement): boolean =>
+              improvement instanceof Fortified
+          )
+      )
+    ).false;
+
+    buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
 
     cityRegistry.unregister(city);
     clientRegistry.unregister(client);
