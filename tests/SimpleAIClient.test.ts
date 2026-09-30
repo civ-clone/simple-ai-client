@@ -165,6 +165,7 @@ import StrategyRegistry from '@civ-clone/core-strategy/StrategyRegistry';
 import { createStrategies } from '../registerStrategies';
 import Path from '@civ-clone/core-world-path/Path';
 import assignMission, { attackEnemyUnits } from '../lib/Unit/assignMission';
+import reachableTiles from '../lib/Unit/reachable';
 import MandatoryPlayerAction from '@civ-clone/core-player/MandatoryPlayerAction';
 import MissionAndMove from '../Strategies/Unit/MissionAndMove';
 import civ1Knowledge from '../lib/Civ1/knowledge';
@@ -337,7 +338,12 @@ import Built from '@civ-clone/core-world/Rules/Built';
 import Effect from '@civ-clone/core-rule/Effect';
 import Unit from '@civ-clone/core-unit/Unit';
 import Tile from '@civ-clone/core-world/Tile';
-import { Fortify, LandAircraft } from '@civ-clone/civ1-unit/Actions';
+import {
+  Attack,
+  Fortify,
+  LandAircraft,
+  Move,
+} from '@civ-clone/civ1-unit/Actions';
 import garrison from '../lib/Unit/garrison';
 import Dependencies, { createDependencies } from '../lib/Dependencies';
 import buildItemInCity from '../lib/Civ1/buildItemInCity';
@@ -1424,6 +1430,223 @@ describe('SimpleAIClient', (): void => {
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+
+  it('should move a Trireme off the coast only with a move to spare and the coast beside it', async (): Promise<void> => {
+    withCivilizations();
+
+    //   0123456
+    // 0 #~~~~~~
+    // 1 ~~~~~~~
+    // 2 ~~~~~~~   (1, 1) is on the coast, (2, 2) is next to it, and (3, 3) is further out.
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('G48O', 7, 7),
+      player = client.player(),
+      trireme = new Trireme(
+        null,
+        player,
+        world.get(1, 1),
+        ruleRegistry,
+        transportRegistry
+      ),
+      moveTo = (x: number, y: number): Move =>
+        new Move(trireme.tile(), world.get(x, y), trireme, ruleRegistry),
+      canReturn = (move: Move): boolean =>
+        civ1Knowledge.canReturnAfter(dependencies, player, trireme, move);
+
+    expect(world.get(1, 1).isCoast()).true;
+    expect(world.get(2, 2).isCoast()).false;
+
+    trireme.moves().set(3);
+
+    expect(canReturn(moveTo(1, 0))).true;
+    expect(canReturn(moveTo(2, 2))).true;
+    expect(canReturn(moveTo(3, 3))).false;
+
+    trireme.moves().set(1);
+
+    expect(canReturn(moveTo(1, 0))).true;
+    expect(canReturn(moveTo(2, 2))).false;
+
+    // Off the coast with a move left, it can move back, but an attack would use it up there.
+    trireme.setTile(world.get(2, 2));
+
+    expect(canReturn(moveTo(1, 1))).true;
+    expect(
+      canReturn(
+        new Attack(trireme.tile(), world.get(3, 3), trireme, ruleRegistry)
+      )
+    ).false;
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+
+  it('should know which tiles a unit can reach by land or by sea', async (): Promise<void> => {
+    //   012345
+    // 0 ##~##~
+    // 1 ##~##~   The map wraps east to west, so the two seas are apart, and so are the two islands.
+    const world = await simpleWorldLoader('2GO2GO2GO2GO', 2, 6),
+      player = new Player(ruleRegistry),
+      playerWorld = new PlayerWorld(player, world);
+
+    playerWorldRegistry.register(playerWorld);
+
+    const warrior = new Warrior(null, player, world.get(0, 0), ruleRegistry),
+      trireme = new Trireme(
+        null,
+        player,
+        world.get(2, 0),
+        ruleRegistry,
+        transportRegistry
+      ),
+      byLand = reachableTiles(warrior)!,
+      bySea = reachableTiles(trireme)!;
+
+    expect(byLand.has(world.get(1, 1))).true;
+    expect(byLand.has(world.get(3, 0))).false;
+    expect(byLand.has(world.get(2, 0))).false;
+    expect(bySea.has(world.get(2, 1))).true;
+    expect(bySea.has(world.get(5, 0))).false;
+    expect(bySea.has(world.get(1, 0))).false;
+
+    unitRegistry.unregister(warrior, trireme);
+    playerWorldRegistry.unregister(playerWorld);
+  });
+
+  it('should send a ship to explore the sea before it hunts enemy units', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('64O', 8, 8),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+    playerWorldRegistry
+      .getByPlayer(player)
+      .register(
+        ...world.entries().filter((tile: Tile): boolean => tile.x() <= 4)
+      );
+
+    const trireme = new Trireme(
+        null,
+        player,
+        world.get(1, 1),
+        ruleRegistry,
+        transportRegistry
+      ),
+      enemyShip = new Trireme(
+        null,
+        enemy,
+        world.get(2, 2),
+        ruleRegistry,
+        transportRegistry
+      ),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    expect(memory.targets.enemyUnitsToAttack).include(enemyShip.tile());
+    expect(memory.targets.seaTilesToExplore).not.empty;
+
+    const seaTilesToExplore = [...memory.targets.seaTilesToExplore];
+
+    assignMission(dependencies, memory, trireme);
+
+    const end = memory.unitPathData.get(trireme)?.end();
+
+    expect(end).not.equal(enemyShip.tile());
+    expect(seaTilesToExplore).include(end);
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+    unitRegistry.unregister(trireme, enemyShip);
+  });
+
+  // Land to the west, sea to the east, and the sea beyond x = 6 unexplored. `ships` Triremes are already in the sea,
+  //  and with `inland`, the player has a second city.
+  const shipTest = async (
+    ships: number,
+    advance: typeof MapMaking | null,
+    inland: boolean = true
+  ): Promise<unknown> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('5G5O5G5O5G5O5G5O5G5O', 5, 10),
+      player = client.player();
+
+    playerWorldRegistry
+      .getByPlayer(player)
+      .register(
+        ...world.entries().filter((tile: Tile): boolean => tile.x() <= 6)
+      );
+
+    await removeSpawnedSettlers(player);
+
+    if (advance) {
+      playerResearchRegistry.getByPlayer(player).addAdvance(advance);
+    }
+
+    const city = new City(
+        player,
+        world.get(4, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      defender = new Warrior(null, player, city.tile(), ruleRegistry);
+
+    unitImprovementRegistry.register(new Fortified(defender));
+
+    if (inland) {
+      new City(player, world.get(0, 2), '', ruleRegistry, workedTileRegistry);
+    }
+
+    new Array(ships)
+      .fill(0)
+      .forEach(
+        () =>
+          new Trireme(
+            null,
+            player,
+            world.get(5, 0),
+            ruleRegistry,
+            transportRegistry
+          )
+      );
+
+    await takeTurns(client);
+
+    const building = cityBuildRegistry.getByCity(city).building()?.item();
+
+    cityRegistry.unregister(...cityRegistry.getByPlayer(player));
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+
+    return building;
+  };
+
+  it('should build a Trireme in a coastal city once it knows Map Making, with no ship and sea to explore', async (): Promise<void> => {
+    expect(await shipTest(0, MapMaking)).equal(Trireme);
+  });
+
+  it('should not build another ship while it has one', async (): Promise<void> => {
+    expect(await shipTest(1, MapMaking)).not.equal(Trireme);
+  });
+
+  it('should not build a ship before Map Making', async (): Promise<void> => {
+    expect(await shipTest(0, null)).not.equal(Trireme);
+  });
+
+  it('should not build a ship in its only city', async (): Promise<void> => {
+    expect(await shipTest(0, MapMaking, false)).not.equal(Trireme);
   });
 
   it('should target an enemy unit next to one of its units', async (): Promise<void> => {

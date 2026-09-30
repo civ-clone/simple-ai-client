@@ -2,6 +2,7 @@
 //  registered into a game's `StrategyRegistry`.
 import { Game, defaultGame } from '@civ-clone/core-game';
 import Dependencies, { createDependencies } from './lib/Dependencies';
+import BuildExplorerShip from './Strategies/City/BuildExplorerShip';
 import ChooseGovernment from './Strategies/Civ1/ChooseGovernment';
 import ChooseProduction from './Strategies/Civ1/ChooseProduction';
 import ChooseResearch from './Strategies/Science/ChooseResearch';
@@ -67,6 +68,7 @@ export const createStrategies = (
   new Garrison(dependencies, knowledge),
   new MissionAndMove(dependencies, knowledge),
   // The other mandatory choices.
+  new BuildExplorerShip(dependencies, knowledge),
   new ChooseProduction(dependencies, knowledge),
   new ChooseResearch(dependencies, knowledge),
   new ChooseGovernment(dependencies, knowledge),
