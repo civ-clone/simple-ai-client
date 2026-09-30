@@ -30,7 +30,7 @@ const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
 const core_random_1 = require("@civ-clone/core-random");
 const government_1 = require("./lib/Civ1/government");
-const Memory_1 = require("./lib/Memory");
+const MemoryRegistry_1 = require("./lib/MemoryRegistry");
 const orders_1 = require("./lib/Unit/orders");
 const buildItemInCity_1 = require("./lib/Civ1/buildItemInCity");
 const chooseNegotiationStep_1 = require("./lib/Diplomacy/chooseNegotiationStep");
@@ -50,36 +50,40 @@ require("./lib/Diplomacy/negotiate");
 // Civ1: the computer player. It keeps the player's working memory and runs the turn, and hands every decision to the
 //  modules in `lib/`: generic ones, given Civ1's judgements through `Knowledge`, and Civ1 ones in `lib/Civ1/`.
 class SimpleAIClient extends AIClient_1.default {
+    // The player's working memory, which the strategies and the `Rules/` hooks share.
+    memory() {
+        return this._dependencies.memoryRegistry.memoryFor(this.player());
+    }
     // The working memory under the names it had as fields, for tests and debugging that reach in for it.
     get _lastUnitMoves() {
-        return this._memory.lastUnitMoves;
+        return this.memory().lastUnitMoves;
     }
     get _unitPathData() {
-        return this._memory.unitPathData;
+        return this.memory().unitPathData;
     }
     get _unitTargetData() {
-        return this._memory.unitTargetData;
+        return this.memory().unitTargetData;
     }
     get _citiesToLiberate() {
-        return this._memory.targets.citiesToLiberate;
+        return this.memory().targets.citiesToLiberate;
     }
     get _enemyCitiesToAttack() {
-        return this._memory.targets.enemyCitiesToAttack;
+        return this.memory().targets.enemyCitiesToAttack;
     }
     get _enemyUnitsToAttack() {
-        return this._memory.targets.enemyUnitsToAttack;
+        return this.memory().targets.enemyUnitsToAttack;
     }
     get _goodSitesForCities() {
-        return this._memory.targets.goodSitesForCities;
+        return this.memory().targets.goodSitesForCities;
     }
     get _landTilesToExplore() {
-        return this._memory.targets.landTilesToExplore;
+        return this.memory().targets.landTilesToExplore;
     }
     get _seaTilesToExplore() {
-        return this._memory.targets.seaTilesToExplore;
+        return this.memory().targets.seaTilesToExplore;
     }
     get _undefendedCities() {
-        return this._memory.targets.undefendedCities;
+        return this.memory().targets.undefendedCities;
     }
     constructor(player, cityRegistry = CityRegistry_1.instance, cityBuildRegistry = CityBuildRegistry_1.instance, cityGrowthRegistry = CityGrowthRegistry_1.instance, goodyHutRegistry = GoodyHutRegistry_1.instance, pathFinderRegistry = PathFinderRegistry_1.instance, playerGovernmentRegistry = PlayerGovernmentRegistry_1.instance, playerResearchRegistry = PlayerResearchRegistry_1.instance, playerTreasuryRegistry = PlayerTreasuryRegistry_1.instance, playerWorldRegistry = PlayerWorldRegistry_1.instance, ruleRegistry = RuleRegistry_1.instance, terrainFeatureRegistry = TerrainFeatureRegistry_1.instance, tileImprovementRegistry = TileImprovementRegistry_1.instance, unitImprovementRegistry = UnitImprovementRegistry_1.instance, unitRegistry = UnitRegistry_1.instance, engine = Engine_1.instance, clientRegistry = ClientRegistry_1.instance, interactionRegistry = InteractionRegistry_1.instance, turn = Turn_1.instance, randomNumberGenerator = core_random_1.instance, strategyNoteRegistry = StrategyNoteRegistry_1.instance, workedTileRegistry = WorkedTileRegistry_1.instance, pendingEffectRegistry = core_pending_effect_1.instance) {
         // The generator goes to `core-client`'s `Client`, which holds the one
@@ -88,7 +92,6 @@ class SimpleAIClient extends AIClient_1.default {
         // same name cannot express.
         super(player, randomNumberGenerator);
         this._knowledge = knowledge_1.default;
-        this._memory = (0, Memory_1.createMemory)();
         this._dependencies = {
             cityBuildRegistry,
             cityGrowthRegistry,
@@ -97,6 +100,7 @@ class SimpleAIClient extends AIClient_1.default {
             engine,
             goodyHutRegistry,
             interactionRegistry,
+            memoryRegistry: MemoryRegistry_1.instance,
             pathFinderRegistry,
             pendingEffectRegistry,
             playerGovernmentRegistry,
@@ -115,15 +119,15 @@ class SimpleAIClient extends AIClient_1.default {
         };
     }
     scoreUnitMove(unit, tile) {
-        return (0, scoreUnitMove_1.default)(this._dependencies, this.player(), this._memory, this._knowledge, unit, tile);
+        return (0, scoreUnitMove_1.default)(this._dependencies, this.player(), this.memory(), this._knowledge, unit, tile);
     }
     // Not `async`: the promise is handed back as it is, so awaiting this takes the same ticks as awaiting `moveUnit`.
     moveUnit(unit) {
-        return (0, moveUnit_1.default)(this._dependencies, this.player(), this._memory, this._knowledge, unit);
+        return (0, moveUnit_1.default)(this._dependencies, this.player(), this.memory(), this._knowledge, unit);
     }
     preProcessTurn() {
-        (0, surveyTargets_1.default)(this._dependencies, this.player(), this._memory, this._knowledge);
-        (0, reviewCities_1.default)(this._dependencies, this.player(), this._memory.targets, this._knowledge);
+        (0, surveyTargets_1.default)(this._dependencies, this.player(), this.memory(), this._knowledge);
+        (0, reviewCities_1.default)(this._dependencies, this.player(), this.memory().targets, this._knowledge);
         (0, wakeCarrierAircraft_1.default)(this._dependencies, this.player(), this._knowledge);
     }
     async chooseFromList(meta) {
@@ -168,7 +172,7 @@ class SimpleAIClient extends AIClient_1.default {
                             continue;
                         }
                         if (item instanceof Unit_1.default) {
-                            const moving = (0, takeUnitTurn_1.default)(this._dependencies, this.player(), this._memory, this._knowledge, item);
+                            const moving = (0, takeUnitTurn_1.default)(this._dependencies, this.player(), this.memory(), this._knowledge, item);
                             if (moving !== null) {
                                 await moving;
                             }
@@ -218,10 +222,10 @@ class SimpleAIClient extends AIClient_1.default {
         });
     }
     buildItemInCity(city) {
-        (0, buildItemInCity_1.default)(this._dependencies, this.player(), this._memory.targets, city);
+        (0, buildItemInCity_1.default)(this._dependencies, this.player(), this.memory().targets, city);
     }
     cityLost(city, player, destroyed) {
-        (0, cityLost_1.default)(this._dependencies, this.player(), this._memory.targets, city, player, destroyed);
+        (0, cityLost_1.default)(this._dependencies, this.player(), this.memory().targets, city, player, destroyed);
     }
     // TODO: `player`, who destroyed the unit, is never used. Kept: #153 changes no play.
     unitDestroyed(unit, player) {
