@@ -24,16 +24,10 @@ import { UnitRegistry } from '@civ-clone/core-unit/UnitRegistry';
 import { WorkedTileRegistry } from '@civ-clone/core-city/WorkedTileRegistry';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
 import City from '@civ-clone/core-city/City';
-import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
 import { PendingEffectRegistry } from '@civ-clone/core-pending-effect';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-declare global {
-  interface ChoiceMetaDataMap {
-    'negotiation.next-step': IAction;
-  }
-}
 export declare class SimpleAIClient extends AIClient {
   private _dependencies;
   private _knowledge;
@@ -83,8 +77,6 @@ export declare class SimpleAIClient extends AIClient {
   private buildItemInCity;
   cityLost(city: City, player: Player | null, destroyed: boolean): void;
   unitDestroyed(unit: Unit, player: Player | null): void;
-  private canNegotiate;
-  private handleNegotiation;
   private skipUnit;
   private noOrders;
 }
