@@ -100,7 +100,8 @@ import { instance as rngInstance } from '@civ-clone/core-random';
 import { pickGovernment, startRevolution } from './lib/Civ1/government';
 import Dependencies from './lib/Dependencies';
 import Knowledge from './lib/Knowledge';
-import { Memory, createMemory } from './lib/Memory';
+import Memory from './lib/Memory';
+import { instance as memoryRegistryInstance } from './lib/MemoryRegistry';
 import { noOrders, skipUnit } from './lib/Unit/orders';
 import buildItemInCity from './lib/Civ1/buildItemInCity';
 import chooseNegotiationStep from './lib/Diplomacy/chooseNegotiationStep';
@@ -123,38 +124,42 @@ import './lib/Diplomacy/negotiate';
 export class SimpleAIClient extends AIClient {
   private _dependencies: Dependencies;
   private _knowledge: Knowledge = civ1Knowledge;
-  private _memory: Memory = createMemory();
+
+  // The player's working memory, which the strategies and the `Rules/` hooks share.
+  private memory(): Memory {
+    return this._dependencies.memoryRegistry.memoryFor(this.player());
+  }
 
   // The working memory under the names it had as fields, for tests and debugging that reach in for it.
   private get _lastUnitMoves(): Map<Unit, Tile[]> {
-    return this._memory.lastUnitMoves;
+    return this.memory().lastUnitMoves;
   }
   private get _unitPathData(): Map<Unit, Path> {
-    return this._memory.unitPathData;
+    return this.memory().unitPathData;
   }
   private get _unitTargetData(): Map<Unit, Tile> {
-    return this._memory.unitTargetData;
+    return this.memory().unitTargetData;
   }
   private get _citiesToLiberate(): Tile[] {
-    return this._memory.targets.citiesToLiberate;
+    return this.memory().targets.citiesToLiberate;
   }
   private get _enemyCitiesToAttack(): Tile[] {
-    return this._memory.targets.enemyCitiesToAttack;
+    return this.memory().targets.enemyCitiesToAttack;
   }
   private get _enemyUnitsToAttack(): Tile[] {
-    return this._memory.targets.enemyUnitsToAttack;
+    return this.memory().targets.enemyUnitsToAttack;
   }
   private get _goodSitesForCities(): Tile[] {
-    return this._memory.targets.goodSitesForCities;
+    return this.memory().targets.goodSitesForCities;
   }
   private get _landTilesToExplore(): Tile[] {
-    return this._memory.targets.landTilesToExplore;
+    return this.memory().targets.landTilesToExplore;
   }
   private get _seaTilesToExplore(): Tile[] {
-    return this._memory.targets.seaTilesToExplore;
+    return this.memory().targets.seaTilesToExplore;
   }
   private get _undefendedCities(): Tile[] {
-    return this._memory.targets.undefendedCities;
+    return this.memory().targets.undefendedCities;
   }
 
   constructor(
@@ -196,6 +201,7 @@ export class SimpleAIClient extends AIClient {
       engine,
       goodyHutRegistry,
       interactionRegistry,
+      memoryRegistry: memoryRegistryInstance,
       pathFinderRegistry,
       pendingEffectRegistry,
       playerGovernmentRegistry,
@@ -218,7 +224,7 @@ export class SimpleAIClient extends AIClient {
     return scoreUnitMove(
       this._dependencies,
       this.player(),
-      this._memory,
+      this.memory(),
       this._knowledge,
       unit,
       tile
@@ -230,7 +236,7 @@ export class SimpleAIClient extends AIClient {
     return moveUnit(
       this._dependencies,
       this.player(),
-      this._memory,
+      this.memory(),
       this._knowledge,
       unit
     );
@@ -240,13 +246,13 @@ export class SimpleAIClient extends AIClient {
     surveyTargets(
       this._dependencies,
       this.player(),
-      this._memory,
+      this.memory(),
       this._knowledge
     );
     reviewCities(
       this._dependencies,
       this.player(),
-      this._memory.targets,
+      this.memory().targets,
       this._knowledge
     );
     wakeCarrierAircraft(this._dependencies, this.player(), this._knowledge);
@@ -327,7 +333,7 @@ export class SimpleAIClient extends AIClient {
                 const moving = takeUnitTurn(
                   this._dependencies,
                   this.player(),
-                  this._memory,
+                  this.memory(),
                   this._knowledge,
                   item
                 );
@@ -406,7 +412,7 @@ export class SimpleAIClient extends AIClient {
     buildItemInCity(
       this._dependencies,
       this.player(),
-      this._memory.targets,
+      this.memory().targets,
       city
     );
   }
@@ -415,7 +421,7 @@ export class SimpleAIClient extends AIClient {
     cityLost(
       this._dependencies,
       this.player(),
-      this._memory.targets,
+      this.memory().targets,
       city,
       player,
       destroyed

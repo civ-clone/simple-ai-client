@@ -19,6 +19,7 @@ import { Turn } from '@civ-clone/core-turn-based-game/Turn';
 import { UnitImprovementRegistry } from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
 import { UnitRegistry } from '@civ-clone/core-unit/UnitRegistry';
 import { WorkedTileRegistry } from '@civ-clone/core-city/WorkedTileRegistry';
+import { MemoryRegistry } from './MemoryRegistry';
 export interface Dependencies {
   cityBuildRegistry: CityBuildRegistry;
   cityGrowthRegistry: CityGrowthRegistry;
@@ -27,6 +28,7 @@ export interface Dependencies {
   engine: Engine;
   goodyHutRegistry: GoodyHutRegistry;
   interactionRegistry: InteractionRegistry;
+  memoryRegistry: MemoryRegistry;
   pathFinderRegistry: PathFinderRegistry;
   pendingEffectRegistry: PendingEffectRegistry;
   playerGovernmentRegistry: PlayerGovernmentRegistry;
@@ -43,4 +45,7 @@ export interface Dependencies {
   unitRegistry: UnitRegistry;
   workedTileRegistry: WorkedTileRegistry;
 }
+export declare const createDependencies: (
+  dependencies?: Partial<Dependencies>
+) => Dependencies;
 export default Dependencies;
