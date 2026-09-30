@@ -343,6 +343,7 @@ import Dependencies, { createDependencies } from '../lib/Dependencies';
 import buildItemInCity from '../lib/Civ1/buildItemInCity';
 import { createMemory } from '../lib/Memory';
 import { Colossus } from '@civ-clone/civ1-wonder/Wonders';
+import Wonder from '@civ-clone/core-wonder/Wonder';
 import { Production as ProductionYield } from '@civ-clone/civ1-world/Yields';
 
 describe('SimpleAIClient', (): void => {
@@ -1922,6 +1923,61 @@ describe('SimpleAIClient', (): void => {
 
     expect(memory.lastUnitMoves.has(unit)).false;
 
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+  it('should fall back to its usual pick, not throw, when a city has production to spare but no Wonder to build', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player();
+
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const city = new City(
+        player,
+        world.get(2, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      units = [
+        new Warrior(null, player, city.tile(), ruleRegistry),
+        new Warrior(null, player, city.tile(), ruleRegistry),
+      ];
+    let draws = 0;
+
+    // As in the Wonder test, production gets as far as considering a Wonder, but none is available.
+    units.forEach((unit: Unit): void =>
+      unitImprovementRegistry.register(new Fortified(unit))
+    );
+    city.yields = () => [new ProductionYield(5)];
+
+    buildItemInCity(
+      createDependencies({
+        ...dependencies,
+        randomNumberGenerator: (): number => {
+          draws++;
+
+          return 0.999;
+        },
+      }),
+      player,
+      createMemory().targets,
+      city
+    );
+
+    const building = cityBuildRegistry.getByCity(city).building();
+
+    expect(building).not.null;
+    expect(Object.prototype.isPrototypeOf.call(Wonder, building!.item())).false;
+    // Only the up-front random pick: nothing is drawn for a Wonder that can't be built.
+    expect(draws).equal(1);
+
+    cityRegistry.unregister(city);
     clientRegistry.unregister(client);
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);
