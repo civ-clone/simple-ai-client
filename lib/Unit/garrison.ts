@@ -23,9 +23,7 @@ export const garrison = (
           .some(
             (improvement: UnitImprovement): boolean =>
               improvement instanceof Fortified
-          ) &&
-        // TODO: compares the `Yield`s, not their values, so it's never true. Kept: #153 changes no play.
-        unit.defence() > tileUnit.defence()
+          ) && unit.defence().value() > tileUnit.defence().value()
     ),
     city = dependencies.cityRegistry.getByTile(tile);
 

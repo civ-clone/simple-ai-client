@@ -120,7 +120,6 @@ import {
   Trireme,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
-import { LandAircraft } from '@civ-clone/civ1-unit/Actions';
 import {
   Luxuries as LuxuriesTradeRate,
   Research as ResearchTradeRate,
@@ -339,6 +338,8 @@ import Built from '@civ-clone/core-world/Rules/Built';
 import Effect from '@civ-clone/core-rule/Effect';
 import Unit from '@civ-clone/core-unit/Unit';
 import Tile from '@civ-clone/core-world/Tile';
+import { Fortify, LandAircraft } from '@civ-clone/civ1-unit/Actions';
+import garrison from '../lib/Unit/garrison';
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
@@ -1623,6 +1624,83 @@ describe('SimpleAIClient', (): void => {
 
     expect(memory.unitPathData.get(trireme)).instanceof(Path);
 
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+  it('should prefer attacking a defender it beats by a wider margin', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const defender = new Warrior(null, enemy, world.get(2, 2), ruleRegistry),
+      chariot = new Chariot(null, player, world.get(1, 2), ruleRegistry),
+      horseman = new Horseman(null, player, world.get(3, 2), ruleRegistry),
+      chariotScore = (client as SimpleAIClient).scoreUnitMove(
+        chariot,
+        defender.tile()
+      ),
+      horsemanScore = (client as SimpleAIClient).scoreUnitMove(
+        horseman,
+        defender.tile()
+      );
+
+    // Chariot (3) and Horseman (2) against a Warrior (1): everything else about the two moves is the same.
+    expect(chariot.attack().value()).greaterThan(horseman.attack().value());
+    expect(chariotScore).greaterThan(horsemanScore);
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+    unitRegistry.unregister(defender, chariot, horseman);
+  });
+
+  it('should fortify a stronger unit in a city in place of a weaker fortified one', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player();
+
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const city = new City(
+        player,
+        world.get(2, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      warrior = new Warrior(null, player, city.tile(), ruleRegistry),
+      musketman = new Musketman(null, player, city.tile(), ruleRegistry),
+      fortify = musketman
+        .actions()
+        .find((action): boolean => action instanceof Fortify) as Fortify;
+
+    unitImprovementRegistry.register(new Fortified(warrior));
+    warrior.setActive(false);
+
+    expect(fortify).instanceof(Fortify);
+    expect(musketman.defence().value()).greaterThan(warrior.defence().value());
+    expect(
+      garrison(
+        dependencies,
+        musketman,
+        city.tile(),
+        unitRegistry.getByTile(city.tile()),
+        fortify
+      )
+    ).true;
+    expect(warrior.active()).true;
+
+    cityRegistry.unregister(city);
     clientRegistry.unregister(client);
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);
