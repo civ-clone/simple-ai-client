@@ -16,7 +16,9 @@ The client itself keeps only two things:
 ## The strategy pack
 
 Importing the package (`index.ts`) registers the pack into the game's `StrategyRegistry`, as `registerRules` does for
-its rules. For now that's `defaultGame.strategies`. In `registerStrategies.ts`, `createStrategies(dependencies,
+its rules. For now that's `defaultGame.strategies`. Importing `SimpleAIClient` alone doesn't register it: until the
+package index has been imported, the default registry is empty, and the client logs `Can't process` for the first unit
+or city action and ends its turn. In `registerStrategies.ts`, `createStrategies(dependencies,
 knowledge)` builds the pack and `register(game)` registers it. In registration order:
 
 | Strategy                                  | Handles                                      | Does                                                                           | Kind    |
