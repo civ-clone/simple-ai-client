@@ -29,6 +29,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Civ1/StartRevolution`         | `BeforeTurn`                                 | starts a revolution once Monarchy is known                                     | Civ1    |
 | `Strategies/Unit/WaitForCarrier`          | a unit's action                              | makes an aircraft wait until carriers have moved (handles it only then)        | generic |
 | `Strategies/Unit/UnloadTransport`         | a unit's action                              | unloads a transport at the coast (handles it only then)                        | generic |
+| `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
 | `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves | generic |
 | `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city (handles it only then)                     | generic |
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; always handles it       | generic |

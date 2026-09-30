@@ -5,6 +5,7 @@ import Dependencies, { createDependencies } from './lib/Dependencies';
 import ChooseGovernment from './Strategies/Civ1/ChooseGovernment';
 import ChooseProduction from './Strategies/Civ1/ChooseProduction';
 import ChooseResearch from './Strategies/Science/ChooseResearch';
+import FoundCapital from './Strategies/Unit/FoundCapital';
 import Garrison from './Strategies/Unit/Garrison';
 import Knowledge from './lib/Knowledge';
 import MissionAndMove from './Strategies/Unit/MissionAndMove';
@@ -61,6 +62,7 @@ export const createStrategies = (
   // A unit's turn: the first that handles it wins.
   new WaitForCarrier(dependencies, knowledge),
   new UnloadTransport(dependencies, knowledge),
+  new FoundCapital(dependencies, knowledge),
   new WorkerTurn(dependencies, knowledge),
   new Garrison(dependencies, knowledge),
   new MissionAndMove(dependencies, knowledge),

@@ -8,6 +8,7 @@ const Dependencies_1 = require("./lib/Dependencies");
 const ChooseGovernment_1 = require("./Strategies/Civ1/ChooseGovernment");
 const ChooseProduction_1 = require("./Strategies/Civ1/ChooseProduction");
 const ChooseResearch_1 = require("./Strategies/Science/ChooseResearch");
+const FoundCapital_1 = require("./Strategies/Unit/FoundCapital");
 const Garrison_1 = require("./Strategies/Unit/Garrison");
 const MissionAndMove_1 = require("./Strategies/Unit/MissionAndMove");
 const NegotiationAnswers_1 = require("./Strategies/Diplomacy/NegotiationAnswers");
@@ -57,6 +58,7 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     // A unit's turn: the first that handles it wins.
     new WaitForCarrier_1.default(dependencies, knowledge),
     new UnloadTransport_1.default(dependencies, knowledge),
+    new FoundCapital_1.default(dependencies, knowledge),
     new WorkerTurn_1.default(dependencies, knowledge),
     new Garrison_1.default(dependencies, knowledge),
     new MissionAndMove_1.default(dependencies, knowledge),
