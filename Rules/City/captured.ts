@@ -21,16 +21,19 @@ export const getRules: (
   clientRegistry: ClientRegistry = clientRegistryInstance
 ): Captured[] => [
   new Captured(
+    // `City#capture` passes the capturing player first, then the one that lost
+    // the city, and it's the loser's client that needs telling.
     new Criterion(
-      (city: City, player: Player) =>
-        clientRegistry.getByPlayer(player) instanceof SimpleAIClient
+      (city: City, capturingPlayer: Player, previousOwner: Player) =>
+        clientRegistry.getByPlayer(previousOwner) instanceof SimpleAIClient
     ),
-    new Effect((city: City, player: Player, capturingPlayer: Player): void =>
-      (clientRegistry.getByPlayer(player) as SimpleAIClient).cityLost(
-        city,
-        capturingPlayer,
-        false
-      )
+    new Effect(
+      (city: City, capturingPlayer: Player, previousOwner: Player): void =>
+        (clientRegistry.getByPlayer(previousOwner) as SimpleAIClient).cityLost(
+          city,
+          capturingPlayer,
+          false
+        )
     )
   ),
 ];

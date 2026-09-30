@@ -8,7 +8,10 @@ const Criterion_1 = require("@civ-clone/core-rule/Criterion");
 const Effect_1 = require("@civ-clone/core-rule/Effect");
 const SimpleAIClient_1 = require("../../SimpleAIClient");
 const getRules = (unitRegistry = UnitRegistry_1.instance, clientRegistry = ClientRegistry_1.instance) => [
-    new Captured_1.default(new Criterion_1.default((city, player) => clientRegistry.getByPlayer(player) instanceof SimpleAIClient_1.default), new Effect_1.default((city, player, capturingPlayer) => clientRegistry.getByPlayer(player).cityLost(city, capturingPlayer, false))),
+    new Captured_1.default(
+    // `City#capture` passes the capturing player first, then the one that lost
+    // the city, and it's the loser's client that needs telling.
+    new Criterion_1.default((city, capturingPlayer, previousOwner) => clientRegistry.getByPlayer(previousOwner) instanceof SimpleAIClient_1.default), new Effect_1.default((city, capturingPlayer, previousOwner) => clientRegistry.getByPlayer(previousOwner).cityLost(city, capturingPlayer, false))),
 ];
 exports.getRules = getRules;
 exports.default = exports.getRules;
