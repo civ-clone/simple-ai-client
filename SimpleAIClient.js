@@ -29,22 +29,26 @@ const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment"
 const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
 const core_random_1 = require("@civ-clone/core-random");
-const Memory_1 = require("./lib/Memory");
-const knowledge_1 = require("./lib/Civ1/knowledge");
-const reviewCities_1 = require("./lib/Turn/reviewCities");
-const chooseNegotiationStep_1 = require("./lib/Diplomacy/chooseNegotiationStep");
-const orders_1 = require("./lib/Unit/orders");
-const takeUnitTurn_1 = require("./lib/Unit/takeUnitTurn");
-const waitForCarrier_1 = require("./lib/Unit/waitForCarrier");
-const moveUnit_1 = require("./lib/Unit/moveUnit");
-const scoreUnitMove_1 = require("./lib/Unit/scoreUnitMove");
 const government_1 = require("./lib/Civ1/government");
+const Memory_1 = require("./lib/Memory");
+const orders_1 = require("./lib/Unit/orders");
 const buildItemInCity_1 = require("./lib/Civ1/buildItemInCity");
+const chooseNegotiationStep_1 = require("./lib/Diplomacy/chooseNegotiationStep");
 const chooseResearch_1 = require("./lib/Science/chooseResearch");
 const cityLost_1 = require("./lib/Events/cityLost");
-const unitDestroyed_1 = require("./lib/Events/unitDestroyed");
+const knowledge_1 = require("./lib/Civ1/knowledge");
+const moveUnit_1 = require("./lib/Unit/moveUnit");
+const reviewCities_1 = require("./lib/Turn/reviewCities");
+const scoreUnitMove_1 = require("./lib/Unit/scoreUnitMove");
 const surveyTargets_1 = require("./lib/Turn/surveyTargets");
+const takeUnitTurn_1 = require("./lib/Unit/takeUnitTurn");
+const unitDestroyed_1 = require("./lib/Events/unitDestroyed");
+const waitForCarrier_1 = require("./lib/Unit/waitForCarrier");
 const wakeCarrierAircraft_1 = require("./lib/Turn/wakeCarrierAircraft");
+// For its `ChoiceMetaDataMap` entry, which `chooseFromList` below and its callers rely on.
+require("./lib/Diplomacy/negotiate");
+// Civ1: the computer player. It keeps the player's working memory and runs the turn, and hands every decision to the
+//  modules in `lib/`: generic ones, given Civ1's judgements through `Knowledge`, and Civ1 ones in `lib/Civ1/`.
 class SimpleAIClient extends AIClient_1.default {
     // The working memory under the names it had as fields, for tests and debugging that reach in for it.
     get _lastUnitMoves() {
