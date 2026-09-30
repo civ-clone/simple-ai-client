@@ -1,0 +1,81 @@
+// Civ1: the strategy pack `SimpleAIClient` plays with, generic strategies given Civ1's `Knowledge` plus the Civ1 ones,
+//  registered into a game's `StrategyRegistry`.
+import { Game, defaultGame } from '@civ-clone/core-game';
+import Dependencies, { createDependencies } from './lib/Dependencies';
+import ChooseGovernment from './Strategies/Civ1/ChooseGovernment';
+import ChooseProduction from './Strategies/Civ1/ChooseProduction';
+import ChooseResearch from './Strategies/Science/ChooseResearch';
+import Garrison from './Strategies/Unit/Garrison';
+import Knowledge from './lib/Knowledge';
+import MissionAndMove from './Strategies/Unit/MissionAndMove';
+import NegotiationAnswers from './Strategies/Diplomacy/NegotiationAnswers';
+import ReviewCities from './Strategies/Turn/ReviewCities';
+import StartRevolution from './Strategies/Civ1/StartRevolution';
+import Strategy from '@civ-clone/core-strategy/Strategy';
+import SurveyTargets from './Strategies/Turn/SurveyTargets';
+import UnloadTransport from './Strategies/Unit/UnloadTransport';
+import WaitForCarrier from './Strategies/Unit/WaitForCarrier';
+import WakeCarrierAircraft from './Strategies/Turn/WakeCarrierAircraft';
+import WorkerTurn from './Strategies/Unit/WorkerTurn';
+import civ1Knowledge from './lib/Civ1/knowledge';
+
+// The game's registries, as the strategies take them.
+export const dependenciesFor = (game: Game): Dependencies =>
+  createDependencies({
+    cityBuildRegistry: game.cityBuilds,
+    cityGrowthRegistry: game.cityGrowth,
+    cityRegistry: game.cities,
+    clientRegistry: game.clients,
+    engine: game.engine,
+    goodyHutRegistry: game.goodyHuts,
+    interactionRegistry: game.interactions,
+    pathFinderRegistry: game.pathFinders,
+    pendingEffectRegistry: game.pendingEffects,
+    playerGovernmentRegistry: game.playerGovernments,
+    playerResearchRegistry: game.playerResearch,
+    playerTreasuryRegistry: game.playerTreasuries,
+    playerWorldRegistry: game.playerWorlds,
+    randomNumberGenerator: game.rng,
+    ruleRegistry: game.rules,
+    strategyNoteRegistry: game.strategyNotes,
+    terrainFeatureRegistry: game.terrainFeatures,
+    tileImprovementRegistry: game.tileImprovements,
+    turn: game.turn,
+    unitImprovementRegistry: game.unitImprovements,
+    unitRegistry: game.units,
+    workedTileRegistry: game.workedTiles,
+  });
+
+// In the order `SimpleAIClient` has always made its decisions. With no `Priority` rules, the registry keeps this
+//  order, so a strategy registered later (another plugin's) comes after all of these unless a `Priority` puts it
+//  first.
+export const createStrategies = (
+  dependencies: Dependencies,
+  knowledge: Knowledge = civ1Knowledge
+): Strategy[] => [
+  // `BeforeTurn`, all of them in turn.
+  new SurveyTargets(dependencies, knowledge),
+  new ReviewCities(dependencies, knowledge),
+  new WakeCarrierAircraft(dependencies, knowledge),
+  new StartRevolution(dependencies, knowledge),
+  // A unit's turn: the first that handles it wins.
+  new WaitForCarrier(dependencies, knowledge),
+  new UnloadTransport(dependencies, knowledge),
+  new WorkerTurn(dependencies, knowledge),
+  new Garrison(dependencies, knowledge),
+  new MissionAndMove(dependencies, knowledge),
+  // The other mandatory choices.
+  new ChooseProduction(dependencies, knowledge),
+  new ChooseResearch(dependencies, knowledge),
+  new ChooseGovernment(dependencies, knowledge),
+  // `chooseFromList`.
+  new NegotiationAnswers(dependencies, knowledge),
+];
+
+export const register = (game: Game): void =>
+  game.strategies.register(...createStrategies(dependenciesFor(game)));
+
+// The plugin loader imports each package for this side effect, as it does `registerRules`.
+register(defaultGame);
+
+export default register;
