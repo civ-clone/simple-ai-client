@@ -126,20 +126,12 @@ import Gold from '@civ-clone/base-city-yield-gold/Gold';
 import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
 import Initiate from '@civ-clone/core-diplomacy/Negotiation/Initiate';
-import { Monarchy as MonarchyAdvance } from '@civ-clone/civ1-science/Advances';
-import {
-  Anarchy as AnarchyGovernment,
-  Monarchy as MonarchyGovernment,
-} from '@civ-clone/civ1-government/Governments';
+import { Monarchy as MonarchyGovernment } from '@civ-clone/civ1-government/Governments';
 import {
   PendingEffectRegistry,
   instance as pendingEffectRegistryInstance,
 } from '@civ-clone/core-pending-effect';
-import {
-  chooseGovernment,
-  pendingRevolution,
-  revolution,
-} from '@civ-clone/civ1-government/lib/revolution';
+import { chooseGovernment } from '@civ-clone/civ1-government/lib/revolution';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
 import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
 import OfferPeace from '@civ-clone/library-diplomacy/Proposals/OfferPeace';
@@ -155,7 +147,6 @@ import Unit from '@civ-clone/core-unit/Unit';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
-import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
 import Decline from '@civ-clone/core-diplomacy/Proposal/Decline';
 import { instance as rngInstance } from '@civ-clone/core-random';
 import Dependencies from './lib/Dependencies';
@@ -167,7 +158,13 @@ import {
   shouldMine,
   shouldRoad,
 } from './lib/Civ1/terrain';
+import Knowledge from './lib/Knowledge';
+import civ1Knowledge from './lib/Civ1/knowledge';
+import reviewCities from './lib/Turn/reviewCities';
 import shouldAttack from './lib/shouldAttack';
+import { startRevolution } from './lib/Civ1/government';
+import surveyTargets from './lib/Turn/surveyTargets';
+import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
 
 declare global {
   interface ChoiceMetaDataMap {
@@ -212,6 +209,7 @@ const hasPlayerCity = (
 
 export class SimpleAIClient extends AIClient {
   private _dependencies: Dependencies;
+  private _knowledge: Knowledge = civ1Knowledge;
   private _memory: Memory = createMemory();
 
   // The working memory under the names it had as fields, for tests and debugging that reach in for it.
@@ -593,125 +591,19 @@ export class SimpleAIClient extends AIClient {
   }
 
   preProcessTurn(): void {
-    this._memory.targets.citiesToLiberate.splice(0);
-    this._memory.targets.enemyCitiesToAttack.splice(0);
-    this._memory.targets.enemyUnitsToAttack.splice(0);
-    this._memory.targets.goodSitesForCities.splice(0);
-    this._memory.targets.landTilesToExplore.splice(0);
-    this._memory.targets.seaTilesToExplore.splice(0);
-    this._memory.targets.undefendedCities.splice(0);
-    const playerWorld = this._dependencies.playerWorldRegistry.getByPlayer(
-      this.player()
+    surveyTargets(
+      this._dependencies,
+      this.player(),
+      this._memory,
+      this._knowledge
     );
-
-    playerWorld.entries().forEach((playerTile: PlayerTile): void => {
-      const tile = playerTile.tile(),
-        tileCity = this._dependencies.cityRegistry.getByTile(tile),
-        tileUnits = this._dependencies.unitRegistry.getBy('tile', tile),
-        existingTarget =
-          this._memory.targets.undefendedCities.includes(tile) &&
-          ![
-            ...this._memory.unitTargetData.values(),
-            ...[...this._memory.unitPathData.values()].map(
-              (path: Path): Tile => path.end()
-            ),
-          ].includes(tile);
-
-      if (
-        tileCity &&
-        tileCity.player() === this.player() &&
-        !tileUnits.length &&
-        !this._memory.targets.undefendedCities.includes(tile) &&
-        !existingTarget
-      ) {
-        this._memory.targets.undefendedCities.push(tile);
-      }
-      // TODO: when diplomacy exists, check diplomatic status with player
-      else if (
-        tileCity &&
-        tileCity.player() !== this.player() &&
-        tileCity.originalPlayer() === this.player()
-      ) {
-        this._memory.targets.citiesToLiberate.push(tile);
-      } else if (
-        tileCity &&
-        tileCity.player() !== this.player() &&
-        !this._memory.targets.enemyCitiesToAttack.includes(tile)
-      ) {
-        this._memory.targets.enemyCitiesToAttack.push(tile);
-      } else if (
-        tileUnits.length &&
-        tileUnits.some(
-          (unit: Unit): boolean => unit.player() !== this.player()
-        ) &&
-        this._memory.targets.enemyUnitsToAttack.includes(tile)
-      ) {
-        this._memory.targets.enemyUnitsToAttack.push(tile);
-      } else if (
-        tile.isLand() &&
-        tile
-          .getNeighbours()
-          .some((tile: Tile): boolean => !playerWorld.includes(tile)) &&
-        !this._memory.targets.landTilesToExplore.includes(tile) &&
-        !existingTarget
-      ) {
-        this._memory.targets.landTilesToExplore.push(tile);
-      } else if (
-        tile.isWater() &&
-        tile
-          .getNeighbours()
-          .some((tile: Tile): boolean => !playerWorld.includes(tile)) &&
-        this._memory.targets.seaTilesToExplore.includes(tile) &&
-        !existingTarget
-      ) {
-        this._memory.targets.seaTilesToExplore.push(tile);
-      }
-
-      if (
-        shouldBuildCity(this._dependencies, this.player(), tile) &&
-        this._memory.targets.goodSitesForCities.includes(tile) &&
-        !existingTarget
-      ) {
-        this._memory.targets.goodSitesForCities.push(tile);
-      }
-    });
-
-    this._dependencies.cityRegistry
-      .getByPlayer(this.player())
-      .forEach((city: City): void => {
-        const tileUnits = this._dependencies.unitRegistry.getByTile(
-          city.tile()
-        );
-
-        assignWorkers(
-          city,
-          this._dependencies.playerWorldRegistry,
-          this._dependencies.cityGrowthRegistry,
-          this._dependencies.workedTileRegistry
-        );
-
-        if (
-          !tileUnits.length &&
-          !this._memory.targets.undefendedCities.includes(city.tile())
-        ) {
-          this._memory.targets.undefendedCities.push(city.tile());
-        }
-      });
-
-    // An aircraft that has landed on one of our `Carrier`s stays aboard until it's given orders, so give it some.
-    this._dependencies.unitRegistry
-      .getByPlayer(this.player())
-      .flatMap((unit: Unit): Unit[] =>
-        unit instanceof NavalTransport && !unit.destroyed() ? unit.cargo() : []
-      )
-      .filter(
-        (unit: Unit): boolean =>
-          aircraftFuel(this._dependencies, unit) !== null && !unit.active()
-      )
-      .forEach((aircraft: Unit): void => {
-        aircraft.setBusy();
-        aircraft.setActive();
-      });
+    reviewCities(
+      this._dependencies,
+      this.player(),
+      this._memory.targets,
+      this._knowledge
+    );
+    wakeCarrierAircraft(this._dependencies, this.player(), this._knowledge);
   }
 
   async chooseFromList<Name extends keyof ChoiceMetaDataMap>(
@@ -763,31 +655,7 @@ export class SimpleAIClient extends AIClient {
 
           this.preProcessTurn();
 
-          const [playerGovernment] =
-              this._dependencies.playerGovernmentRegistry.filter(
-                (playerGovernment) =>
-                  playerGovernment.player() === this.player()
-              ),
-            [playerResearch] = this._dependencies.playerResearchRegistry.filter(
-              (playerScience) => playerScience.player() === this.player()
-            );
-          // Through a revolution, like a human player: Anarchy first, then
-          // `ChooseGovernment` below once it's over.
-          if (
-            playerResearch.completed(MonarchyAdvance) &&
-            !playerGovernment.is(MonarchyGovernment, AnarchyGovernment) &&
-            pendingRevolution(
-              playerGovernment,
-              this._dependencies.pendingEffectRegistry
-            ) === null
-          ) {
-            revolution(
-              playerGovernment,
-              this._dependencies.pendingEffectRegistry,
-              this._dependencies.ruleRegistry,
-              this._dependencies.turn
-            );
-          }
+          startRevolution(this._dependencies, this.player());
 
           while (this.player().hasMandatoryActions()) {
             const action = this.player().mandatoryAction(),

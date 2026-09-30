@@ -35,7 +35,6 @@ const ExchangeKnowledge_1 = require("@civ-clone/library-diplomacy/Proposals/Exch
 const UnitImprovements_1 = require("@civ-clone/civ1-unit/UnitImprovements");
 const Gold_1 = require("@civ-clone/base-city-yield-gold/Gold");
 const Initiate_1 = require("@civ-clone/core-diplomacy/Negotiation/Initiate");
-const Advances_1 = require("@civ-clone/civ1-science/Advances");
 const Governments_1 = require("@civ-clone/civ1-government/Governments");
 const core_pending_effect_1 = require("@civ-clone/core-pending-effect");
 const revolution_1 = require("@civ-clone/civ1-government/lib/revolution");
@@ -50,13 +49,17 @@ const Units_1 = require("@civ-clone/civ1-unit/Units");
 const Tile_1 = require("@civ-clone/core-world/Tile");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
 const Wonder_1 = require("@civ-clone/core-wonder/Wonder");
-const assignWorkers_1 = require("@civ-clone/civ1-city/lib/assignWorkers");
 const Decline_1 = require("@civ-clone/core-diplomacy/Proposal/Decline");
 const core_random_1 = require("@civ-clone/core-random");
 const Memory_1 = require("./lib/Memory");
 const aircraft_1 = require("./lib/Civ1/aircraft");
 const terrain_1 = require("./lib/Civ1/terrain");
+const knowledge_1 = require("./lib/Civ1/knowledge");
+const reviewCities_1 = require("./lib/Turn/reviewCities");
 const shouldAttack_1 = require("./lib/shouldAttack");
+const government_1 = require("./lib/Civ1/government");
+const surveyTargets_1 = require("./lib/Turn/surveyTargets");
+const wakeCarrierAircraft_1 = require("./lib/Turn/wakeCarrierAircraft");
 const awaitTimeout = (delay, reason) => new Promise((resolve, reject) => setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay));
 const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
     const city = cityRegistry.getByTile(tile);
@@ -103,6 +106,7 @@ class SimpleAIClient extends AIClient_1.default {
         // `#randomNumberGenerator` shadowing it, which two `private` fields of the
         // same name cannot express.
         super(player, randomNumberGenerator);
+        this._knowledge = knowledge_1.default;
         this._memory = (0, Memory_1.createMemory)();
         this._dependencies = {
             cityBuildRegistry,
@@ -303,84 +307,9 @@ class SimpleAIClient extends AIClient_1.default {
         }
     }
     preProcessTurn() {
-        this._memory.targets.citiesToLiberate.splice(0);
-        this._memory.targets.enemyCitiesToAttack.splice(0);
-        this._memory.targets.enemyUnitsToAttack.splice(0);
-        this._memory.targets.goodSitesForCities.splice(0);
-        this._memory.targets.landTilesToExplore.splice(0);
-        this._memory.targets.seaTilesToExplore.splice(0);
-        this._memory.targets.undefendedCities.splice(0);
-        const playerWorld = this._dependencies.playerWorldRegistry.getByPlayer(this.player());
-        playerWorld.entries().forEach((playerTile) => {
-            const tile = playerTile.tile(), tileCity = this._dependencies.cityRegistry.getByTile(tile), tileUnits = this._dependencies.unitRegistry.getBy('tile', tile), existingTarget = this._memory.targets.undefendedCities.includes(tile) &&
-                ![
-                    ...this._memory.unitTargetData.values(),
-                    ...[...this._memory.unitPathData.values()].map((path) => path.end()),
-                ].includes(tile);
-            if (tileCity &&
-                tileCity.player() === this.player() &&
-                !tileUnits.length &&
-                !this._memory.targets.undefendedCities.includes(tile) &&
-                !existingTarget) {
-                this._memory.targets.undefendedCities.push(tile);
-            }
-            // TODO: when diplomacy exists, check diplomatic status with player
-            else if (tileCity &&
-                tileCity.player() !== this.player() &&
-                tileCity.originalPlayer() === this.player()) {
-                this._memory.targets.citiesToLiberate.push(tile);
-            }
-            else if (tileCity &&
-                tileCity.player() !== this.player() &&
-                !this._memory.targets.enemyCitiesToAttack.includes(tile)) {
-                this._memory.targets.enemyCitiesToAttack.push(tile);
-            }
-            else if (tileUnits.length &&
-                tileUnits.some((unit) => unit.player() !== this.player()) &&
-                this._memory.targets.enemyUnitsToAttack.includes(tile)) {
-                this._memory.targets.enemyUnitsToAttack.push(tile);
-            }
-            else if (tile.isLand() &&
-                tile
-                    .getNeighbours()
-                    .some((tile) => !playerWorld.includes(tile)) &&
-                !this._memory.targets.landTilesToExplore.includes(tile) &&
-                !existingTarget) {
-                this._memory.targets.landTilesToExplore.push(tile);
-            }
-            else if (tile.isWater() &&
-                tile
-                    .getNeighbours()
-                    .some((tile) => !playerWorld.includes(tile)) &&
-                this._memory.targets.seaTilesToExplore.includes(tile) &&
-                !existingTarget) {
-                this._memory.targets.seaTilesToExplore.push(tile);
-            }
-            if ((0, terrain_1.shouldBuildCity)(this._dependencies, this.player(), tile) &&
-                this._memory.targets.goodSitesForCities.includes(tile) &&
-                !existingTarget) {
-                this._memory.targets.goodSitesForCities.push(tile);
-            }
-        });
-        this._dependencies.cityRegistry
-            .getByPlayer(this.player())
-            .forEach((city) => {
-            const tileUnits = this._dependencies.unitRegistry.getByTile(city.tile());
-            (0, assignWorkers_1.default)(city, this._dependencies.playerWorldRegistry, this._dependencies.cityGrowthRegistry, this._dependencies.workedTileRegistry);
-            if (!tileUnits.length &&
-                !this._memory.targets.undefendedCities.includes(city.tile())) {
-                this._memory.targets.undefendedCities.push(city.tile());
-            }
-        });
-        // An aircraft that has landed on one of our `Carrier`s stays aboard until it's given orders, so give it some.
-        this._dependencies.unitRegistry
-            .getByPlayer(this.player())
-            .flatMap((unit) => unit instanceof Types_1.NavalTransport && !unit.destroyed() ? unit.cargo() : [])
-            .filter((unit) => (0, aircraft_1.aircraftFuel)(this._dependencies, unit) !== null && !unit.active())
-            .forEach((aircraft) => {
-            aircraft.setBusy();
-            aircraft.setActive();
-        });
+        (0, surveyTargets_1.default)(this._dependencies, this.player(), this._memory, this._knowledge);
+        (0, reviewCities_1.default)(this._dependencies, this.player(), this._memory.targets, this._knowledge);
+        (0, wakeCarrierAircraft_1.default)(this._dependencies, this.player(), this._knowledge);
     }
     async chooseFromList(meta) {
         if (meta.key() !== 'negotiation.next-step') {
@@ -412,14 +341,7 @@ class SimpleAIClient extends AIClient_1.default {
             try {
                 let loopCheck = 0;
                 this.preProcessTurn();
-                const [playerGovernment] = this._dependencies.playerGovernmentRegistry.filter((playerGovernment) => playerGovernment.player() === this.player()), [playerResearch] = this._dependencies.playerResearchRegistry.filter((playerScience) => playerScience.player() === this.player());
-                // Through a revolution, like a human player: Anarchy first, then
-                // `ChooseGovernment` below once it's over.
-                if (playerResearch.completed(Advances_1.Monarchy) &&
-                    !playerGovernment.is(Governments_1.Monarchy, Governments_1.Anarchy) &&
-                    (0, revolution_1.pendingRevolution)(playerGovernment, this._dependencies.pendingEffectRegistry) === null) {
-                    (0, revolution_1.revolution)(playerGovernment, this._dependencies.pendingEffectRegistry, this._dependencies.ruleRegistry, this._dependencies.turn);
-                }
+                (0, government_1.startRevolution)(this._dependencies, this.player());
                 while (this.player().hasMandatoryActions()) {
                     const action = this.player().mandatoryAction(), item = action.value();
                     try {
