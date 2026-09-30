@@ -1,4 +1,3 @@
-import { Attack, Defence } from '@civ-clone/core-unit/Yields';
 import {
   ChoiceMeta,
   DataForChoiceMeta,
@@ -23,7 +22,6 @@ import {
   Engine,
   instance as engineInstance,
 } from '@civ-clone/core-engine/Engine';
-import { Production } from '@civ-clone/civ1-world/Yields';
 import {
   GoodyHutRegistry,
   instance as goodyHutRegistryInstance,
@@ -85,32 +83,21 @@ import {
   instance as workedTileRegistryInstance,
 } from '@civ-clone/core-city/WorkedTileRegistry';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
-import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
-import BuildItem from '@civ-clone/core-city-build/BuildItem';
-import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
-import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import Gold from '@civ-clone/base-city-yield-gold/Gold';
-import { IConstructor } from '@civ-clone/core-registry/Registry';
-import { Monarchy as MonarchyGovernment } from '@civ-clone/civ1-government/Governments';
 import {
   PendingEffectRegistry,
   instance as pendingEffectRegistryInstance,
 } from '@civ-clone/core-pending-effect';
-import { chooseGovernment } from '@civ-clone/civ1-government/lib/revolution';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
-import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
-import { Settlers } from '@civ-clone/civ1-unit/Units';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-import Wonder from '@civ-clone/core-wonder/Wonder';
-import Yield from '@civ-clone/core-yield/Yield';
 import { instance as rngInstance } from '@civ-clone/core-random';
 import Dependencies from './lib/Dependencies';
 import { Memory, createMemory } from './lib/Memory';
@@ -123,7 +110,9 @@ import takeUnitTurn from './lib/Unit/takeUnitTurn';
 import waitForCarrier from './lib/Unit/waitForCarrier';
 import moveUnit from './lib/Unit/moveUnit';
 import scoreUnitMove from './lib/Unit/scoreUnitMove';
-import { startRevolution } from './lib/Civ1/government';
+import { pickGovernment, startRevolution } from './lib/Civ1/government';
+import buildItemInCity from './lib/Civ1/buildItemInCity';
+import chooseResearch from './lib/Science/chooseResearch';
 import surveyTargets from './lib/Turn/surveyTargets';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
 
@@ -367,33 +356,13 @@ export class SimpleAIClient extends AIClient {
               }
 
               if (item instanceof PlayerResearch) {
-                const available = item.available();
-
-                if (available.length) {
-                  item.research(
-                    available[
-                      Math.floor(
-                        available.length *
-                          this._dependencies.randomNumberGenerator()
-                      )
-                    ]
-                  );
-                }
+                chooseResearch(this._dependencies, item);
 
                 continue;
               }
 
               if (item instanceof PlayerGovernment) {
-                const available = item.available();
-
-                chooseGovernment(
-                  item,
-                  available.includes(MonarchyGovernment)
-                    ? MonarchyGovernment
-                    : available[0],
-                  this._dependencies.pendingEffectRegistry,
-                  this._dependencies.turn
-                );
+                pickGovernment(this._dependencies, item);
 
                 continue;
               }
@@ -444,143 +413,12 @@ export class SimpleAIClient extends AIClient {
   }
 
   private buildItemInCity(city: City): void {
-    const tile = city.tile(),
-      cityBuild = this._dependencies.cityBuildRegistry.getByCity(city),
-      tileUnits = this._dependencies.unitRegistry.getByTile(tile),
-      available = cityBuild.available(),
-      restrictions: IConstructor[] = [Palace, Settlers],
-      availableFiltered = available.filter(
-        (buildItem: BuildItem): boolean =>
-          !restrictions.includes(buildItem.item()) &&
-          // TODO: Add auto-wonders or have more logic around this
-          !Object.prototype.isPrototypeOf.call(Wonder, buildItem.item())
-      ),
-      availableWonders = available.filter((buildItem: BuildItem): boolean =>
-        Object.prototype.isPrototypeOf.call(Wonder, buildItem.item())
-      ),
-      availableUnits = availableFiltered.filter(
-        (buildItem: BuildItem): boolean =>
-          Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
-      ),
-      randomSelection =
-        availableFiltered[
-          Math.floor(
-            availableFiltered.length *
-              this._dependencies.randomNumberGenerator()
-          )
-        ].item(),
-      getUnitByYield = (YieldType: typeof Yield) => {
-        const [[UnitType]] = availableUnits
-          .map((buildItem: BuildItem): [typeof Unit, Yield] => {
-            const UnitType = buildItem.item() as unknown as typeof Unit,
-              unitYield = new YieldType();
-
-            this._dependencies.ruleRegistry.process(
-              BaseYield,
-              UnitType,
-              unitYield
-            );
-
-            return [UnitType as typeof Unit, unitYield];
-          })
-          .sort(
-            (
-              [, unitYieldA]: [typeof Unit, Yield],
-              [, unitYieldB]: [typeof Unit, Yield]
-            ): number => unitYieldB.value() - unitYieldA.value()
-          );
-
-        return UnitType;
-      },
-      getDefensiveUnit = (
-        (UnitType?: typeof Unit): (() => typeof Unit) =>
-        (): typeof Unit =>
-          UnitType || (UnitType = getUnitByYield(Defence))
-      )(),
-      getOffensiveUnit = (
-        (UnitType?: typeof Unit): (() => typeof Unit) =>
-        (): typeof Unit =>
-          UnitType || (UnitType = getUnitByYield(Attack))
-      )();
-
-    if (
-      this._dependencies.unitRegistry.getByTile(tile).length < 2 &&
-      getDefensiveUnit()
-    ) {
-      cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
-
-      return;
-    }
-
-    const cityGrowth = this._dependencies.cityGrowthRegistry.getByCity(
-      cityBuild.city()
+    buildItemInCity(
+      this._dependencies,
+      this.player(),
+      this._memory.targets,
+      city
     );
-
-    // Always Build Cities
-    if (
-      available.some(
-        (buildItem: BuildItem) =>
-          buildItem.item() === (Settlers as unknown as typeof Buildable)
-      ) &&
-      !this._dependencies.unitRegistry
-        .getByCity(cityBuild.city())
-        .some((unit: Unit): boolean => unit instanceof Settlers) &&
-      // TODO: use expansionist leader trait
-      this._dependencies.unitRegistry
-        .getByPlayer(this.player())
-        .filter((unit: Unit): boolean => unit instanceof Settlers).length < 3 &&
-      cityGrowth.size() > 1
-    ) {
-      cityBuild.build(Settlers as unknown as typeof Buildable);
-
-      return;
-    }
-
-    if (
-      this._memory.targets.citiesToLiberate.length > 0 ||
-      this._memory.targets.enemyCitiesToAttack.length > 0 ||
-      this._memory.targets.enemyUnitsToAttack.length > 4
-    ) {
-      cityBuild.build(getOffensiveUnit() as unknown as typeof Buildable);
-
-      return;
-    }
-
-    if (
-      tileUnits.filter((unit) =>
-        this._dependencies.unitImprovementRegistry
-          .getByUnit(unit)
-          .filter((improvement) => improvement instanceof Fortified)
-      ).length < 2 ||
-      this._memory.targets.undefendedCities.length
-    ) {
-      cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
-
-      return;
-    }
-
-    // If we have resources to burn, build a wonder
-    if (
-      cityBuild
-        .city()
-        .yields()
-        .filter((cityYield) => cityYield instanceof Production)
-        .some((cityYield) => cityYield.value() > 4)
-    ) {
-      const wonders = availableWonders.map((cityBuild) => cityBuild.item());
-
-      cityBuild.build(
-        wonders[
-          Math.floor(
-            this._dependencies.randomNumberGenerator() * wonders.length
-          )
-        ]
-      );
-    }
-
-    if (randomSelection) {
-      cityBuild.build(randomSelection);
-    }
   }
 
   cityLost(city: City, player: Player | null, destroyed: boolean): void {

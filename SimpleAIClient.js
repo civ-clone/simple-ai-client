@@ -1,13 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SimpleAIClient = void 0;
-const Yields_1 = require("@civ-clone/core-unit/Yields");
 const CityBuildRegistry_1 = require("@civ-clone/core-city-build/CityBuildRegistry");
 const CityGrowthRegistry_1 = require("@civ-clone/core-city-growth/CityGrowthRegistry");
 const CityRegistry_1 = require("@civ-clone/core-city/CityRegistry");
 const ClientRegistry_1 = require("@civ-clone/core-client/ClientRegistry");
 const Engine_1 = require("@civ-clone/core-engine/Engine");
-const Yields_2 = require("@civ-clone/civ1-world/Yields");
 const GoodyHutRegistry_1 = require("@civ-clone/core-goody-hut/GoodyHutRegistry");
 const InteractionRegistry_1 = require("@civ-clone/core-diplomacy/InteractionRegistry");
 const PathFinderRegistry_1 = require("@civ-clone/core-world-path/PathFinderRegistry");
@@ -24,20 +22,13 @@ const StrategyNoteRegistry_1 = require("@civ-clone/core-strategy/StrategyNoteReg
 const UnitRegistry_1 = require("@civ-clone/core-unit/UnitRegistry");
 const WorkedTileRegistry_1 = require("@civ-clone/core-city/WorkedTileRegistry");
 const AIClient_1 = require("@civ-clone/core-ai-client/AIClient");
-const Yield_1 = require("@civ-clone/core-unit/Rules/Yield");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
 const EndTurn_1 = require("@civ-clone/base-player-action-end-turn/EndTurn");
-const UnitImprovements_1 = require("@civ-clone/civ1-unit/UnitImprovements");
 const Gold_1 = require("@civ-clone/base-city-yield-gold/Gold");
-const Governments_1 = require("@civ-clone/civ1-government/Governments");
 const core_pending_effect_1 = require("@civ-clone/core-pending-effect");
-const revolution_1 = require("@civ-clone/civ1-government/lib/revolution");
 const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment");
-const CityImprovements_1 = require("@civ-clone/civ1-city-improvement/CityImprovements");
 const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
-const Units_1 = require("@civ-clone/civ1-unit/Units");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
-const Wonder_1 = require("@civ-clone/core-wonder/Wonder");
 const core_random_1 = require("@civ-clone/core-random");
 const Memory_1 = require("./lib/Memory");
 const knowledge_1 = require("./lib/Civ1/knowledge");
@@ -49,6 +40,8 @@ const waitForCarrier_1 = require("./lib/Unit/waitForCarrier");
 const moveUnit_1 = require("./lib/Unit/moveUnit");
 const scoreUnitMove_1 = require("./lib/Unit/scoreUnitMove");
 const government_1 = require("./lib/Civ1/government");
+const buildItemInCity_1 = require("./lib/Civ1/buildItemInCity");
+const chooseResearch_1 = require("./lib/Science/chooseResearch");
 const surveyTargets_1 = require("./lib/Turn/surveyTargets");
 const wakeCarrierAircraft_1 = require("./lib/Turn/wakeCarrierAircraft");
 const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
@@ -188,18 +181,11 @@ class SimpleAIClient extends AIClient_1.default {
                             continue;
                         }
                         if (item instanceof PlayerResearch_1.default) {
-                            const available = item.available();
-                            if (available.length) {
-                                item.research(available[Math.floor(available.length *
-                                    this._dependencies.randomNumberGenerator())]);
-                            }
+                            (0, chooseResearch_1.default)(this._dependencies, item);
                             continue;
                         }
                         if (item instanceof PlayerGovernment_1.default) {
-                            const available = item.available();
-                            (0, revolution_1.chooseGovernment)(item, available.includes(Governments_1.Monarchy)
-                                ? Governments_1.Monarchy
-                                : available[0], this._dependencies.pendingEffectRegistry, this._dependencies.turn);
+                            (0, government_1.pickGovernment)(this._dependencies, item);
                             continue;
                         }
                         if (action instanceof EndTurn_1.default) {
@@ -234,63 +220,7 @@ class SimpleAIClient extends AIClient_1.default {
         });
     }
     buildItemInCity(city) {
-        const tile = city.tile(), cityBuild = this._dependencies.cityBuildRegistry.getByCity(city), tileUnits = this._dependencies.unitRegistry.getByTile(tile), available = cityBuild.available(), restrictions = [CityImprovements_1.Palace, Units_1.Settlers], availableFiltered = available.filter((buildItem) => !restrictions.includes(buildItem.item()) &&
-            // TODO: Add auto-wonders or have more logic around this
-            !Object.prototype.isPrototypeOf.call(Wonder_1.default, buildItem.item())), availableWonders = available.filter((buildItem) => Object.prototype.isPrototypeOf.call(Wonder_1.default, buildItem.item())), availableUnits = availableFiltered.filter((buildItem) => Object.prototype.isPrototypeOf.call(Unit_1.default, buildItem.item())), randomSelection = availableFiltered[Math.floor(availableFiltered.length *
-            this._dependencies.randomNumberGenerator())].item(), getUnitByYield = (YieldType) => {
-            const [[UnitType]] = availableUnits
-                .map((buildItem) => {
-                const UnitType = buildItem.item(), unitYield = new YieldType();
-                this._dependencies.ruleRegistry.process(Yield_1.BaseYield, UnitType, unitYield);
-                return [UnitType, unitYield];
-            })
-                .sort(([, unitYieldA], [, unitYieldB]) => unitYieldB.value() - unitYieldA.value());
-            return UnitType;
-        }, getDefensiveUnit = ((UnitType) => () => UnitType || (UnitType = getUnitByYield(Yields_1.Defence)))(), getOffensiveUnit = ((UnitType) => () => UnitType || (UnitType = getUnitByYield(Yields_1.Attack)))();
-        if (this._dependencies.unitRegistry.getByTile(tile).length < 2 &&
-            getDefensiveUnit()) {
-            cityBuild.build(getDefensiveUnit());
-            return;
-        }
-        const cityGrowth = this._dependencies.cityGrowthRegistry.getByCity(cityBuild.city());
-        // Always Build Cities
-        if (available.some((buildItem) => buildItem.item() === Units_1.Settlers) &&
-            !this._dependencies.unitRegistry
-                .getByCity(cityBuild.city())
-                .some((unit) => unit instanceof Units_1.Settlers) &&
-            // TODO: use expansionist leader trait
-            this._dependencies.unitRegistry
-                .getByPlayer(this.player())
-                .filter((unit) => unit instanceof Units_1.Settlers).length < 3 &&
-            cityGrowth.size() > 1) {
-            cityBuild.build(Units_1.Settlers);
-            return;
-        }
-        if (this._memory.targets.citiesToLiberate.length > 0 ||
-            this._memory.targets.enemyCitiesToAttack.length > 0 ||
-            this._memory.targets.enemyUnitsToAttack.length > 4) {
-            cityBuild.build(getOffensiveUnit());
-            return;
-        }
-        if (tileUnits.filter((unit) => this._dependencies.unitImprovementRegistry
-            .getByUnit(unit)
-            .filter((improvement) => improvement instanceof UnitImprovements_1.Fortified)).length < 2 ||
-            this._memory.targets.undefendedCities.length) {
-            cityBuild.build(getDefensiveUnit());
-            return;
-        }
-        // If we have resources to burn, build a wonder
-        if (cityBuild
-            .city()
-            .yields()
-            .filter((cityYield) => cityYield instanceof Yields_2.Production)
-            .some((cityYield) => cityYield.value() > 4)) {
-            const wonders = availableWonders.map((cityBuild) => cityBuild.item());
-            cityBuild.build(wonders[Math.floor(this._dependencies.randomNumberGenerator() * wonders.length)]);
-        }
-        if (randomSelection) {
-            cityBuild.build(randomSelection);
-        }
+        (0, buildItemInCity_1.default)(this._dependencies, this.player(), this._memory.targets, city);
     }
     cityLost(city, player, destroyed) {
         // Can't retaliate against ourselves, we deserved it...
