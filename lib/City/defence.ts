@@ -12,11 +12,10 @@ export const defendersWanted = (
 ): number =>
   Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5);
 
+// A unit that could defend a city: not, say, Settlers or a ship.
+export const isDefender = (unit: Unit): boolean =>
+  unit instanceof Fortifiable && unit.defence().value() > 0;
+
 // The units on the city's tile that could defend it, fortified or not.
 export const defendersIn = (dependencies: Dependencies, city: City): Unit[] =>
-  dependencies.unitRegistry
-    .getByTile(city.tile())
-    .filter(
-      (unit: Unit): boolean =>
-        unit instanceof Fortifiable && unit.defence().value() > 0
-    );
+  dependencies.unitRegistry.getByTile(city.tile()).filter(isDefender);

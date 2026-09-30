@@ -1,7 +1,7 @@
 // Generic: a unit in one of the player's cities fortifies there if the city needs more defenders, or if it can relieve
 //  a weaker one.
 import Dependencies from '../Dependencies';
-import { defendersWanted } from '../City/defence';
+import { defendersWanted, isDefender } from '../City/defence';
 import { Fortified } from '@civ-clone/library-unit/UnitImprovements';
 import { Fortify } from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
@@ -32,7 +32,8 @@ export const garrison = (
     fortify &&
     city &&
     (cityUnitWithLowerDefence ||
-      tileUnits.length <= defendersWanted(dependencies, city))
+      tileUnits.filter(isDefender).length <=
+        defendersWanted(dependencies, city))
   ) {
     unit.action(fortify);
 

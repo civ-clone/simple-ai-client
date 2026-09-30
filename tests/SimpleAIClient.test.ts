@@ -1875,10 +1875,79 @@ describe('SimpleAIClient', (): void => {
   });
 
   // Its garrison keeps one unit in a city this size, so a second would only walk off, and the city would build another.
-  it('should not build a second defender in a small city, fortified or not', async (): Promise<void> => {
-    const { city, cleanUp, player } = await productionCity(1, false);
+  [false, true].forEach((fortified: boolean): void =>
+    it(`should not build a second defender in a small city with one ${
+      fortified ? '' : 'un'
+    }fortified`, async (): Promise<void> => {
+      const { city, cleanUp, player } = await productionCity(1, fortified);
 
-    buildItemInCity(lastPick(), player, createMemory().targets, city);
+      buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+      expect(isUnit(cityBuildRegistry.getByCity(city).building()!.item()))
+        .false;
+
+      cleanUp();
+    })
+  );
+
+  it('should fortify a lone defender in a small city that Settlers are also in', async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(0, false),
+      settlers = new Settlers(null, player, city.tile(), ruleRegistry),
+      warrior = new Warrior(null, player, city.tile(), ruleRegistry),
+      fortify = warrior
+        .actions()
+        .find((action): boolean => action instanceof Fortify) as Fortify;
+
+    expect(unitRegistry.getByTile(city.tile())).members([settlers, warrior]);
+    expect(
+      garrison(
+        dependencies,
+        warrior,
+        city.tile(),
+        unitRegistry.getByTile(city.tile()),
+        fortify
+      )
+    ).true;
+
+    cleanUp();
+  });
+
+  it('should not build an attacker when nothing it can build is one', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      targets = createMemory().targets;
+
+    // Warriors only, which attack no better than they defend.
+    targets.enemyCitiesToAttack.push(world.get(9, 4));
+
+    buildItemInCity(lastPick(), player, targets, city);
+
+    expect(isUnit(cityBuildRegistry.getByCity(city).building()!.item())).false;
+
+    cleanUp();
+  });
+
+  it('should count attackers its other cities are building towards the ones it wants', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      other = new City(
+        player,
+        world.get(7, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      targets = createMemory().targets;
+
+    playerResearchRegistry.getByPlayer(player).addAdvance(HorsebackRiding);
+    unitImprovementRegistry.register(
+      new Fortified(new Warrior(null, player, other.tile(), ruleRegistry))
+    );
+    targets.enemyCitiesToAttack.push(world.get(9, 4));
+
+    // Two cities want two attackers: one is out, and the other city is building the second.
+    new Horseman(null, player, world.get(5, 0), ruleRegistry);
+    cityBuildRegistry.getByCity(other).build(Horseman);
+
+    buildItemInCity(lastPick(), player, targets, city);
 
     expect(isUnit(cityBuildRegistry.getByCity(city).building()!.item())).false;
 
