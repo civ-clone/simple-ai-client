@@ -8,7 +8,6 @@ const CityRegistry_1 = require("@civ-clone/core-city/CityRegistry");
 const ClientRegistry_1 = require("@civ-clone/core-client/ClientRegistry");
 const Engine_1 = require("@civ-clone/core-engine/Engine");
 const Yields_2 = require("@civ-clone/civ1-world/Yields");
-const Types_1 = require("@civ-clone/civ1-unit/Types");
 const GoodyHutRegistry_1 = require("@civ-clone/core-goody-hut/GoodyHutRegistry");
 const InteractionRegistry_1 = require("@civ-clone/core-diplomacy/InteractionRegistry");
 const PathFinderRegistry_1 = require("@civ-clone/core-world-path/PathFinderRegistry");
@@ -35,19 +34,18 @@ const core_pending_effect_1 = require("@civ-clone/core-pending-effect");
 const revolution_1 = require("@civ-clone/civ1-government/lib/revolution");
 const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment");
 const CityImprovements_1 = require("@civ-clone/civ1-city-improvement/CityImprovements");
-const Path_1 = require("@civ-clone/core-world-path/Path");
 const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
 const Units_1 = require("@civ-clone/civ1-unit/Units");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
 const Wonder_1 = require("@civ-clone/core-wonder/Wonder");
 const core_random_1 = require("@civ-clone/core-random");
 const Memory_1 = require("./lib/Memory");
-const aircraft_1 = require("./lib/Civ1/aircraft");
-const terrain_1 = require("./lib/Civ1/terrain");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const reviewCities_1 = require("./lib/Turn/reviewCities");
 const chooseNegotiationStep_1 = require("./lib/Diplomacy/chooseNegotiationStep");
 const orders_1 = require("./lib/Unit/orders");
+const takeUnitTurn_1 = require("./lib/Unit/takeUnitTurn");
+const waitForCarrier_1 = require("./lib/Unit/waitForCarrier");
 const moveUnit_1 = require("./lib/Unit/moveUnit");
 const scoreUnitMove_1 = require("./lib/Unit/scoreUnitMove");
 const government_1 = require("./lib/Civ1/government");
@@ -174,146 +172,15 @@ class SimpleAIClient extends AIClient_1.default {
                             console.error("SimpleAIClient: Couldn't pick an action to do.");
                             break;
                         }
-                        // Our `Carrier`s move first, so an aircraft only counts on one being where it'll be at the end of the turn.
                         if (item instanceof Unit_1.default &&
-                            !item.waiting() &&
-                            (0, aircraft_1.aircraftFuel)(this._dependencies, item) !== null &&
-                            this._dependencies.unitRegistry
-                                .getByPlayer(this.player())
-                                .some((carrier) => carrier instanceof Types_1.NavalTransport &&
-                                carrier.canStow(item) &&
-                                carrier.active() &&
-                                carrier.moves().value() > 0)) {
-                            item.setWaiting();
+                            (0, waitForCarrier_1.default)(this._dependencies, this.player(), this._knowledge, item)) {
                             continue;
                         }
                         if (item instanceof Unit_1.default) {
-                            const unit = item, tile = unit.tile(), target = this._memory.unitTargetData.get(unit), actions = unit.actions(), { buildIrrigation, buildMine, buildRoad, fortify, foundCity, unload, } = actions.reduce((object, entity) => ({
-                                ...object,
-                                [entity.constructor.name.replace(/^./, (char) => char.toLowerCase())]: entity,
-                            }), {}), tileUnits = this._dependencies.unitRegistry.getByTile(tile), lastUnitMoves = this._memory.lastUnitMoves.get(unit);
-                            if (!lastUnitMoves) {
-                                this._memory.lastUnitMoves.set(unit, [unit.tile()]);
+                            const moving = (0, takeUnitTurn_1.default)(this._dependencies, this.player(), this._memory, this._knowledge, item);
+                            if (moving !== null) {
+                                await moving;
                             }
-                            if (unit instanceof Types_1.NavalTransport &&
-                                unload &&
-                                tile.isCoast() &&
-                                unit
-                                    .cargo()
-                                    .some((unit) => !tile
-                                    .getNeighbours()
-                                    .some((tile) => (this._memory.lastUnitMoves.get(unit) || []).includes(tile)))) {
-                                unit.action(unload);
-                                unit.setWaiting();
-                                // skip out to allow the unloaded units to be moved.
-                                continue;
-                            }
-                            if (unit instanceof Types_1.Worker) {
-                                if (foundCity &&
-                                    (0, terrain_1.shouldBuildCity)(this._dependencies, this.player(), tile)) {
-                                    unit.action(foundCity);
-                                }
-                                else if (buildIrrigation &&
-                                    (0, terrain_1.shouldIrrigate)(this._dependencies, this.player(), tile)) {
-                                    unit.action(buildIrrigation);
-                                }
-                                else if (buildMine &&
-                                    (0, terrain_1.shouldMine)(this._dependencies, this.player(), tile)) {
-                                    unit.action(buildMine);
-                                }
-                                else if (buildRoad &&
-                                    (0, terrain_1.shouldRoad)(this._dependencies, this.player(), tile)) {
-                                    unit.action(buildRoad);
-                                }
-                                else if (!target &&
-                                    this._memory.targets.goodSitesForCities.length) {
-                                    this._memory.unitTargetData.set(unit, this._memory.targets.goodSitesForCities.shift());
-                                }
-                                await this.moveUnit(unit);
-                                continue;
-                            }
-                            // TODO: check for defense values and activate weaker for disband/upgrade/scouting
-                            const [cityUnitWithLowerDefence] = tileUnits.filter((tileUnit) => this._dependencies.unitImprovementRegistry
-                                .getByUnit(tileUnit)
-                                .some((improvement) => improvement instanceof UnitImprovements_1.Fortified) && unit.defence() > tileUnit.defence()), city = this._dependencies.cityRegistry.getByTile(tile);
-                            if (fortify &&
-                                city &&
-                                (cityUnitWithLowerDefence ||
-                                    tileUnits.length <=
-                                        Math.ceil(this._dependencies.cityGrowthRegistry
-                                            .getByCity(city)
-                                            .size() / 5))) {
-                                unit.action(fortify);
-                                if (cityUnitWithLowerDefence) {
-                                    cityUnitWithLowerDefence.activate();
-                                }
-                                continue;
-                            }
-                            if (!target) {
-                                // TODO: all the repetition - sort this.
-                                if (unit instanceof Types_1.Fortifiable &&
-                                    unit.defence().value() > 0 &&
-                                    this._memory.targets.undefendedCities.length > 0) {
-                                    const [targetTile] = this._memory.targets.undefendedCities.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._dependencies.pathFinderRegistry);
-                                    if (path) {
-                                        this._memory.targets.undefendedCities.splice(this._memory.targets.undefendedCities.indexOf(targetTile), 1);
-                                        this._memory.unitPathData.set(unit, path);
-                                    }
-                                }
-                                else if (unit.attack().value() > 0 &&
-                                    this._memory.targets.citiesToLiberate.length > 0) {
-                                    const [targetTile] = this._memory.targets.citiesToLiberate
-                                        .filter((tile) => unit instanceof Types_1.Land && tile.isLand())
-                                        .sort((a, b) => a.distanceFrom(unit.tile()) -
-                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._dependencies.pathFinderRegistry);
-                                    if (path) {
-                                        this._memory.targets.citiesToLiberate.splice(this._memory.targets.citiesToLiberate.indexOf(targetTile), 1);
-                                        this._memory.unitPathData.set(unit, path);
-                                    }
-                                }
-                                else if (unit.attack().value() > 0 &&
-                                    this._memory.targets.enemyUnitsToAttack.length > 0) {
-                                    const [targetTile] = this._memory.targets.enemyUnitsToAttack
-                                        .filter((tile) => (unit instanceof Types_1.Land && tile.isLand()) ||
-                                        (unit instanceof Types_1.Naval && tile.isWater()))
-                                        .sort((a, b) => a.distanceFrom(unit.tile()) -
-                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._dependencies.pathFinderRegistry);
-                                    if (path) {
-                                        this._memory.targets.enemyUnitsToAttack.splice(this._memory.targets.enemyUnitsToAttack.indexOf(targetTile), 1);
-                                        this._memory.unitPathData.set(unit, path);
-                                    }
-                                }
-                                else if (unit instanceof Types_1.Land &&
-                                    unit.attack().value() > 0 &&
-                                    this._memory.targets.enemyCitiesToAttack.length > 0) {
-                                    const [targetTile] = this._memory.targets.enemyCitiesToAttack.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._dependencies.pathFinderRegistry);
-                                    if (path) {
-                                        this._memory.targets.enemyCitiesToAttack.splice(this._memory.targets.enemyCitiesToAttack.indexOf(targetTile), 1);
-                                        this._memory.unitPathData.set(unit, path);
-                                    }
-                                }
-                                else if (unit instanceof Types_1.Land &&
-                                    this._memory.targets.landTilesToExplore.length > 0) {
-                                    const [targetTile] = this._memory.targets.landTilesToExplore.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._dependencies.pathFinderRegistry);
-                                    if (path) {
-                                        this._memory.targets.landTilesToExplore.splice(this._memory.targets.landTilesToExplore.indexOf(targetTile), 1);
-                                        this._memory.unitPathData.set(unit, path);
-                                    }
-                                }
-                                else if (unit instanceof Types_1.Naval &&
-                                    this._memory.targets.seaTilesToExplore.length > 0) {
-                                    const [targetTile] = this._memory.targets.seaTilesToExplore.sort((a, b) => a.distanceFrom(unit.tile()) -
-                                        b.distanceFrom(unit.tile())), path = Path_1.default.for(unit, unit.tile(), targetTile, this._dependencies.pathFinderRegistry);
-                                    if (path) {
-                                        this._memory.targets.seaTilesToExplore.splice(this._memory.targets.seaTilesToExplore.indexOf(targetTile), 1);
-                                        this._memory.unitPathData.set(unit, path);
-                                    }
-                                }
-                            }
-                            await this.moveUnit(unit);
                             continue;
                         }
                         if (item instanceof CityBuild_1.default) {
