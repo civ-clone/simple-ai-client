@@ -460,6 +460,18 @@ describe('SimpleAIClient', (): void => {
         })
       );
 
+  // Building a world gives each registered client's player a Settlers at a start tile (`civ1-player`'s `Spawn`), once
+  //  the promise chain it starts has run. This lets that run, then removes them.
+  const removeSpawnedSettlers = async (player: Player): Promise<void> => {
+    await new Promise((resolve) => setImmediate(resolve));
+
+    unitRegistry.unregister(
+      ...unitRegistry
+        .getByPlayer(player)
+        .filter((unit: Unit): boolean => unit instanceof Settlers)
+    );
+  };
+
   availableGovernmentRegistry.register(
     AnarchyGovernment,
     DespotismGovernment,
@@ -1093,6 +1105,10 @@ describe('SimpleAIClient', (): void => {
 
     playerWorld.register(...world.entries());
 
+    // With no city of its own, the player would found one with its spawned Settlers from turn 5, and the Warrior would
+    //  go to defend that city rather than take this one.
+    await removeSpawnedSettlers(player);
+
     await takeTurns(client, 12);
 
     expect(unit.tile()).to.equal(city.tile());
@@ -1473,6 +1489,81 @@ describe('SimpleAIClient', (): void => {
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+
+  // Desert everywhere but the top row, where a city can feed itself: no tile passes `shouldBuildCity`, so a worker
+  //  looking for a good site would never find one.
+  const firstCityTest = async (
+    turnValue: number,
+    withCity: boolean
+  ): Promise<{ city: City | undefined; settlers: Unit; start: Tile }> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('7G42D', 7, 7),
+      player = client.player();
+
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    await removeSpawnedSettlers(player);
+
+    const existing = withCity
+        ? new City(
+            player,
+            world.get(0, 0),
+            '',
+            ruleRegistry,
+            workedTileRegistry
+          )
+        : null,
+      start = world.get(4, 4),
+      settlers = new Settlers(null, player, start, ruleRegistry),
+      turnBefore = turn.value();
+
+    expect(cityRegistry.getByPlayer(player)).length(withCity ? 1 : 0);
+    expect(civ1Knowledge.shouldBuildCity(dependencies, player, start)).false;
+
+    turn.set(turnValue);
+
+    try {
+      await takeTurns(client);
+    } finally {
+      turn.set(turnBefore);
+    }
+
+    const city = cityRegistry
+      .getByPlayer(player)
+      .find((city: City): boolean => city !== existing);
+
+    cityRegistry.unregister(...cityRegistry.getByPlayer(player));
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+
+    return { city, settlers, start };
+  };
+
+  it('should found its first city where its Settlers stand by turn 5, even with no good site', async (): Promise<void> => {
+    const { city, settlers, start } = await firstCityTest(5, false);
+
+    expect(city).instanceof(City);
+    expect(city!.tile()).equal(start);
+    expect(settlers.destroyed()).true;
+  });
+
+  it('should keep looking for a good site for its first city before turn 5', async (): Promise<void> => {
+    const { city, settlers } = await firstCityTest(1, false);
+
+    expect(city).undefined;
+    expect(settlers.destroyed()).false;
+  });
+
+  it('should not found a city on a poor site once it has a city', async (): Promise<void> => {
+    const { city, settlers } = await firstCityTest(50, true);
+
+    expect(city).undefined;
+    expect(settlers.destroyed()).false;
   });
 
   it('should not offer a tile another unit is already heading for', async (): Promise<void> => {
