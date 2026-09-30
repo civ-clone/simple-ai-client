@@ -35,11 +35,6 @@ declare global {
   }
 }
 export declare class SimpleAIClient extends AIClient {
-  private _isACityTile;
-  private _shouldBuildCity;
-  private _shouldIrrigate;
-  private _shouldMine;
-  private _shouldRoad;
   private _dependencies;
   private _memory;
   private get _lastUnitMoves();
@@ -77,9 +72,6 @@ export declare class SimpleAIClient extends AIClient {
     workedTileRegistry?: WorkedTileRegistry,
     pendingEffectRegistry?: PendingEffectRegistry
   );
-  private aircraftFuel;
-  private aircraftCanReturn;
-  private carriersFor;
   scoreUnitMove(unit: Unit, tile: Tile): number;
   moveUnit(unit: Unit): Promise<void>;
   preProcessTurn(): void;
@@ -94,6 +86,5 @@ export declare class SimpleAIClient extends AIClient {
   private handleNegotiation;
   private skipUnit;
   private noOrders;
-  private shouldAttack;
 }
 export default SimpleAIClient;
