@@ -44,8 +44,7 @@ export const cityLost = (
       ...playerWorld
         .entries()
         .filter((playerTile: PlayerTile) =>
-          // TODO: these are the player's own cities, not `by`'s. Kept: #153 changes no play.
-          hasPlayerCity(playerTile.tile(), player, dependencies.cityRegistry)
+          hasPlayerCity(playerTile.tile(), by, dependencies.cityRegistry)
         )
         .map((playerTile: PlayerTile) => playerTile.tile())
     );
