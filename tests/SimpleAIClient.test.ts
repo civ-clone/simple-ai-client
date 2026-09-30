@@ -166,7 +166,10 @@ import StrategyRegistry from '@civ-clone/core-strategy/StrategyRegistry';
 import { createDependencies } from '../lib/Dependencies';
 import { createStrategies } from '../registerStrategies';
 import Path from '@civ-clone/core-world-path/Path';
-import assignMission from '../lib/Unit/assignMission';
+import assignMission, { attackEnemyUnits } from '../lib/Unit/assignMission';
+import MandatoryPlayerAction from '@civ-clone/core-player/MandatoryPlayerAction';
+import MissionAndMove from '../Strategies/Unit/MissionAndMove';
+import civ1Knowledge from '../lib/Civ1/knowledge';
 import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
 import TerrainFeatureRegistry from '@civ-clone/core-terrain-feature/TerrainFeatureRegistry';
 import TileImprovementRegistry from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
@@ -1499,5 +1502,130 @@ describe('SimpleAIClient', (): void => {
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);
     unitRegistry.unregister(unit);
+  });
+  it('should hunt the nearest enemy unit it has a path to, and none it has no path to', async (): Promise<void> => {
+    withCivilizations();
+
+    //   01234
+    // 0 ##~#~   the warrior at 1,0; an enemy on the island at 3,0
+    // 1 #~~~~
+    // 2 #~~~~
+    // 3 #~~~~
+    // 4 #~~~~   another enemy at 0,2, farther but on the same land (the map wraps)
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('2GOGOG4OG4OG4OG4O', 5, 5),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const unit = new Warrior(null, player, world.get(1, 0), ruleRegistry),
+      unreachable = new Warrior(null, enemy, world.get(3, 0), ruleRegistry),
+      reachable = new Warrior(null, enemy, world.get(0, 2), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    expect(memory.targets.enemyUnitsToAttack).include.members([
+      unreachable.tile(),
+      reachable.tile(),
+    ]);
+    expect(unreachable.tile().distanceFrom(unit.tile())).lessThan(
+      reachable.tile().distanceFrom(unit.tile())
+    );
+
+    expect(attackEnemyUnits(dependencies, memory, unit)).true;
+    expect(memory.unitPathData.get(unit)?.end()).equal(reachable.tile());
+
+    memory.unitPathData.delete(unit);
+    memory.targets.enemyUnitsToAttack.splice(0);
+    memory.targets.enemyUnitsToAttack.push(unreachable.tile());
+
+    // With nothing it can reach, the mission leaves the unit to the ones after it.
+    expect(attackEnemyUnits(dependencies, memory, unit)).false;
+    expect(memory.unitPathData.has(unit)).false;
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+    unitRegistry.unregister(unit, unreachable, reachable);
+  });
+
+  it('should keep a unit on its way to where it was going when other targets come up', async (): Promise<void> => {
+    withCivilizations();
+
+    //   0123
+    // 0 ~~~~
+    // 1 ~###
+    // 2 ~###
+    // 3 ~###
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('5O3GO3GO3G', 4, 4),
+      player = client.player(),
+      unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player),
+      destination = world.get(3, 3);
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    memory.unitPathData.set(
+      unit,
+      Path.for(unit, unit.tile(), destination, pathFinderRegistry)
+    );
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    // Nearer tiles to explore, which a new mission would pick instead.
+    expect(
+      memory.targets.landTilesToExplore.some(
+        (tile: Tile): boolean =>
+          tile.distanceFrom(unit.tile()) < destination.distanceFrom(unit.tile())
+      )
+    ).true;
+
+    await new MissionAndMove(dependencies, civ1Knowledge).attempt(
+      new MandatoryPlayerAction(player, unit)
+    );
+
+    expect(memory.unitPathData.get(unit)?.end()).equal(destination);
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(unit);
+  });
+
+  it('should send a ship to explore even while there are cities to liberate', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('64O', 8, 8),
+      player = client.player(),
+      trireme = new Trireme(
+        null,
+        player,
+        world.get(1, 1),
+        ruleRegistry,
+        transportRegistry
+      ),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    // A ship can't liberate a city, so a city waiting to be liberated mustn't keep it from exploring.
+    memory.targets.citiesToLiberate.push(world.get(6, 6));
+
+    expect(trireme.attack().value()).greaterThan(0);
+    expect(memory.targets.seaTilesToExplore).not.empty;
+
+    assignMission(dependencies, memory, trireme);
+
+    expect(memory.unitPathData.get(trireme)).instanceof(Path);
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
 });
