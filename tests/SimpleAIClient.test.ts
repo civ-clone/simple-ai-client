@@ -1809,48 +1809,179 @@ describe('SimpleAIClient', (): void => {
       randomNumberGenerator: (): number => 0.999,
     });
 
-  it('should build another defender in a city whose units are not fortified', async (): Promise<void> => {
+  // A size 1 city of a new player's on grassland, with `defenders` Warriors on its tile, fortified or not, for the city
+  //  production tests. `cleanUp` unregisters everything.
+  const productionCity = async (
+    defenders: number,
+    fortified: boolean,
+    x: number = 2
+  ): Promise<{
+    city: City;
+    cleanUp: () => void;
+    player: Player;
+    world: World;
+  }> => {
     withCivilizations();
 
     const [client] = await createClients(),
-      world = await simpleWorldLoader('25G', 5, 5),
+      world = await simpleWorldLoader('50G', 5, 10),
       player = client.player();
 
     playerWorldRegistry.getByPlayer(player).register(...world.entries());
 
-    const city = new City(
-        player,
-        world.get(2, 2),
-        '',
-        ruleRegistry,
-        workedTileRegistry
-      ),
-      units = [
-        new Warrior(null, player, city.tile(), ruleRegistry),
-        new Warrior(null, player, city.tile(), ruleRegistry),
-      ];
+    await removeSpawnedSettlers(player);
 
-    expect(
-      units.some((unit: Unit): boolean =>
-        unitImprovementRegistry
-          .getByUnit(unit)
-          .some(
-            (improvement: UnitImprovement): boolean =>
-              improvement instanceof Fortified
-          )
-      )
-    ).false;
+    const city = new City(
+      player,
+      world.get(x, 2),
+      '',
+      ruleRegistry,
+      workedTileRegistry
+    );
+
+    new Array(defenders).fill(0).forEach((): void => {
+      const unit = new Warrior(null, player, city.tile(), ruleRegistry);
+
+      if (fortified) {
+        unitImprovementRegistry.register(new Fortified(unit));
+      }
+    });
+
+    return {
+      city,
+      cleanUp: (): void => {
+        cityRegistry.unregister(...cityRegistry.getByPlayer(player));
+        clientRegistry.unregister(client);
+        currentPlayerRegistry.unregister(player);
+        playerRegistry.unregister(player);
+        unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+      },
+      player,
+      world,
+    };
+  };
+
+  const isUnit = (item: unknown): boolean =>
+    Object.prototype.isPrototypeOf.call(Unit, item);
+
+  it('should build a defender in a city with none', async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(0, false);
 
     buildItemInCity(lastPick(), player, createMemory().targets, city);
 
     expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
 
-    cityRegistry.unregister(city);
-    clientRegistry.unregister(client);
-    currentPlayerRegistry.unregister(player);
-    playerRegistry.unregister(player);
-    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+    cleanUp();
   });
+
+  // Its garrison keeps one unit in a city this size, so a second would only walk off, and the city would build another.
+  it('should not build a second defender in a small city, fortified or not', async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(1, false);
+
+    buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+    expect(isUnit(cityBuildRegistry.getByCity(city).building()!.item())).false;
+
+    cleanUp();
+  });
+
+  it('should build an attacker while it has fewer than one per city and an enemy city to attack', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      targets = createMemory().targets;
+
+    playerResearchRegistry.getByPlayer(player).addAdvance(HorsebackRiding);
+    targets.enemyCitiesToAttack.push(world.get(9, 4));
+
+    buildItemInCity(lastPick(), player, targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+      Horseman
+    );
+
+    cleanUp();
+  });
+
+  it('should build something other than a unit once it has an attacker for each city, even with an enemy city to attack', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      targets = createMemory().targets;
+
+    playerResearchRegistry.getByPlayer(player).addAdvance(HorsebackRiding);
+    targets.enemyCitiesToAttack.push(world.get(9, 4));
+    new Horseman(null, player, world.get(6, 2), ruleRegistry);
+
+    buildItemInCity(lastPick(), player, targets, city);
+
+    expect(isUnit(cityBuildRegistry.getByCity(city).building()!.item())).false;
+
+    cleanUp();
+  });
+
+  it('should build the cheapest unit that can fight to explore with, while there is land to explore', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      targets = createMemory().targets;
+
+    // So the best defender, a Phalanx, isn't also the cheapest fighter.
+    playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
+    targets.landTilesToExplore.push(world.get(9, 4));
+
+    buildItemInCity(lastPick(), player, targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
+
+    cleanUp();
+  });
+
+  // A city's yields come one per tile and unit, so a city making 3 shields has no single Production yield over 1.
+  it('should start a Wonder in its most productive city, one at a time', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      other = new City(
+        player,
+        world.get(7, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      fortified = new Warrior(null, player, other.tile(), ruleRegistry);
+
+    unitImprovementRegistry.register(new Fortified(fortified));
+    playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
+    availableBuildItemsRegistry.register(Colossus as unknown as IBuildable);
+
+    city.yields = () => [
+      new ProductionYield(1),
+      new ProductionYield(1),
+      new ProductionYield(1),
+    ];
+    other.yields = () => [new ProductionYield(1)];
+
+    try {
+      buildItemInCity(lastPick(), player, createMemory().targets, other);
+
+      expect(cityBuildRegistry.getByCity(other).building()!.item()).not.equal(
+        Colossus
+      );
+
+      buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+      expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+        Colossus
+      );
+
+      // Now the more productive, but the first city is already building a Wonder.
+      other.yields = () => [new ProductionYield(5)];
+
+      buildItemInCity(lastPick(), player, createMemory().targets, other);
+
+      expect(cityBuildRegistry.getByCity(other).building()!.item()).not.equal(
+        Colossus
+      );
+    } finally {
+      availableBuildItemsRegistry.unregister(Colossus as unknown as IBuildable);
+    }
+
+    cleanUp();
+  });
+
   it('should build a Wonder when a city has production to spare', async (): Promise<void> => {
     withCivilizations();
 
