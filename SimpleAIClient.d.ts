@@ -36,6 +36,7 @@ declare global {
 }
 export declare class SimpleAIClient extends AIClient {
   private _dependencies;
+  private _knowledge;
   private _memory;
   private get _lastUnitMoves();
   private get _unitPathData();
