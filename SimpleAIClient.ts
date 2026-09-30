@@ -86,7 +86,6 @@ import AIClient from '@civ-clone/core-ai-client/AIClient';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
-import Gold from '@civ-clone/base-city-yield-gold/Gold';
 import {
   PendingEffectRegistry,
   instance as pendingEffectRegistryInstance,
@@ -95,7 +94,6 @@ import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
-import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { instance as rngInstance } from '@civ-clone/core-random';
@@ -113,22 +111,10 @@ import scoreUnitMove from './lib/Unit/scoreUnitMove';
 import { pickGovernment, startRevolution } from './lib/Civ1/government';
 import buildItemInCity from './lib/Civ1/buildItemInCity';
 import chooseResearch from './lib/Science/chooseResearch';
+import cityLost from './lib/Events/cityLost';
+import unitDestroyed from './lib/Events/unitDestroyed';
 import surveyTargets from './lib/Turn/surveyTargets';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
-
-const hasPlayerCity = (
-  tile: Tile,
-  player: Player,
-  cityRegistry: CityRegistry = cityRegistryInstance
-): boolean => {
-  const city = cityRegistry.getByTile(tile);
-
-  if (city === null) {
-    return false;
-  }
-
-  return city.player() === player;
-};
 
 export class SimpleAIClient extends AIClient {
   private _dependencies: Dependencies;
@@ -422,57 +408,21 @@ export class SimpleAIClient extends AIClient {
   }
 
   cityLost(city: City, player: Player | null, destroyed: boolean): void {
-    // Can't retaliate against ourselves, we deserved it...
-    if (!player) {
-      return;
-    }
-
-    const playerWorld = this._dependencies.playerWorldRegistry.getByPlayer(
-      this.player()
+    cityLost(
+      this._dependencies,
+      this.player(),
+      this._memory.targets,
+      city,
+      player,
+      destroyed
     );
-
-    if (destroyed) {
-      // REVENGE!
-      this._memory.targets.enemyCitiesToAttack.push(
-        ...playerWorld
-          .entries()
-          .filter((playerTile: PlayerTile) =>
-            hasPlayerCity(
-              playerTile.tile(),
-              this.player(),
-              this._dependencies.cityRegistry
-            )
-          )
-          .map((playerTile: PlayerTile) => playerTile.tile())
-      );
-      this._memory.targets.enemyUnitsToAttack.push(
-        ...playerWorld
-          .entries()
-          .filter((playerTile: PlayerTile) =>
-            this._dependencies.unitRegistry
-              .getByTile(playerTile.tile())
-              .some((unit) => unit.player() === player)
-          )
-          .map((playerTile: PlayerTile) => playerTile.tile())
-      );
-
-      return;
-    }
-
-    this._memory.targets.citiesToLiberate.push(city.tile());
   }
 
+  // TODO: `player`, who destroyed the unit, is never used. Kept: #153 changes no play.
   unitDestroyed(unit: Unit, player: Player | null): void {
-    const city = this._dependencies.cityRegistry.getByTile(unit.tile()),
-      tileUnits = this._dependencies.unitRegistry.getByTile(unit.tile());
-
-    if (city && city.player() === this.player() && tileUnits.length < 2) {
-      this.buildItemInCity(city);
-
-      this._dependencies.playerTreasuryRegistry
-        .getByPlayerAndType(this.player(), Gold)
-        .buy(city);
-    }
+    unitDestroyed(this._dependencies, this.player(), unit, (city: City) =>
+      this.buildItemInCity(city)
+    );
   }
 }
 
