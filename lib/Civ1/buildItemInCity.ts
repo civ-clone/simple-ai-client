@@ -49,6 +49,57 @@ const isExploring = (dependencies: Dependencies, unit: Unit): boolean =>
   unit.attack().value() > 0 &&
   dependencies.cityRegistry.getByTile(unit.tile()) === null;
 
+// The value of a unit type's `YieldType` (`Attack`, `Defence`) before anything modifies it.
+const baseYield = (
+  dependencies: Dependencies,
+  item: object,
+  YieldType: typeof Yield
+): number => {
+  const unitYield = new YieldType();
+
+  dependencies.ruleRegistry.process(
+    BaseYield,
+    item as unknown as typeof Unit,
+    unitYield
+  );
+
+  return unitYield.value();
+};
+
+const isLandUnitType = (item: object): boolean =>
+  Object.prototype.isPrototypeOf.call(Land, item);
+
+// A unit type built to attack rather than defend, as `isAttacker` judges a unit.
+const isAttackerType = (dependencies: Dependencies, item: object): boolean =>
+  isLandUnitType(item) &&
+  baseYield(dependencies, item, Attack) >
+    baseYield(dependencies, item, Defence);
+
+// A unit type that can explore: a land unit that can fight, not a worker.
+const isExplorerType = (dependencies: Dependencies, item: object): boolean =>
+  isLandUnitType(item) &&
+  !Object.prototype.isPrototypeOf.call(Worker, item) &&
+  baseYield(dependencies, item, Attack) > 0;
+
+// How many of the player's units match `isUnit`, and how many more its cities are building that match `isType`, so
+//  that cities choosing in the same turn don't all build the last one wanted.
+const unitsAndOrders = (
+  dependencies: Dependencies,
+  player: Player,
+  isUnit: (unit: Unit) => boolean,
+  isType: (item: object) => boolean
+): number =>
+  dependencies.unitRegistry.getByPlayer(player).filter(isUnit).length +
+  dependencies.cityRegistry
+    .getByPlayer(player)
+    .filter((city: City): boolean => {
+      const building = dependencies.cityBuildRegistry
+        .getByCity(city)
+        .building();
+
+      return building !== null && isType(building.item());
+    }).length;
+
 const production = (city: City): number =>
   reduceYield(city.yields(), Production);
 
@@ -109,42 +160,38 @@ export const buildItemInCity = (
           availableFiltered.length * dependencies.randomNumberGenerator()
         )
       ].item(),
-    baseYield = (buildItem: BuildItem, YieldType: typeof Yield): Yield => {
-      const unitYield = new YieldType();
-
-      dependencies.ruleRegistry.process(
-        BaseYield,
-        buildItem.item() as unknown as typeof Unit,
-        unitYield
-      );
-
-      return unitYield;
-    },
-    getUnitByYield = (YieldType: typeof Yield) => {
-      const [[UnitType]] = availableUnits
-        .map((buildItem: BuildItem): [typeof Unit, Yield] => [
+    // The unit among `buildItems` with the most `YieldType`, if any.
+    getUnitByYield = (
+      YieldType: typeof Yield,
+      buildItems: BuildItem[] = availableUnits
+    ): typeof Unit | undefined => {
+      const [[UnitType] = []] = buildItems
+        .map((buildItem: BuildItem): [typeof Unit, number] => [
           buildItem.item() as unknown as typeof Unit,
-          baseYield(buildItem, YieldType),
+          baseYield(dependencies, buildItem.item(), YieldType),
         ])
         .sort(
           (
-            [, unitYieldA]: [typeof Unit, Yield],
-            [, unitYieldB]: [typeof Unit, Yield]
-          ): number => unitYieldB.value() - unitYieldA.value()
+            [, a]: [typeof Unit, number],
+            [, b]: [typeof Unit, number]
+          ): number => b - a
         );
 
       return UnitType;
     },
     getDefensiveUnit = (
-      (UnitType?: typeof Unit): (() => typeof Unit) =>
-      (): typeof Unit =>
+      (UnitType?: typeof Unit): (() => typeof Unit | undefined) =>
+      (): typeof Unit | undefined =>
         UnitType || (UnitType = getUnitByYield(Defence))
     )(),
-    getOffensiveUnit = (
-      (UnitType?: typeof Unit): (() => typeof Unit) =>
-      (): typeof Unit =>
-        UnitType || (UnitType = getUnitByYield(Attack))
-    )();
+    // Only a unit that counts as an attacker, so that building one gets the player closer to what it wants.
+    getOffensiveUnit = (): typeof Unit | undefined =>
+      getUnitByYield(
+        Attack,
+        availableUnits.filter((buildItem: BuildItem): boolean =>
+          isAttackerType(dependencies, buildItem.item())
+        )
+      );
 
   if (
     defendersIn(dependencies, city).length <
@@ -163,17 +210,18 @@ export const buildItemInCity = (
 
   if (
     targets.landTilesToExplore.length > 0 &&
-    dependencies.unitRegistry
-      .getByPlayer(player)
-      .filter((unit: Unit): boolean => isExploring(dependencies, unit)).length <
+    unitsAndOrders(
+      dependencies,
+      player,
+      (unit: Unit): boolean => isExploring(dependencies, unit),
+      (item: object): boolean => isExplorerType(dependencies, item)
+    ) <
       policy.explorers + policy.explorersPerCity * cities
   ) {
     // The cheapest land unit that can fight.
     const [explorer] = availableUnits
-      .filter(
-        (buildItem: BuildItem): boolean =>
-          Object.prototype.isPrototypeOf.call(Land, buildItem.item()) &&
-          baseYield(buildItem, Attack).value() > 0
+      .filter((buildItem: BuildItem): boolean =>
+        isExplorerType(dependencies, buildItem.item())
       )
       .sort(
         (a: BuildItem, b: BuildItem): number =>
@@ -207,19 +255,24 @@ export const buildItemInCity = (
     return;
   }
 
+  const offensiveUnit = getOffensiveUnit();
+
   if (
+    offensiveUnit &&
     (targets.citiesToLiberate.length > 0 ||
       targets.enemyCitiesToAttack.length > 0 ||
       targets.enemyUnitsToAttack.length > 4) &&
-    dependencies.unitRegistry.getByPlayer(player).filter(isAttacker).length <
+    unitsAndOrders(dependencies, player, isAttacker, (item: object): boolean =>
+      isAttackerType(dependencies, item)
+    ) <
       policy.attackersPerCity * cities
   ) {
-    cityBuild.build(getOffensiveUnit() as unknown as typeof Buildable);
+    cityBuild.build(offensiveUnit as unknown as typeof Buildable);
 
     return;
   }
 
-  if (targets.undefendedCities.length) {
+  if (targets.undefendedCities.length && getDefensiveUnit()) {
     cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
 
     return;

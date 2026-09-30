@@ -5,6 +5,7 @@ export declare const defendersWanted: (
   dependencies: Dependencies,
   city: City
 ) => number;
+export declare const isDefender: (unit: Unit) => boolean;
 export declare const defendersIn: (
   dependencies: Dependencies,
   city: City
