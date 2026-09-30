@@ -6,8 +6,8 @@ import Path from '@civ-clone/core-world-path/Path';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 
-// Returns whether `unit` qualifies. One that does takes the nearest target, and no later mission is tried even when
-//  there's no path to it.
+// Returns whether `unit` took the mission: it qualifies and has a path to one of the mission's targets, the nearest
+//  it can reach. Otherwise the next mission is tried.
 export type Mission = (
   dependencies: Dependencies,
   memory: Memory,
@@ -19,30 +19,37 @@ const nearest =
   (a: Tile, b: Tile): number =>
     a.distanceFrom(unit.tile()) - b.distanceFrom(unit.tile());
 
-// `ranked` is sometimes `list` itself, sorted in place, and sometimes a sorted copy of part of it.
+// Sets `unit` off for the first target in `ranked` it has a path to, and takes that target off `list`. Returns whether
+//  there was one. `ranked` is sometimes `list` itself, sorted in place, and sometimes a sorted copy of part of it.
 const pursue = (
   dependencies: Dependencies,
   memory: Memory,
   unit: Unit,
   list: Tile[],
-  [targetTile]: Tile[]
-): void => {
-  // Nothing to head for, or already there: a search would find nothing worth following.
-  if (!targetTile || targetTile === unit.tile()) {
-    return;
+  ranked: Tile[]
+): boolean => {
+  for (const targetTile of ranked) {
+    // Already there: a search would find nothing worth following.
+    if (targetTile === unit.tile()) {
+      continue;
+    }
+
+    const path = Path.for(
+      unit,
+      unit.tile(),
+      targetTile,
+      dependencies.pathFinderRegistry
+    );
+
+    if (path) {
+      list.splice(list.indexOf(targetTile), 1);
+      memory.unitPathData.set(unit, path);
+
+      return true;
+    }
   }
 
-  const path = Path.for(
-    unit,
-    unit.tile(),
-    targetTile,
-    dependencies.pathFinderRegistry
-  );
-
-  if (path) {
-    list.splice(list.indexOf(targetTile), 1);
-    memory.unitPathData.set(unit, path);
-  }
+  return false;
 };
 
 export const defendUndefendedCity: Mission = (dependencies, memory, unit) => {
@@ -58,15 +65,13 @@ export const defendUndefendedCity: Mission = (dependencies, memory, unit) => {
     return false;
   }
 
-  pursue(
+  return pursue(
     dependencies,
     memory,
     unit,
     undefendedCities,
     undefendedCities.sort(nearest(unit))
   );
-
-  return true;
 };
 
 export const liberateCity: Mission = (dependencies, memory, unit) => {
@@ -76,7 +81,7 @@ export const liberateCity: Mission = (dependencies, memory, unit) => {
     return false;
   }
 
-  pursue(
+  return pursue(
     dependencies,
     memory,
     unit,
@@ -85,8 +90,6 @@ export const liberateCity: Mission = (dependencies, memory, unit) => {
       .filter((tile: Tile): boolean => unit instanceof Land && tile.isLand())
       .sort(nearest(unit))
   );
-
-  return true;
 };
 
 export const attackEnemyUnits: Mission = (dependencies, memory, unit) => {
@@ -96,27 +99,21 @@ export const attackEnemyUnits: Mission = (dependencies, memory, unit) => {
     return false;
   }
 
-  const reachable = enemyUnitsToAttack.filter(
-    (tile: Tile): boolean =>
-      (unit instanceof Land && tile.isLand()) ||
-      (unit instanceof Naval && tile.isWater())
-  );
-
-  // Enemy units only on terrain this unit can't cross leave it free for the missions after this one, such as a ship
-  //  exploring by sea.
-  if (reachable.length === 0) {
-    return false;
-  }
-
-  pursue(
+  // Only enemies on terrain this unit can cross: with none, or none it has a path to, it's free for the missions
+  //  after this one, such as a ship exploring by sea.
+  return pursue(
     dependencies,
     memory,
     unit,
     enemyUnitsToAttack,
-    reachable.sort(nearest(unit))
+    enemyUnitsToAttack
+      .filter(
+        (tile: Tile): boolean =>
+          (unit instanceof Land && tile.isLand()) ||
+          (unit instanceof Naval && tile.isWater())
+      )
+      .sort(nearest(unit))
   );
-
-  return true;
 };
 
 export const attackEnemyCity: Mission = (dependencies, memory, unit) => {
@@ -132,15 +129,13 @@ export const attackEnemyCity: Mission = (dependencies, memory, unit) => {
     return false;
   }
 
-  pursue(
+  return pursue(
     dependencies,
     memory,
     unit,
     enemyCitiesToAttack,
     enemyCitiesToAttack.sort(nearest(unit))
   );
-
-  return true;
 };
 
 export const exploreLand: Mission = (dependencies, memory, unit) => {
@@ -150,15 +145,13 @@ export const exploreLand: Mission = (dependencies, memory, unit) => {
     return false;
   }
 
-  pursue(
+  return pursue(
     dependencies,
     memory,
     unit,
     landTilesToExplore,
     landTilesToExplore.sort(nearest(unit))
   );
-
-  return true;
 };
 
 export const exploreSea: Mission = (dependencies, memory, unit) => {
@@ -168,15 +161,13 @@ export const exploreSea: Mission = (dependencies, memory, unit) => {
     return false;
   }
 
-  pursue(
+  return pursue(
     dependencies,
     memory,
     unit,
     seaTilesToExplore,
     seaTilesToExplore.sort(nearest(unit))
   );
-
-  return true;
 };
 
 // In priority order. Hunting enemy units comes after exploring land: ahead of it (as it was written, when the list was
