@@ -1,6 +1,6 @@
 // Generic: the ship a city should build to explore the sea with, if any (civ-clone/web-renderer#208). A player with
-//  more than one city keeps one ship at a time for this, built in a city that has its defenders and is on water leading
-//  to sea it hasn't explored. Transports and their escorts are another matter.
+//  more than one city keeps one ship at a time for this, built in a city that has its defenders and is on a sea, not a
+//  lake, that leads to water it hasn't explored. Transports and their escorts are another matter.
 import { defendersIn, defendersWanted } from './defence';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
@@ -15,51 +15,65 @@ import Unit from '@civ-clone/core-unit/Unit';
 const isShip = (item: object): boolean =>
   Object.prototype.isPrototypeOf.call(Naval, item);
 
-// Whether the water beside `city`, as far as the player knows it, reaches a tile on the edge of what it has explored.
-//  Gives up after `limit` tiles, as a lake would long before.
-export const reachesSeaToExplore = (
-  dependencies: Dependencies,
-  player: Player,
-  targets: TargetBoard,
+// The water tiles joined to `city`'s by water, found one at a time: from the map itself, or, with `known`, only those
+//  tiles. Stops as soon as `enough` returns `true`, or after `limit` tiles.
+const searchWater = (
   city: City,
+  enough: (tile: Tile, found: number) => boolean,
+  known: (tile: Tile) => boolean = (): boolean => true,
   limit: number = 1000
 ): boolean => {
-  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
-    toExplore = new Set<Tile>(targets.seaTilesToExplore),
-    seen = new Set<Tile>(),
-    queue: Tile[] = city
-      .tile()
-      .getNeighbours()
-      .filter((tile: Tile): boolean => tile.isWater());
+  const found = new Set<Tile>(),
+    queue: Tile[] = [];
 
-  while (queue.length > 0 && seen.size < limit) {
-    const tile = queue.shift()!;
-
-    if (seen.has(tile) || !playerWorld.includes(tile)) {
-      continue;
+  const visit = (tile: Tile): void => {
+    if (tile.isWater() && !found.has(tile) && known(tile)) {
+      found.add(tile);
+      queue.push(tile);
     }
+  };
 
-    if (toExplore.has(tile)) {
+  city.tile().getNeighbours().forEach(visit);
+
+  for (let i = 0; i < queue.length && i < limit; i++) {
+    if (enough(queue[i], i + 1)) {
       return true;
     }
 
-    seen.add(tile);
-
-    queue.push(
-      ...tile
-        .getNeighbours()
-        .filter(
-          (neighbour: Tile): boolean =>
-            neighbour.isWater() && !seen.has(neighbour)
-        )
-    );
+    queue[i].getNeighbours().forEach(visit);
   }
 
   return false;
 };
 
+// Whether `city` is on the sea rather than a lake: on a body of water of at least `seaSize` tiles. It's judged from the
+//  map, as Civ1's own computer players know the extent of each ocean, and a lake the player has only partly seen
+//  looks no different from a sea.
+export const isOnSea = (city: City, seaSize: number = 20): boolean =>
+  searchWater(city, (tile: Tile, found: number): boolean => found >= seaSize);
+
+// Whether the water beside `city`, as far as the player knows it, reaches a tile on the edge of what it has explored.
+export const reachesSeaToExplore = (
+  dependencies: Dependencies,
+  player: Player,
+  targets: TargetBoard,
+  city: City
+): boolean => {
+  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
+    toExplore = new Set<Tile>(targets.seaTilesToExplore);
+
+  return (
+    toExplore.size > 0 &&
+    searchWater(
+      city,
+      (tile: Tile): boolean => toExplore.has(tile),
+      (tile: Tile): boolean => playerWorld.includes(tile)
+    )
+  );
+};
+
 // The cheapest ship `city` can build, if the player has another city, no ship and none on order, the city has its
-//  defenders, and it can reach sea to explore. Otherwise `null`. A player's only city has better things to build.
+//  defenders, and it's on a sea it can explore. Otherwise `null`. A player's only city has better things to build.
 export const explorerShipFor = (
   dependencies: Dependencies,
   player: Player,
@@ -92,6 +106,7 @@ export const explorerShipFor = (
       }) ||
     defendersIn(dependencies, city).length <
       defendersWanted(dependencies, city) ||
+    !isOnSea(city) ||
     !reachesSeaToExplore(dependencies, player, targets, city)
   ) {
     return null;
