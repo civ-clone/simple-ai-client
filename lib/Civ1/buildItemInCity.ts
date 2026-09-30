@@ -136,6 +136,7 @@ export const buildItemInCity = (
 
   // If we have resources to burn, build a wonder
   if (
+    availableWonders.length > 0 &&
     cityBuild
       .city()
       .yields()
@@ -147,9 +148,10 @@ export const buildItemInCity = (
     cityBuild.build(
       wonders[Math.floor(dependencies.randomNumberGenerator() * wonders.length)]
     );
+
+    return;
   }
 
-  // TODO: replaces the Wonder chosen above, so this never builds one. Kept: #153 changes no play.
   if (randomSelection) {
     cityBuild.build(randomSelection);
   }
