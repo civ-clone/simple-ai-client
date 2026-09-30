@@ -136,7 +136,7 @@ export const moveUnit = async (
 
   await canNegotiate(dependencies, player, unit);
 
-  // If we're here, we still have some moves left, lets clear them up.
+  // If we're here, we still have some moves left, let's clear them up.
   // TODO: This might not be necessary, just remove all checks for >= .1 moves left...
   if (unit.moves().value() > 0) {
     noOrders(dependencies, unit);
