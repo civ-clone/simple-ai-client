@@ -77,7 +77,5 @@ export declare class SimpleAIClient extends AIClient {
   private buildItemInCity;
   cityLost(city: City, player: Player | null, destroyed: boolean): void;
   unitDestroyed(unit: Unit, player: Player | null): void;
-  private skipUnit;
-  private noOrders;
 }
 export default SimpleAIClient;
