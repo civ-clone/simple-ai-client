@@ -342,6 +342,8 @@ import garrison from '../lib/Unit/garrison';
 import Dependencies, { createDependencies } from '../lib/Dependencies';
 import buildItemInCity from '../lib/Civ1/buildItemInCity';
 import { createMemory } from '../lib/Memory';
+import { Colossus } from '@civ-clone/civ1-wonder/Wonders';
+import { Production as ProductionYield } from '@civ-clone/civ1-world/Yields';
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
@@ -1750,6 +1752,51 @@ describe('SimpleAIClient', (): void => {
     buildItemInCity(lastPick(), player, createMemory().targets, city);
 
     expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
+
+    cityRegistry.unregister(city);
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+  it('should build a Wonder when a city has production to spare', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player();
+
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+    playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
+    availableBuildItemsRegistry.register(Colossus as unknown as IBuildable);
+
+    const city = new City(
+        player,
+        world.get(2, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      units = [
+        new Warrior(null, player, city.tile(), ruleRegistry),
+        new Warrior(null, player, city.tile(), ruleRegistry),
+      ];
+
+    // Two fortified defenders, so production gets as far as considering a Wonder, and more than 4 shields to spend.
+    units.forEach((unit: Unit): void =>
+      unitImprovementRegistry.register(new Fortified(unit))
+    );
+    city.yields = () => [new ProductionYield(5)];
+
+    try {
+      buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+      expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+        Colossus
+      );
+    } finally {
+      availableBuildItemsRegistry.unregister(Colossus as unknown as IBuildable);
+    }
 
     cityRegistry.unregister(city);
     clientRegistry.unregister(client);
