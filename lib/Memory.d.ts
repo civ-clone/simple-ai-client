@@ -17,6 +17,7 @@ export interface Memory {
   unitTargetData: Map<Unit, Tile>;
 }
 export declare const claimedTiles: (memory: Memory) => Set<Tile>;
+export declare const forgetUnit: (memory: Memory, unit: Unit) => void;
 export declare const forgetDestroyedUnits: (memory: Memory) => void;
 export declare const createMemory: () => Memory;
 export default Memory;
