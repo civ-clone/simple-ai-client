@@ -1,8 +1,4 @@
 import {
-  ChoiceMeta,
-  DataForChoiceMeta,
-} from '@civ-clone/core-client/ChoiceMeta';
-import {
   CityBuildRegistry,
   instance as cityBuildRegistryInstance,
 } from '@civ-clone/core-city-build/CityBuildRegistry';
@@ -82,46 +78,45 @@ import {
   WorkedTileRegistry,
   instance as workedTileRegistryInstance,
 } from '@civ-clone/core-city/WorkedTileRegistry';
-import AIClient from '@civ-clone/core-ai-client/AIClient';
 import City from '@civ-clone/core-city/City';
-import CityBuild from '@civ-clone/core-city-build/CityBuild';
+import {
+  StrategyRegistry,
+  instance as strategyRegistryInstance,
+} from '@civ-clone/core-strategy/StrategyRegistry';
 import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
+import MandatoryPlayerAction from '@civ-clone/core-player/MandatoryPlayerAction';
+import StrategyAIClient from '@civ-clone/core-strategy-ai-client/StrategyAIClient';
 import {
   PendingEffectRegistry,
   instance as pendingEffectRegistryInstance,
 } from '@civ-clone/core-pending-effect';
-import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
-import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { instance as rngInstance } from '@civ-clone/core-random';
-import { pickGovernment, startRevolution } from './lib/Civ1/government';
 import Dependencies from './lib/Dependencies';
 import Knowledge from './lib/Knowledge';
 import Memory from './lib/Memory';
 import { instance as memoryRegistryInstance } from './lib/MemoryRegistry';
 import { noOrders, skipUnit } from './lib/Unit/orders';
 import buildItemInCity from './lib/Civ1/buildItemInCity';
-import chooseNegotiationStep from './lib/Diplomacy/chooseNegotiationStep';
-import chooseResearch from './lib/Science/chooseResearch';
 import cityLost from './lib/Events/cityLost';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import moveUnit from './lib/Unit/moveUnit';
 import reviewCities from './lib/Turn/reviewCities';
 import scoreUnitMove from './lib/Unit/scoreUnitMove';
 import surveyTargets from './lib/Turn/surveyTargets';
-import takeUnitTurn from './lib/Unit/takeUnitTurn';
 import unitDestroyed from './lib/Events/unitDestroyed';
-import waitForCarrier from './lib/Unit/waitForCarrier';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
-// For its `ChoiceMetaDataMap` entry, which `chooseFromList` below and its callers rely on.
+// For its `ChoiceMetaDataMap` entry, which `chooseFromList` and its callers rely on.
 import './lib/Diplomacy/negotiate';
 
-// Civ1: the computer player. It keeps the player's working memory and runs the turn, and hands every decision to the
-//  modules in `lib/`: generic ones, given Civ1's judgements through `Knowledge`, and Civ1 ones in `lib/Civ1/`.
-export class SimpleAIClient extends AIClient {
+// Civ1: the computer player. A `StrategyAIClient`, so each turn is the game's strategies at work: `registerStrategies`
+//  registers the Civ1 pack (`Strategies/`), and any other plugin's strategies play alongside. What stays here is what
+//  the turn loop can't express as a strategy: Civ1's handling of failed, unhandled and runaway actions, and the hooks
+//  that `Rules/` call during other players' turns.
+export class SimpleAIClient extends StrategyAIClient {
   private _dependencies: Dependencies;
   private _knowledge: Knowledge = civ1Knowledge;
 
@@ -185,13 +180,16 @@ export class SimpleAIClient extends AIClient {
     randomNumberGenerator: () => number = rngInstance,
     strategyNoteRegistry: StrategyNoteRegistry = strategyNoteRegistryInstance,
     workedTileRegistry: WorkedTileRegistry = workedTileRegistryInstance,
-    pendingEffectRegistry: PendingEffectRegistry = pendingEffectRegistryInstance
+    pendingEffectRegistry: PendingEffectRegistry = pendingEffectRegistryInstance,
+    // The game-wide registry, which `registerStrategies` fills with the Civ1 pack. A client given registries of its own
+    //  needs a `StrategyRegistry` built over them: `createStrategies(createDependencies({ … }))`.
+    strategyRegistry: StrategyRegistry = strategyRegistryInstance
   ) {
     // The generator goes to `core-client`'s `Client`, which holds the one
     // `protected _randomNumberGenerator`. This class declared a second
     // `#randomNumberGenerator` shadowing it, which two `private` fields of the
     // same name cannot express.
-    super(player, randomNumberGenerator);
+    super(player, strategyRegistry, randomNumberGenerator);
 
     this._dependencies = {
       cityBuildRegistry,
@@ -242,6 +240,8 @@ export class SimpleAIClient extends AIClient {
     );
   }
 
+  // What the `BeforeTurn` strategies `SurveyTargets`, `ReviewCities` and `WakeCarrierAircraft` do, for a caller that
+  //  wants it outside a turn.
   preProcessTurn(): void {
     surveyTargets(
       this._dependencies,
@@ -258,154 +258,64 @@ export class SimpleAIClient extends AIClient {
     wakeCarrierAircraft(this._dependencies, this.player(), this._knowledge);
   }
 
-  async chooseFromList<Name extends keyof ChoiceMetaDataMap>(
-    meta: ChoiceMeta<Name>
-  ): Promise<DataForChoiceMeta<ChoiceMeta<Name>>> {
-    if (meta.key() !== 'negotiation.next-step') {
-      return super.chooseFromList(meta);
+  // One unit's failed move shouldn't cost the player the rest of their turn, so log it, stop that unit for this turn
+  //  and carry on with the others (civ-clone/web-renderer#79). Anything else fails the turn.
+  protected actionFailed(
+    action: MandatoryPlayerAction,
+    error: unknown
+  ): boolean {
+    const item = action.value();
+
+    if (!(item instanceof Unit)) {
+      throw error;
     }
 
-    return chooseNegotiationStep(this._dependencies, this.player(), meta);
+    console.error(
+      `SimpleAIClient: ${
+        item.constructor.name
+      } ${item.id()} couldn't act and was skipped this turn:`,
+      error
+    );
+
+    skipUnit(this._dependencies, item);
+
+    return true;
   }
 
-  takeTurn(): Promise<void> {
-    return new Promise(
-      async (
-        resolve: () => void,
-        reject: (error: Error) => any
-      ): Promise<void> => {
-        try {
-          let loopCheck = 0;
+  // TODO: Remove this when it's working as expected
+  protected actionLimitReached(action: MandatoryPlayerAction): void {
+    const item = action.value();
 
-          this.preProcessTurn();
+    // TODO: raise warning - notification?
+    console.log('');
+    console.log('');
+    console.log(item);
 
-          startRevolution(this._dependencies, this.player());
+    if (item instanceof Unit) {
+      console.log(item.actions());
+      item
+        .tile()
+        .getNeighbours()
+        .forEach((tile: Tile): void => console.log(item.actions(tile)));
+      console.log(item.active());
+      console.log(item.busy());
+      console.log(item.moves().value());
+      console.log(this._dependencies.unitImprovementRegistry.getByUnit(item));
+    }
 
-          while (this.player().hasMandatoryActions()) {
-            const action = this.player().mandatoryAction(),
-              item = action.value();
+    // Do nothing, but shout about it
+    noOrders(this._dependencies, item);
 
-            try {
-              // TODO: Remove this when it's working as expected
-              if (loopCheck++ > 1e3) {
-                // TODO: raise warning - notification?
-                console.log('');
-                console.log('');
-                console.log(item);
+    console.error("SimpleAIClient: Couldn't pick an action to do.");
+  }
 
-                if (item instanceof Unit) {
-                  console.log(item.actions());
-                  item
-                    .tile()
-                    .getNeighbours()
-                    .forEach((tile: Tile): void =>
-                      console.log(item.actions(tile))
-                    );
-                  console.log(item.active());
-                  console.log(item.busy());
-                  console.log(item.moves().value());
-                  console.log(
-                    this._dependencies.unitImprovementRegistry.getByUnit(item)
-                  );
-                }
+  // The turn ends at the first action no strategy handles, which should be `EndTurn`.
+  protected unhandledAction(action: MandatoryPlayerAction): void {
+    if (action instanceof EndTurn) {
+      return;
+    }
 
-                // Do nothing, but shout about it
-                noOrders(this._dependencies, item);
-
-                console.error("SimpleAIClient: Couldn't pick an action to do.");
-
-                break;
-              }
-
-              if (
-                item instanceof Unit &&
-                waitForCarrier(
-                  this._dependencies,
-                  this.player(),
-                  this._knowledge,
-                  item
-                )
-              ) {
-                continue;
-              }
-
-              if (item instanceof Unit) {
-                const moving = takeUnitTurn(
-                  this._dependencies,
-                  this.player(),
-                  this.memory(),
-                  this._knowledge,
-                  item
-                );
-
-                if (moving !== null) {
-                  await moving;
-                }
-
-                continue;
-              }
-
-              if (item instanceof CityBuild) {
-                this.buildItemInCity(item.city());
-
-                continue;
-              }
-
-              if (item instanceof PlayerResearch) {
-                chooseResearch(this._dependencies, item);
-
-                continue;
-              }
-
-              if (item instanceof PlayerGovernment) {
-                pickGovernment(this._dependencies, item);
-
-                continue;
-              }
-
-              if (action instanceof EndTurn) {
-                break;
-              }
-
-              console.log(`Can't process: '${item.constructor.name}'`);
-
-              break;
-            } catch (e) {
-              if (!(item instanceof Unit)) {
-                throw e;
-              }
-
-              // One unit's failed move shouldn't cost the player the rest of their turn, so log it, stop that unit for
-              //  this turn and carry on with the others (civ-clone/web-renderer#79).
-              console.error(
-                `SimpleAIClient: ${
-                  item.constructor.name
-                } ${item.id()} couldn't act and was skipped this turn:`,
-                e
-              );
-
-              skipUnit(this._dependencies, item);
-            }
-          }
-
-          resolve();
-        } catch (e) {
-          if (typeof e === 'string') {
-            reject(new Error(e));
-
-            return;
-          }
-
-          if (e instanceof Error) {
-            reject(e);
-
-            return;
-          }
-
-          reject(new Error(`An unknown error occurred: ${e}`));
-        }
-      }
-    );
+    console.log(`Can't process: '${action.value().constructor.name}'`);
   }
 
   private buildItemInCity(city: City): void {

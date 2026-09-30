@@ -1,7 +1,3 @@
-import {
-  ChoiceMeta,
-  DataForChoiceMeta,
-} from '@civ-clone/core-client/ChoiceMeta';
 import { CityBuildRegistry } from '@civ-clone/core-city-build/CityBuildRegistry';
 import { CityGrowthRegistry } from '@civ-clone/core-city-growth/CityGrowthRegistry';
 import { CityRegistry } from '@civ-clone/core-city/CityRegistry';
@@ -22,14 +18,16 @@ import { UnitImprovementRegistry } from '@civ-clone/core-unit-improvement/UnitIm
 import { StrategyNoteRegistry } from '@civ-clone/core-strategy/StrategyNoteRegistry';
 import { UnitRegistry } from '@civ-clone/core-unit/UnitRegistry';
 import { WorkedTileRegistry } from '@civ-clone/core-city/WorkedTileRegistry';
-import AIClient from '@civ-clone/core-ai-client/AIClient';
 import City from '@civ-clone/core-city/City';
+import { StrategyRegistry } from '@civ-clone/core-strategy/StrategyRegistry';
+import MandatoryPlayerAction from '@civ-clone/core-player/MandatoryPlayerAction';
+import StrategyAIClient from '@civ-clone/core-strategy-ai-client/StrategyAIClient';
 import { PendingEffectRegistry } from '@civ-clone/core-pending-effect';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import './lib/Diplomacy/negotiate';
-export declare class SimpleAIClient extends AIClient {
+export declare class SimpleAIClient extends StrategyAIClient {
   private _dependencies;
   private _knowledge;
   private memory;
@@ -66,15 +64,18 @@ export declare class SimpleAIClient extends AIClient {
     randomNumberGenerator?: () => number,
     strategyNoteRegistry?: StrategyNoteRegistry,
     workedTileRegistry?: WorkedTileRegistry,
-    pendingEffectRegistry?: PendingEffectRegistry
+    pendingEffectRegistry?: PendingEffectRegistry,
+    strategyRegistry?: StrategyRegistry
   );
   scoreUnitMove(unit: Unit, tile: Tile): number;
   moveUnit(unit: Unit): Promise<void>;
   preProcessTurn(): void;
-  chooseFromList<Name extends keyof ChoiceMetaDataMap>(
-    meta: ChoiceMeta<Name>
-  ): Promise<DataForChoiceMeta<ChoiceMeta<Name>>>;
-  takeTurn(): Promise<void>;
+  protected actionFailed(
+    action: MandatoryPlayerAction,
+    error: unknown
+  ): boolean;
+  protected actionLimitReached(action: MandatoryPlayerAction): void;
+  protected unhandledAction(action: MandatoryPlayerAction): void;
   private buildItemInCity;
   cityLost(city: City, player: Player | null, destroyed: boolean): void;
   unitDestroyed(unit: Unit, player: Player | null): void;
