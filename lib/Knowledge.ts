@@ -8,7 +8,8 @@ import Unit from '@civ-clone/core-unit/Unit';
 
 // Stateless, so one value serves every player.
 export interface Knowledge {
-  // Whether `unit` can still get back to somewhere it can end its turn after taking `action`. Only aircraft can't.
+  // Whether `unit` can still get back to somewhere it can safely end its turn after taking `action`. In Civ1, only
+  //  aircraft (to a city or carrier) and Triremes (to the coast) might not.
   canReturnAfter(
     dependencies: Dependencies,
     player: Player,

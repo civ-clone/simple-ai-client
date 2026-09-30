@@ -5,6 +5,7 @@ exports.register = exports.createStrategies = exports.dependenciesFor = void 0;
 //  registered into a game's `StrategyRegistry`.
 const core_game_1 = require("@civ-clone/core-game");
 const Dependencies_1 = require("./lib/Dependencies");
+const BuildExplorerShip_1 = require("./Strategies/City/BuildExplorerShip");
 const ChooseGovernment_1 = require("./Strategies/Civ1/ChooseGovernment");
 const ChooseProduction_1 = require("./Strategies/Civ1/ChooseProduction");
 const ChooseResearch_1 = require("./Strategies/Science/ChooseResearch");
@@ -63,6 +64,7 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     new Garrison_1.default(dependencies, knowledge),
     new MissionAndMove_1.default(dependencies, knowledge),
     // The other mandatory choices.
+    new BuildExplorerShip_1.default(dependencies, knowledge),
     new ChooseProduction_1.default(dependencies, knowledge),
     new ChooseResearch_1.default(dependencies, knowledge),
     new ChooseGovernment_1.default(dependencies, knowledge),

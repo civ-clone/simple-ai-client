@@ -33,6 +33,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves | generic |
 | `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city (handles it only then)                     | generic |
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; always handles it       | generic |
+| `Strategies/City/BuildExplorerShip`       | a `CityBuild` choice                         | builds a ship to explore with, if the player has 2+ cities and no ship (handles it only then) | generic |
 | `Strategies/Civ1/ChooseProduction`        | a `CityBuild` choice                         | picks what the city builds, by each player's `ProductionPolicy`               | Civ1    |
 | `Strategies/Science/ChooseResearch`       | a `PlayerResearch` choice                    | picks research at random                                                       | generic |
 | `Strategies/Civ1/ChooseGovernment`        | a `PlayerGovernment` choice                  | picks Monarchy after Anarchy                                                   | Civ1    |

@@ -8,6 +8,7 @@ import {
 import { aircraftCanReturn, aircraftFuel } from './aircraft';
 import Knowledge from '../Knowledge';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
+import triremeCanReturn from './trireme';
 
 export const civ1Knowledge: Knowledge = {
   assignWorkers: (dependencies, city) =>
@@ -17,7 +18,9 @@ export const civ1Knowledge: Knowledge = {
       dependencies.cityGrowthRegistry,
       dependencies.workedTileRegistry
     ),
-  canReturnAfter: aircraftCanReturn,
+  canReturnAfter: (dependencies, player, unit, action) =>
+    aircraftCanReturn(dependencies, player, unit, action) &&
+    triremeCanReturn(dependencies, player, unit, action),
   isAircraft: (dependencies, unit) => aircraftFuel(dependencies, unit) !== null,
   shouldBuildCity,
   shouldIrrigate,
