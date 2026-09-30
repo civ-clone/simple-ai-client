@@ -162,6 +162,9 @@ import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
 import SimpleAIClient from '../SimpleAIClient';
 import SpaceshipRegistry from '@civ-clone/core-spaceship/SpaceshipRegistry';
 import StrategyNoteRegistry from '@civ-clone/core-strategy/StrategyNoteRegistry';
+import StrategyRegistry from '@civ-clone/core-strategy/StrategyRegistry';
+import { createDependencies } from '../lib/Dependencies';
+import { createStrategies } from '../registerStrategies';
 import TerrainFeatureRegistry from '@civ-clone/core-terrain-feature/TerrainFeatureRegistry';
 import TileImprovementRegistry from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
 import TraitRegistry from '@civ-clone/core-civilization/TraitRegistry';
@@ -369,6 +372,8 @@ describe('SimpleAIClient', (): void => {
     unitImprovementRegistry = new UnitImprovementRegistry(),
     unitRegistry = new UnitRegistry(),
     workedTileRegistry = new WorkedTileRegistry(ruleRegistry),
+    // The client's strategies act on the same registries it's given.
+    strategyRegistry = new StrategyRegistry(),
     simpleWorldLoader = simpleRLELoader(ruleRegistry, terrainFeatureRegistry),
     takeTurns = async (
       client: Client,
@@ -416,7 +421,8 @@ describe('SimpleAIClient', (): void => {
               undefined,
               strategyNoteRegistry,
               workedTileRegistry,
-              pendingEffectRegistry
+              pendingEffectRegistry,
+              strategyRegistry
             ),
             availableCivilizations = civilizationRegistry.entries();
 
@@ -900,6 +906,33 @@ describe('SimpleAIClient', (): void => {
   );
 
   registerCityNames(cityNameRegistry);
+
+  strategyRegistry.register(
+    ...createStrategies(
+      createDependencies({
+        cityBuildRegistry,
+        cityGrowthRegistry,
+        cityRegistry,
+        clientRegistry,
+        goodyHutRegistry,
+        interactionRegistry,
+        pathFinderRegistry,
+        pendingEffectRegistry,
+        playerGovernmentRegistry,
+        playerResearchRegistry,
+        playerTreasuryRegistry,
+        playerWorldRegistry,
+        ruleRegistry,
+        strategyNoteRegistry,
+        terrainFeatureRegistry,
+        tileImprovementRegistry,
+        turn,
+        unitImprovementRegistry,
+        unitRegistry,
+        workedTileRegistry,
+      })
+    )
+  );
 
   pathFinderRegistry.register(BasePathFinder);
 
