@@ -9,10 +9,8 @@ import {
   Embark,
   Fortify,
   FoundCity,
-  Move,
   NoOrders,
   SneakAttack,
-  SneakCaptureCity,
   Unload,
 } from '@civ-clone/civ1-unit/Actions';
 import {
@@ -139,7 +137,7 @@ import Yield from '@civ-clone/core-yield/Yield';
 import { instance as rngInstance } from '@civ-clone/core-random';
 import Dependencies from './lib/Dependencies';
 import { Memory, createMemory } from './lib/Memory';
-import { aircraftCanReturn, aircraftFuel } from './lib/Civ1/aircraft';
+import { aircraftFuel } from './lib/Civ1/aircraft';
 import {
   shouldBuildCity,
   shouldIrrigate,
@@ -149,9 +147,10 @@ import {
 import Knowledge from './lib/Knowledge';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import reviewCities from './lib/Turn/reviewCities';
-import canNegotiate from './lib/Diplomacy/negotiate';
 import chooseNegotiationStep from './lib/Diplomacy/chooseNegotiationStep';
-import shouldAttack from './lib/shouldAttack';
+import { noOrders, skipUnit } from './lib/Unit/orders';
+import moveUnit from './lib/Unit/moveUnit';
+import scoreUnitMove from './lib/Unit/scoreUnitMove';
 import { startRevolution } from './lib/Civ1/government';
 import surveyTargets from './lib/Turn/surveyTargets';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
@@ -280,292 +279,25 @@ export class SimpleAIClient extends AIClient {
   }
 
   scoreUnitMove(unit: Unit, tile: Tile): number {
-    const actions = unit.actions(tile),
-      {
-        attack,
-        buildIrrigation,
-        buildMine,
-        buildRoad,
-        captureCity,
-        disembark,
-        embark,
-        fortify,
-        foundCity,
-        noOrders,
-        sneakAttack,
-      } = actions.reduce(
-        (object: ActionLookup, entity: Action): ActionLookup => ({
-          ...object,
-          [entity.constructor.name.replace(/^./, (char: string): string =>
-            char.toLowerCase()
-          )]: entity,
-        }),
-        {}
-      );
-
-    if (
-      sneakAttack &&
-      !shouldAttack(this._dependencies, this.player(), sneakAttack.enemy())
-    ) {
-      return -10;
-    }
-
-    const [firstAction] = actions;
-
-    if (
-      firstAction &&
-      !aircraftCanReturn(this._dependencies, this.player(), unit, firstAction)
-    ) {
-      return -1;
-    }
-
-    if (
-      !actions.length ||
-      (actions.length === 1 && noOrders) ||
-      (unit instanceof Fortifiable &&
-        actions.length === 2 &&
-        fortify &&
-        noOrders)
-    ) {
-      return -1;
-    }
-
-    let score = 0;
-
-    const goodyHut = this._dependencies.goodyHutRegistry.getByTile(tile);
-
-    if (goodyHut !== null) {
-      score += 60;
-    }
-
-    if (
-      (foundCity && shouldBuildCity(this._dependencies, this.player(), tile)) ||
-      (buildMine && shouldMine(this._dependencies, this.player(), tile)) ||
-      (buildIrrigation &&
-        shouldIrrigate(this._dependencies, this.player(), tile)) ||
-      (buildRoad && shouldRoad(this._dependencies, this.player(), tile))
-    ) {
-      score += 24;
-    }
-
-    const tileUnits = this._dependencies.unitRegistry
-        .getByTile(tile)
-        .sort(
-          (a: Unit, b: Unit): number =>
-            b.defence().value() - a.defence().value()
-        ),
-      [defender] = tileUnits,
-      ourUnitsOnTile = tileUnits.some(
-        (unit: Unit) => unit.player() === this.player()
-      );
-
-    if (
-      unit instanceof NavalTransport &&
-      unit.hasCapacity() &&
-      tileUnits.length &&
-      ourUnitsOnTile
-    ) {
-      score += 10;
-    }
-
-    if (
-      unit instanceof NavalTransport &&
-      unit.hasCargo() &&
-      tile.isCoast() &&
-      tile.isWater()
-    ) {
-      score += 16;
-    }
-
-    if (embark) {
-      score += 16;
-    }
-
-    // TODO: move to far off continents
-    if (disembark /* && tile.continentId !== unit.departureContinentId*/) {
-      score += 16;
-    }
-
-    if (captureCity) {
-      score += 100;
-    }
-
-    // TODO: weight attacking dependent on leader's personality
-    if (attack && unit.attack() > defender.defence()) {
-      score += 24 * (unit.attack().value() - defender.defence().value());
-    }
-
-    if (attack && unit.attack().value() >= defender.defence().value()) {
-      score += 16;
-    }
-
-    // add some jeopardy
-    if (
-      attack &&
-      unit.attack().value() >= defender.defence().value() * (2 / 3)
-    ) {
-      score += 8;
-    }
-
-    const playerWorld = this._dependencies.playerWorldRegistry.getByPlayer(
-      this.player()
+    return scoreUnitMove(
+      this._dependencies,
+      this.player(),
+      this._memory,
+      this._knowledge,
+      unit,
+      tile
     );
-
-    const discoverableTiles = tile
-      .getNeighbours()
-      .filter(
-        (neighbouringTile: Tile): boolean =>
-          !playerWorld.includes(neighbouringTile)
-      ).length;
-
-    if (discoverableTiles > 0) {
-      score += discoverableTiles * 3;
-    }
-
-    const target = this._memory.unitTargetData.get(unit);
-
-    if (
-      target instanceof Tile &&
-      tile.distanceFrom(target) < unit.tile().distanceFrom(target)
-    ) {
-      score += 14;
-    }
-
-    const lastMoves = this._memory.lastUnitMoves.get(unit) || [];
-
-    if (!lastMoves.includes(tile)) {
-      score *= 4;
-    }
-
-    return score;
   }
 
-  async moveUnit(unit: Unit): Promise<void> {
-    let loopCheck = 0;
-
-    while (unit.active() && unit.moves().value() >= 0.1) {
-      if (loopCheck++ > 1e3) {
-        console.log('SimpleAIClient#moveUnit: loopCheck: aborting');
-        console.log(
-          `${unit.player().civilization().name()} ${unit.constructor.name}`
-        );
-        console.log(unit.actions());
-        console.log(unit.actionsForNeighbours());
-        this.noOrders(unit);
-
-        return;
-      }
-
-      const path = this._memory.unitPathData.get(unit);
-
-      if (path) {
-        const target = path.shift(),
-          moves = unit
-            .actions(target)
-            .filter((action) => action instanceof Move),
-          // Passing through, fly over a `City` or `Carrier` rather than landing on it, which would end the turn.
-          [move] =
-            path.length > 0 && unit.moves().value() > 1
-              ? [
-                  ...moves.filter((action) => action.constructor === Move),
-                  ...moves,
-                ]
-              : moves;
-
-        if (
-          (move instanceof SneakCaptureCity &&
-            !shouldAttack(this._dependencies, this.player(), move.enemy())) ||
-          (move &&
-            !aircraftCanReturn(
-              this._dependencies,
-              this.player(),
-              unit,
-              move as Action
-            ))
-        ) {
-          this._memory.unitPathData.delete(unit);
-
-          continue;
-        }
-
-        if (move) {
-          unit.action(move as Action);
-
-          if (path.length === 0) {
-            this._memory.unitPathData.delete(unit);
-          }
-
-          await canNegotiate(this._dependencies, this.player(), unit);
-
-          continue;
-        }
-
-        if (path.length > 0) {
-          // restart the loop
-          continue;
-        }
-
-        this._memory.unitPathData.delete(unit);
-      }
-
-      const [target] = unit
-        .tile()
-        .getNeighbours()
-        .map((tile: Tile): [Tile, number] => [
-          tile,
-          this.scoreUnitMove(unit, tile),
-        ])
-        .filter(([, score]: [Tile, number]): boolean => score > -1)
-        .sort(
-          ([, a]: [Tile, number], [, b]: [Tile, number]): number =>
-            b - a ||
-            // if there's no difference, sort randomly
-            Math.floor(this._dependencies.randomNumberGenerator() * 3) - 1
-        )
-        .map(([tile]: [Tile, number]): Tile => tile);
-
-      if (!target) {
-        // TODO: could do something a bit more intelligent here
-        this.noOrders(unit);
-
-        return;
-      }
-
-      const actions = unit.actions(target),
-        [action] = actions,
-        lastMoves = this._memory.lastUnitMoves.get(unit) || [],
-        currentTarget = this._memory.unitTargetData.get(unit);
-
-      if (
-        !action ||
-        ((action instanceof SneakAttack ||
-          action instanceof SneakCaptureCity) &&
-          !shouldAttack(this._dependencies, this.player(), action.enemy()))
-      ) {
-        // TODO: could do something a bit more intelligent here
-        this.noOrders(unit);
-
-        return;
-      }
-
-      if (currentTarget === target) {
-        this._memory.unitTargetData.delete(unit);
-      }
-
-      lastMoves.push(target);
-
-      this._memory.lastUnitMoves.set(unit, lastMoves.slice(-50));
-
-      unit.action(action as Action);
-    }
-
-    await canNegotiate(this._dependencies, this.player(), unit);
-
-    // If we're here, we still have some moves left, lets clear them up.
-    // TODO: This might not be necessary, just remove all checks for >= .1 moves left...
-    if (unit.moves().value() > 0) {
-      this.noOrders(unit);
-    }
+  // Not `async`: the promise is handed back as it is, so awaiting this takes the same ticks as awaiting `moveUnit`.
+  moveUnit(unit: Unit): Promise<void> {
+    return moveUnit(
+      this._dependencies,
+      this.player(),
+      this._memory,
+      this._knowledge,
+      unit
+    );
   }
 
   preProcessTurn(): void {
@@ -636,7 +368,7 @@ export class SimpleAIClient extends AIClient {
                 }
 
                 // Do nothing, but shout about it
-                this.noOrders(item);
+                noOrders(this._dependencies, item);
 
                 console.error("SimpleAIClient: Couldn't pick an action to do.");
 
@@ -1020,7 +752,7 @@ export class SimpleAIClient extends AIClient {
                 e
               );
 
-              this.skipUnit(item);
+              skipUnit(this._dependencies, item);
             }
           }
 
@@ -1236,27 +968,6 @@ export class SimpleAIClient extends AIClient {
         .getByPlayerAndType(this.player(), Gold)
         .buy(city);
     }
-  }
-
-  private skipUnit(unit: Unit): void {
-    try {
-      this.noOrders(unit);
-    } catch (e) {
-      // `NoOrders` is only a fallback here, so if it fails too, make sure the unit stops being a mandatory action.
-      unit.moves().set(0);
-      unit.setActive(false);
-    }
-  }
-
-  private noOrders(unit: Unit) {
-    unit.action(
-      new NoOrders(
-        unit.tile(),
-        unit.tile(),
-        unit,
-        this._dependencies.ruleRegistry
-      )
-    );
   }
 }
 
