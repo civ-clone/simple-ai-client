@@ -52,10 +52,6 @@ import {
   instance as goodyHutRegistryInstance,
 } from '@civ-clone/core-goody-hut/GoodyHutRegistry';
 import {
-  Interaction,
-  IInteraction,
-} from '@civ-clone/core-diplomacy/Interaction';
-import {
   InteractionRegistry,
   instance as interactionRegistryInstance,
 } from '@civ-clone/core-diplomacy/InteractionRegistry';
@@ -111,7 +107,6 @@ import {
   WorkedTileRegistry,
   instance as workedTileRegistryInstance,
 } from '@civ-clone/core-city/WorkedTileRegistry';
-import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
 import Action from '@civ-clone/core-unit/Action';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
@@ -120,12 +115,9 @@ import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import EndTurn from '@civ-clone/base-player-action-end-turn/EndTurn';
-import ExchangeKnowledge from '@civ-clone/library-diplomacy/Proposals/ExchangeKnowledge';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import Gold from '@civ-clone/base-city-yield-gold/Gold';
-import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
-import Initiate from '@civ-clone/core-diplomacy/Negotiation/Initiate';
 import { Monarchy as MonarchyGovernment } from '@civ-clone/civ1-government/Governments';
 import {
   PendingEffectRegistry,
@@ -133,21 +125,17 @@ import {
 } from '@civ-clone/core-pending-effect';
 import { chooseGovernment } from '@civ-clone/civ1-government/lib/revolution';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
-import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
-import OfferPeace from '@civ-clone/library-diplomacy/Proposals/OfferPeace';
 import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
-import Resolution from '@civ-clone/core-diplomacy/Proposal/Resolution';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
-import Decline from '@civ-clone/core-diplomacy/Proposal/Decline';
 import { instance as rngInstance } from '@civ-clone/core-random';
 import Dependencies from './lib/Dependencies';
 import { Memory, createMemory } from './lib/Memory';
@@ -161,16 +149,12 @@ import {
 import Knowledge from './lib/Knowledge';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import reviewCities from './lib/Turn/reviewCities';
+import canNegotiate from './lib/Diplomacy/negotiate';
+import chooseNegotiationStep from './lib/Diplomacy/chooseNegotiationStep';
 import shouldAttack from './lib/shouldAttack';
 import { startRevolution } from './lib/Civ1/government';
 import surveyTargets from './lib/Turn/surveyTargets';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
-
-declare global {
-  interface ChoiceMetaDataMap {
-    'negotiation.next-step': IAction;
-  }
-}
 
 type ActionLookup = {
   attack?: AttackAction;
@@ -187,25 +171,19 @@ type ActionLookup = {
   unload?: Unload;
 };
 
-const awaitTimeout = (delay: number, reason?: any) =>
-  new Promise<void>((resolve, reject) =>
-    setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay)
-  );
-
 const hasPlayerCity = (
-    tile: Tile,
-    player: Player,
-    cityRegistry: CityRegistry = cityRegistryInstance
-  ): boolean => {
-    const city = cityRegistry.getByTile(tile);
+  tile: Tile,
+  player: Player,
+  cityRegistry: CityRegistry = cityRegistryInstance
+): boolean => {
+  const city = cityRegistry.getByTile(tile);
 
-    if (city === null) {
-      return false;
-    }
+  if (city === null) {
+    return false;
+  }
 
-    return city.player() === player;
-  },
-  MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
+  return city.player() === player;
+};
 
 export class SimpleAIClient extends AIClient {
   private _dependencies: Dependencies;
@@ -517,7 +495,7 @@ export class SimpleAIClient extends AIClient {
             this._memory.unitPathData.delete(unit);
           }
 
-          await this.canNegotiate(unit);
+          await canNegotiate(this._dependencies, this.player(), unit);
 
           continue;
         }
@@ -581,7 +559,7 @@ export class SimpleAIClient extends AIClient {
       unit.action(action as Action);
     }
 
-    await this.canNegotiate(unit);
+    await canNegotiate(this._dependencies, this.player(), unit);
 
     // If we're here, we still have some moves left, lets clear them up.
     // TODO: This might not be necessary, just remove all checks for >= .1 moves left...
@@ -613,35 +591,7 @@ export class SimpleAIClient extends AIClient {
       return super.chooseFromList(meta);
     }
 
-    const score = (item: Interaction) => {
-      const aggressive = shouldAttack(
-        this._dependencies,
-        this.player(),
-        item.players().filter((player) => player !== this.player())[0]
-      );
-
-      if (aggressive) {
-        return item instanceof Decline ? 10 : -1;
-      }
-
-      return item instanceof ExchangeKnowledge
-        ? 30
-        : item instanceof OfferPeace
-        ? 20
-        : item instanceof Accept
-        ? 10
-        : 0;
-    };
-
-    const [topChoice] = meta.choices().sort((actionA, actionB) => {
-      return (
-        // TODO: This isn't `unknown`...
-        score(actionB.value() as unknown as Interaction) -
-        score(actionA.value() as unknown as Interaction)
-      );
-    });
-
-    return topChoice.value();
+    return chooseNegotiationStep(this._dependencies, this.player(), meta);
   }
 
   takeTurn(): Promise<void> {
@@ -1286,127 +1236,6 @@ export class SimpleAIClient extends AIClient {
         .getByPlayerAndType(this.player(), Gold)
         .buy(city);
     }
-  }
-
-  private async canNegotiate(unit: Unit): Promise<void> {
-    const surroundingPlayers = Array.from(
-      new Set(
-        unit
-          .tile()
-          .getNeighbours()
-          .flatMap((tile) =>
-            this._dependencies.unitRegistry
-              .getByTile(tile)
-              .map((tileUnit) => tileUnit.player())
-              .filter((player) => player !== this.player())
-          )
-      )
-    );
-
-    if (surroundingPlayers.length === 0) {
-      return;
-    }
-
-    await surroundingPlayers
-      .filter((player) =>
-        this._dependencies.interactionRegistry
-          .getByPlayer(player)
-          .filter(
-            (interaction) =>
-              interaction instanceof Negotiation &&
-              interaction.isBetween(player, this.player())
-          )
-          .every(
-            (interaction) =>
-              this._dependencies.turn.value() - interaction.when() >
-              MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION
-          )
-      )
-      .reduce(
-        (promise, player): Promise<any> =>
-          promise.then(() => this.handleNegotiation(player)),
-        Promise.resolve()
-      );
-  }
-
-  private async handleNegotiation(player: Player): Promise<Negotiation> {
-    const negotiation = new Negotiation(
-      this.player(),
-      player,
-      this._dependencies.ruleRegistry
-    );
-
-    negotiation.proceed(
-      new Initiate(
-        this.player(),
-        negotiation,
-        this._dependencies.ruleRegistry
-      ) as IAction
-    );
-
-    while (!negotiation.terminated()) {
-      const lastInteraction = negotiation.lastInteraction(),
-        players =
-          lastInteraction !== null
-            ? lastInteraction.for()
-            : negotiation.players().slice(1);
-
-      await players.reduce(
-        async (promise, player) =>
-          promise
-            .then(async () => {
-              const client =
-                  this._dependencies.clientRegistry.getByPlayer(player),
-                nextSteps = negotiation.nextSteps(),
-                resultPromise = Promise.race([
-                  client.chooseFromList(
-                    new ChoiceMeta(
-                      nextSteps,
-                      'negotiation.next-step',
-                      negotiation
-                    )
-                  ),
-                  client instanceof AIClient
-                    ? awaitTimeout(
-                        500,
-                        new Error(
-                          `Timeout waiting for ${client.player().id()} (${
-                            client.player().civilization().sourceClass().name
-                          }) - sent ${nextSteps.length} options`
-                        )
-                      )
-                    : new Promise<void>(() => {}),
-                ]);
-
-              const interaction = await resultPromise;
-
-              if (!interaction) {
-                return;
-              }
-
-              negotiation.proceed(interaction);
-
-              if (interaction instanceof Resolution) {
-                await interaction.proposal().resolve(interaction);
-              }
-
-              // Sleep for a bit to ensure any other async actions have taken place
-              await awaitTimeout(20);
-            })
-            .catch((reason) => console.error(reason)),
-        Promise.resolve()
-      );
-
-      if (negotiation.terminated()) {
-        break;
-      }
-    }
-
-    this._dependencies.interactionRegistry.register(
-      negotiation as IInteraction
-    );
-
-    return negotiation;
   }
 
   private skipUnit(unit: Unit): void {

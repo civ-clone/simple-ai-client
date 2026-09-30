@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SimpleAIClient = void 0;
 const Yields_1 = require("@civ-clone/core-unit/Yields");
 const Actions_1 = require("@civ-clone/civ1-unit/Actions");
-const ChoiceMeta_1 = require("@civ-clone/core-client/ChoiceMeta");
 const CityBuildRegistry_1 = require("@civ-clone/core-city-build/CityBuildRegistry");
 const CityGrowthRegistry_1 = require("@civ-clone/core-city-growth/CityGrowthRegistry");
 const CityRegistry_1 = require("@civ-clone/core-city/CityRegistry");
@@ -26,48 +25,42 @@ const UnitImprovementRegistry_1 = require("@civ-clone/core-unit-improvement/Unit
 const StrategyNoteRegistry_1 = require("@civ-clone/core-strategy/StrategyNoteRegistry");
 const UnitRegistry_1 = require("@civ-clone/core-unit/UnitRegistry");
 const WorkedTileRegistry_1 = require("@civ-clone/core-city/WorkedTileRegistry");
-const Accept_1 = require("@civ-clone/core-diplomacy/Proposal/Accept");
 const AIClient_1 = require("@civ-clone/core-ai-client/AIClient");
 const Yield_1 = require("@civ-clone/core-unit/Rules/Yield");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
 const EndTurn_1 = require("@civ-clone/base-player-action-end-turn/EndTurn");
-const ExchangeKnowledge_1 = require("@civ-clone/library-diplomacy/Proposals/ExchangeKnowledge");
 const UnitImprovements_1 = require("@civ-clone/civ1-unit/UnitImprovements");
 const Gold_1 = require("@civ-clone/base-city-yield-gold/Gold");
-const Initiate_1 = require("@civ-clone/core-diplomacy/Negotiation/Initiate");
 const Governments_1 = require("@civ-clone/civ1-government/Governments");
 const core_pending_effect_1 = require("@civ-clone/core-pending-effect");
 const revolution_1 = require("@civ-clone/civ1-government/lib/revolution");
 const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment");
-const Negotiation_1 = require("@civ-clone/core-diplomacy/Negotiation");
-const OfferPeace_1 = require("@civ-clone/library-diplomacy/Proposals/OfferPeace");
 const CityImprovements_1 = require("@civ-clone/civ1-city-improvement/CityImprovements");
 const Path_1 = require("@civ-clone/core-world-path/Path");
 const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
-const Resolution_1 = require("@civ-clone/core-diplomacy/Proposal/Resolution");
 const Units_1 = require("@civ-clone/civ1-unit/Units");
 const Tile_1 = require("@civ-clone/core-world/Tile");
 const Unit_1 = require("@civ-clone/core-unit/Unit");
 const Wonder_1 = require("@civ-clone/core-wonder/Wonder");
-const Decline_1 = require("@civ-clone/core-diplomacy/Proposal/Decline");
 const core_random_1 = require("@civ-clone/core-random");
 const Memory_1 = require("./lib/Memory");
 const aircraft_1 = require("./lib/Civ1/aircraft");
 const terrain_1 = require("./lib/Civ1/terrain");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const reviewCities_1 = require("./lib/Turn/reviewCities");
+const negotiate_1 = require("./lib/Diplomacy/negotiate");
+const chooseNegotiationStep_1 = require("./lib/Diplomacy/chooseNegotiationStep");
 const shouldAttack_1 = require("./lib/shouldAttack");
 const government_1 = require("./lib/Civ1/government");
 const surveyTargets_1 = require("./lib/Turn/surveyTargets");
 const wakeCarrierAircraft_1 = require("./lib/Turn/wakeCarrierAircraft");
-const awaitTimeout = (delay, reason) => new Promise((resolve, reject) => setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay));
 const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
     const city = cityRegistry.getByTile(tile);
     if (city === null) {
         return false;
     }
     return city.player() === player;
-}, MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
+};
 class SimpleAIClient extends AIClient_1.default {
     // The working memory under the names it had as fields, for tests and debugging that reach in for it.
     get _lastUnitMoves() {
@@ -257,7 +250,7 @@ class SimpleAIClient extends AIClient_1.default {
                     if (path.length === 0) {
                         this._memory.unitPathData.delete(unit);
                     }
-                    await this.canNegotiate(unit);
+                    await (0, negotiate_1.default)(this._dependencies, this.player(), unit);
                     continue;
                 }
                 if (path.length > 0) {
@@ -299,7 +292,7 @@ class SimpleAIClient extends AIClient_1.default {
             this._memory.lastUnitMoves.set(unit, lastMoves.slice(-50));
             unit.action(action);
         }
-        await this.canNegotiate(unit);
+        await (0, negotiate_1.default)(this._dependencies, this.player(), unit);
         // If we're here, we still have some moves left, lets clear them up.
         // TODO: This might not be necessary, just remove all checks for >= .1 moves left...
         if (unit.moves().value() > 0) {
@@ -315,26 +308,7 @@ class SimpleAIClient extends AIClient_1.default {
         if (meta.key() !== 'negotiation.next-step') {
             return super.chooseFromList(meta);
         }
-        const score = (item) => {
-            const aggressive = (0, shouldAttack_1.default)(this._dependencies, this.player(), item.players().filter((player) => player !== this.player())[0]);
-            if (aggressive) {
-                return item instanceof Decline_1.default ? 10 : -1;
-            }
-            return item instanceof ExchangeKnowledge_1.default
-                ? 30
-                : item instanceof OfferPeace_1.default
-                    ? 20
-                    : item instanceof Accept_1.default
-                        ? 10
-                        : 0;
-        };
-        const [topChoice] = meta.choices().sort((actionA, actionB) => {
-            return (
-            // TODO: This isn't `unknown`...
-            score(actionB.value()) -
-                score(actionA.value()));
-        });
-        return topChoice.value();
+        return (0, chooseNegotiationStep_1.default)(this._dependencies, this.player(), meta);
     }
     takeTurn() {
         return new Promise(async (resolve, reject) => {
@@ -648,60 +622,6 @@ class SimpleAIClient extends AIClient_1.default {
                 .getByPlayerAndType(this.player(), Gold_1.default)
                 .buy(city);
         }
-    }
-    async canNegotiate(unit) {
-        const surroundingPlayers = Array.from(new Set(unit
-            .tile()
-            .getNeighbours()
-            .flatMap((tile) => this._dependencies.unitRegistry
-            .getByTile(tile)
-            .map((tileUnit) => tileUnit.player())
-            .filter((player) => player !== this.player()))));
-        if (surroundingPlayers.length === 0) {
-            return;
-        }
-        await surroundingPlayers
-            .filter((player) => this._dependencies.interactionRegistry
-            .getByPlayer(player)
-            .filter((interaction) => interaction instanceof Negotiation_1.default &&
-            interaction.isBetween(player, this.player()))
-            .every((interaction) => this._dependencies.turn.value() - interaction.when() >
-            MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION))
-            .reduce((promise, player) => promise.then(() => this.handleNegotiation(player)), Promise.resolve());
-    }
-    async handleNegotiation(player) {
-        const negotiation = new Negotiation_1.default(this.player(), player, this._dependencies.ruleRegistry);
-        negotiation.proceed(new Initiate_1.default(this.player(), negotiation, this._dependencies.ruleRegistry));
-        while (!negotiation.terminated()) {
-            const lastInteraction = negotiation.lastInteraction(), players = lastInteraction !== null
-                ? lastInteraction.for()
-                : negotiation.players().slice(1);
-            await players.reduce(async (promise, player) => promise
-                .then(async () => {
-                const client = this._dependencies.clientRegistry.getByPlayer(player), nextSteps = negotiation.nextSteps(), resultPromise = Promise.race([
-                    client.chooseFromList(new ChoiceMeta_1.ChoiceMeta(nextSteps, 'negotiation.next-step', negotiation)),
-                    client instanceof AIClient_1.default
-                        ? awaitTimeout(500, new Error(`Timeout waiting for ${client.player().id()} (${client.player().civilization().sourceClass().name}) - sent ${nextSteps.length} options`))
-                        : new Promise(() => { }),
-                ]);
-                const interaction = await resultPromise;
-                if (!interaction) {
-                    return;
-                }
-                negotiation.proceed(interaction);
-                if (interaction instanceof Resolution_1.default) {
-                    await interaction.proposal().resolve(interaction);
-                }
-                // Sleep for a bit to ensure any other async actions have taken place
-                await awaitTimeout(20);
-            })
-                .catch((reason) => console.error(reason)), Promise.resolve());
-            if (negotiation.terminated()) {
-                break;
-            }
-        }
-        this._dependencies.interactionRegistry.register(negotiation);
-        return negotiation;
     }
     skipUnit(unit) {
         try {
