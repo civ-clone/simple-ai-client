@@ -27,6 +27,11 @@ const pursue = (
   list: Tile[],
   [targetTile]: Tile[]
 ): void => {
+  // Nothing to head for, or already there: a search would find nothing worth following.
+  if (!targetTile || targetTile === unit.tile()) {
+    return;
+  }
+
   const path = Path.for(
     unit,
     unit.tile(),
@@ -91,18 +96,24 @@ export const attackEnemyUnits: Mission = (dependencies, memory, unit) => {
     return false;
   }
 
+  const reachable = enemyUnitsToAttack.filter(
+    (tile: Tile): boolean =>
+      (unit instanceof Land && tile.isLand()) ||
+      (unit instanceof Naval && tile.isWater())
+  );
+
+  // Enemy units only on terrain this unit can't cross leave it free for the missions after this one, such as a ship
+  //  exploring by sea.
+  if (reachable.length === 0) {
+    return false;
+  }
+
   pursue(
     dependencies,
     memory,
     unit,
     enemyUnitsToAttack,
-    enemyUnitsToAttack
-      .filter(
-        (tile: Tile): boolean =>
-          (unit instanceof Land && tile.isLand()) ||
-          (unit instanceof Naval && tile.isWater())
-      )
-      .sort(nearest(unit))
+    reachable.sort(nearest(unit))
   );
 
   return true;

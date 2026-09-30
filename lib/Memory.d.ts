@@ -16,5 +16,7 @@ export interface Memory {
   unitPathData: Map<Unit, Path>;
   unitTargetData: Map<Unit, Tile>;
 }
+export declare const claimedTiles: (memory: Memory) => Set<Tile>;
+export declare const forgetDestroyedUnits: (memory: Memory) => void;
 export declare const createMemory: () => Memory;
 export default Memory;

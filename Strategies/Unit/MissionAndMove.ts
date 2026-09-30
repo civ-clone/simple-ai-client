@@ -1,5 +1,5 @@
-// Generic: the fallback for any unit: a unit with no target takes the first mission it qualifies for, then the move
-//  executor runs. Always handles a unit.
+// Generic: the fallback for any unit: a unit with no target and no path to follow takes the first mission it
+//  qualifies for, then the move executor runs. Always handles a unit.
 import AIStrategy from '../lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -19,7 +19,9 @@ export class MissionAndMove extends AIStrategy {
       memory = this.memoryFor(player),
       { target } = unitTurnContextFor(this.dependencies(), action);
 
-    if (!target) {
+    // A unit already on its way somewhere keeps going: its path ends where the last mission sent it, and the survey
+    //  no longer offers that tile to anyone else.
+    if (!target && !memory.unitPathData.has(unit)) {
       assignMission(this.dependencies(), memory, unit);
     }
 

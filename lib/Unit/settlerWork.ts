@@ -1,12 +1,84 @@
-// Generic: a worker founds a city, irrigates, mines or builds a road where it stands, or else is given a city site to
-//  head for. Either way the move executor runs next.
+// Generic: a worker founds a city, irrigates, mines or builds a road where it stands, or else claims the nearest good
+//  city site it can reach and sets off along a path to it. Either way the move executor runs next.
 import { ActionLookup } from '../actionLookup';
 import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
 import Memory from '../Memory';
+import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+
+// The site the worker should still be heading for, if any. A site is given up when the worker has reached it, when
+//  it's no longer a good place for a city (say another city was founded nearby), or when the worker has lost its path
+//  and no new one can be found. Giving it up frees it for the survey to offer again.
+const siteToKeep = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  knowledge: Knowledge,
+  unit: Unit,
+  tile: Tile,
+  target: Tile | undefined
+): Tile | undefined => {
+  if (!target) {
+    return undefined;
+  }
+
+  if (
+    target !== tile &&
+    knowledge.shouldBuildCity(dependencies, player, target)
+  ) {
+    if (memory.unitPathData.has(unit)) {
+      return target;
+    }
+
+    const path = Path.for(unit, tile, target, dependencies.pathFinderRegistry);
+
+    if (path) {
+      memory.unitPathData.set(unit, path);
+
+      return target;
+    }
+  }
+
+  memory.unitTargetData.delete(unit);
+
+  if (memory.unitPathData.get(unit)?.end() === target) {
+    memory.unitPathData.delete(unit);
+  }
+
+  return undefined;
+};
+
+// The nearest site on the board that the worker can reach: claimed as its target, with the path to it, and taken off
+//  the board.
+const claimSite = (
+  dependencies: Dependencies,
+  memory: Memory,
+  unit: Unit,
+  tile: Tile
+): void => {
+  const sites = memory.targets.goodSitesForCities.sort(
+    (a: Tile, b: Tile): number => a.distanceFrom(tile) - b.distanceFrom(tile)
+  );
+
+  for (const site of sites) {
+    if (site === tile) {
+      continue;
+    }
+
+    const path = Path.for(unit, tile, site, dependencies.pathFinderRegistry);
+
+    if (path) {
+      sites.splice(sites.indexOf(site), 1);
+      memory.unitTargetData.set(unit, site);
+      memory.unitPathData.set(unit, path);
+
+      return;
+    }
+  }
+};
 
 export const settlerWork = (
   dependencies: Dependencies,
@@ -18,6 +90,16 @@ export const settlerWork = (
   target: Tile | undefined,
   { buildIrrigation, buildMine, buildRoad, foundCity }: ActionLookup
 ): void => {
+  const site = siteToKeep(
+    dependencies,
+    player,
+    memory,
+    knowledge,
+    unit,
+    tile,
+    target
+  );
+
   if (foundCity && knowledge.shouldBuildCity(dependencies, player, tile)) {
     unit.action(foundCity);
   } else if (
@@ -29,11 +111,8 @@ export const settlerWork = (
     unit.action(buildMine);
   } else if (buildRoad && knowledge.shouldRoad(dependencies, player, tile)) {
     unit.action(buildRoad);
-  } else if (!target && memory.targets.goodSitesForCities.length) {
-    memory.unitTargetData.set(
-      unit,
-      memory.targets.goodSitesForCities.shift() as Tile
-    );
+  } else if (!site && memory.targets.goodSitesForCities.length) {
+    claimSite(dependencies, memory, unit, tile);
   }
 };
 

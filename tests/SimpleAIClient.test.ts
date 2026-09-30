@@ -165,6 +165,9 @@ import StrategyNoteRegistry from '@civ-clone/core-strategy/StrategyNoteRegistry'
 import StrategyRegistry from '@civ-clone/core-strategy/StrategyRegistry';
 import { createDependencies } from '../lib/Dependencies';
 import { createStrategies } from '../registerStrategies';
+import Path from '@civ-clone/core-world-path/Path';
+import assignMission from '../lib/Unit/assignMission';
+import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
 import TerrainFeatureRegistry from '@civ-clone/core-terrain-feature/TerrainFeatureRegistry';
 import TileImprovementRegistry from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
 import TraitRegistry from '@civ-clone/core-civilization/TraitRegistry';
@@ -907,32 +910,30 @@ describe('SimpleAIClient', (): void => {
 
   registerCityNames(cityNameRegistry);
 
-  strategyRegistry.register(
-    ...createStrategies(
-      createDependencies({
-        cityBuildRegistry,
-        cityGrowthRegistry,
-        cityRegistry,
-        clientRegistry,
-        goodyHutRegistry,
-        interactionRegistry,
-        pathFinderRegistry,
-        pendingEffectRegistry,
-        playerGovernmentRegistry,
-        playerResearchRegistry,
-        playerTreasuryRegistry,
-        playerWorldRegistry,
-        ruleRegistry,
-        strategyNoteRegistry,
-        terrainFeatureRegistry,
-        tileImprovementRegistry,
-        turn,
-        unitImprovementRegistry,
-        unitRegistry,
-        workedTileRegistry,
-      })
-    )
-  );
+  const dependencies = createDependencies({
+    cityBuildRegistry,
+    cityGrowthRegistry,
+    cityRegistry,
+    clientRegistry,
+    goodyHutRegistry,
+    interactionRegistry,
+    pathFinderRegistry,
+    pendingEffectRegistry,
+    playerGovernmentRegistry,
+    playerResearchRegistry,
+    playerTreasuryRegistry,
+    playerWorldRegistry,
+    ruleRegistry,
+    strategyNoteRegistry,
+    terrainFeatureRegistry,
+    tileImprovementRegistry,
+    turn,
+    unitImprovementRegistry,
+    unitRegistry,
+    workedTileRegistry,
+  });
+
+  strategyRegistry.register(...createStrategies(dependencies));
 
   pathFinderRegistry.register(BasePathFinder);
 
@@ -1358,5 +1359,145 @@ describe('SimpleAIClient', (): void => {
     clientRegistry.unregister(client);
     currentPlayerRegistry.unregister(player);
     playerRegistry.unregister(player);
+  });
+  // Building a world hands each registered player a civilization and takes it out of the registry, and there are
+  //  fewer civilizations than tests, so the tests below put them back once they've run out.
+  const withCivilizations = (): void => {
+    if (civilizationRegistry.entries().length === 0) {
+      registerCivilizations(civilizationRegistry);
+      registerLeaders(leaderRegistry);
+    }
+  };
+
+  it('should send a ship with nothing else to do to explore unknown sea', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('64O', 8, 8),
+      player = client.player(),
+      trireme = new Trireme(
+        null,
+        player,
+        world.get(1, 1),
+        ruleRegistry,
+        transportRegistry
+      ),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    expect(memory.targets.seaTilesToExplore).not.empty;
+
+    assignMission(dependencies, memory, trireme);
+
+    const path = memory.unitPathData.get(trireme);
+
+    expect(path).instanceof(Path);
+    expect(memory.targets.seaTilesToExplore).not.include(path!.end());
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+
+  it('should target an enemy unit next to one of its units', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
+      enemyUnit = new Warrior(null, enemy, world.get(2, 1), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    expect(memory.targets.enemyUnitsToAttack).include(enemyUnit.tile());
+
+    assignMission(dependencies, memory, unit);
+
+    expect(memory.unitPathData.get(unit)?.end()).equal(enemyUnit.tile());
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+    unitRegistry.unregister(unit, enemyUnit);
+  });
+
+  it('should have Settlers claim the nearest good city site and set off for it', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('80G', 5, 16),
+      player = client.player();
+
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const city = new City(
+        player,
+        world.get(2, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      // Close enough to the city that its own tile isn't a good site, and outside the city's tiles, so there's no
+      //  road or irrigation to build.
+      settlers = new Settlers(null, player, world.get(6, 2), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    await takeTurns(client);
+
+    const site = memory.unitTargetData.get(settlers);
+
+    expect(site).instanceof(Tile);
+    expect(site!.distanceFrom(city.tile())).greaterThan(4);
+    expect(site!.distanceFrom(world.get(6, 2))).equal(1);
+
+    cityRegistry.unregister(city);
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
+
+  it('should not offer a tile another unit is already heading for', async (): Promise<void> => {
+    withCivilizations();
+
+    //   0123
+    // 0 ~~~~
+    // 1 ~###
+    // 2 ~###
+    // 3 ~###
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('5O3GO3GO3G', 4, 4),
+      player = client.player(),
+      unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player),
+      heading = world.get(2, 2);
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    expect(memory.targets.landTilesToExplore).include(heading);
+
+    memory.unitPathData.set(
+      unit,
+      Path.for(unit, unit.tile(), heading, pathFinderRegistry)
+    );
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    expect(memory.targets.landTilesToExplore).not.include(heading);
+    expect(memory.targets.landTilesToExplore).not.empty;
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(unit);
   });
 });

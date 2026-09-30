@@ -1,8 +1,7 @@
 // Generic: the start-of-turn survey of everything the player can see, refilling the target board.
 import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
-import Memory from '../Memory';
-import Path from '@civ-clone/core-world-path/Path';
+import Memory, { claimedTiles, forgetDestroyedUnits } from '../Memory';
 import Player from '@civ-clone/core-player/Player';
 import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
 import Tile from '@civ-clone/core-world/Tile';
@@ -15,7 +14,7 @@ export const surveyTargets = (
   memory: Memory,
   knowledge: Knowledge
 ): void => {
-  const { targets, unitPathData, unitTargetData } = memory;
+  const { targets } = memory;
 
   targets.citiesToLiberate.splice(0);
   targets.enemyCitiesToAttack.splice(0);
@@ -24,18 +23,17 @@ export const surveyTargets = (
   targets.landTilesToExplore.splice(0);
   targets.seaTilesToExplore.splice(0);
   targets.undefendedCities.splice(0);
-  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player);
+  forgetDestroyedUnits(memory);
+
+  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
+    // A tile some unit is already heading for isn't offered as a target again.
+    claimed = claimedTiles(memory);
 
   playerWorld.entries().forEach((playerTile: PlayerTile): void => {
     const tile = playerTile.tile(),
       tileCity = dependencies.cityRegistry.getByTile(tile),
       tileUnits = dependencies.unitRegistry.getBy('tile', tile),
-      existingTarget =
-        targets.undefendedCities.includes(tile) &&
-        ![
-          ...unitTargetData.values(),
-          ...[...unitPathData.values()].map((path: Path): Tile => path.end()),
-        ].includes(tile);
+      existingTarget = claimed.has(tile);
 
     if (
       tileCity &&
@@ -62,8 +60,7 @@ export const surveyTargets = (
     } else if (
       tileUnits.length &&
       tileUnits.some((unit: Unit): boolean => unit.player() !== player) &&
-      // TODO(civ-clone/web-renderer#199): missing `!`, so this list is never filled. Kept: #153 changes no play.
-      targets.enemyUnitsToAttack.includes(tile)
+      !targets.enemyUnitsToAttack.includes(tile)
     ) {
       targets.enemyUnitsToAttack.push(tile);
     } else if (
@@ -80,8 +77,7 @@ export const surveyTargets = (
       tile
         .getNeighbours()
         .some((tile: Tile): boolean => !playerWorld.includes(tile)) &&
-      // TODO(civ-clone/web-renderer#199): missing `!`, so this list is never filled. Kept: #153 changes no play.
-      targets.seaTilesToExplore.includes(tile) &&
+      !targets.seaTilesToExplore.includes(tile) &&
       !existingTarget
     ) {
       targets.seaTilesToExplore.push(tile);
@@ -89,8 +85,7 @@ export const surveyTargets = (
 
     if (
       knowledge.shouldBuildCity(dependencies, player, tile) &&
-      // TODO: missing `!`, so this list is never filled and no `Settlers` is given a target. Kept: #153 changes no play.
-      targets.goodSitesForCities.includes(tile) &&
+      !targets.goodSitesForCities.includes(tile) &&
       !existingTarget
     ) {
       targets.goodSitesForCities.push(tile);

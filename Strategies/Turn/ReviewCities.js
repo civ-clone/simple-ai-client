@@ -11,7 +11,7 @@ class ReviewCities extends AIStrategy_1.default {
     }
     attempt(action) {
         const player = action.player();
-        (0, reviewCities_1.default)(this.dependencies(), player, this.memoryFor(player).targets, this.knowledge());
+        (0, reviewCities_1.default)(this.dependencies(), player, this.memoryFor(player), this.knowledge());
         return true;
     }
 }
