@@ -8,14 +8,11 @@ const CityBuildRegistry_1 = require("@civ-clone/core-city-build/CityBuildRegistr
 const CityGrowthRegistry_1 = require("@civ-clone/core-city-growth/CityGrowthRegistry");
 const CityRegistry_1 = require("@civ-clone/core-city/CityRegistry");
 const ClientRegistry_1 = require("@civ-clone/core-client/ClientRegistry");
-const Terrains_1 = require("@civ-clone/civ1-world/Terrains");
 const Engine_1 = require("@civ-clone/core-engine/Engine");
 const Yields_2 = require("@civ-clone/civ1-world/Yields");
 const Types_1 = require("@civ-clone/civ1-unit/Types");
-const TerrainFeatures_1 = require("@civ-clone/civ1-world/TerrainFeatures");
 const GoodyHutRegistry_1 = require("@civ-clone/core-goody-hut/GoodyHutRegistry");
 const InteractionRegistry_1 = require("@civ-clone/core-diplomacy/InteractionRegistry");
-const TileImprovements_1 = require("@civ-clone/civ1-world/TileImprovements");
 const PathFinderRegistry_1 = require("@civ-clone/core-world-path/PathFinderRegistry");
 const PlayerGovernmentRegistry_1 = require("@civ-clone/core-government/PlayerGovernmentRegistry");
 const PlayerResearchRegistry_1 = require("@civ-clone/core-science/PlayerResearchRegistry");
@@ -29,7 +26,6 @@ const UnitImprovementRegistry_1 = require("@civ-clone/core-unit-improvement/Unit
 const StrategyNoteRegistry_1 = require("@civ-clone/core-strategy/StrategyNoteRegistry");
 const UnitRegistry_1 = require("@civ-clone/core-unit/UnitRegistry");
 const WorkedTileRegistry_1 = require("@civ-clone/core-city/WorkedTileRegistry");
-const turnEnd_1 = require("@civ-clone/civ1-unit/Rules/Player/turnEnd");
 const Accept_1 = require("@civ-clone/core-diplomacy/Proposal/Accept");
 const AIClient_1 = require("@civ-clone/core-ai-client/AIClient");
 const Yield_1 = require("@civ-clone/core-unit/Rules/Yield");
@@ -58,16 +54,11 @@ const assignWorkers_1 = require("@civ-clone/civ1-city/lib/assignWorkers");
 const Decline_1 = require("@civ-clone/core-diplomacy/Proposal/Decline");
 const core_random_1 = require("@civ-clone/core-random");
 const Memory_1 = require("./lib/Memory");
+const aircraft_1 = require("./lib/Civ1/aircraft");
+const terrain_1 = require("./lib/Civ1/terrain");
+const shouldAttack_1 = require("./lib/shouldAttack");
 const awaitTimeout = (delay, reason) => new Promise((resolve, reject) => setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay));
-// How many moves an `Air` `Unit` needs to get from one `Tile` to the other: every step costs 1, diagonals included, and
-//  the map wraps as it does in `Tile#distanceFrom`.
-const movesBetween = (from, to) => {
-    const map = from.map(), onAxis = (delta, size) => {
-        const direct = Math.abs(delta);
-        return Math.min(direct, Math.abs(size - direct));
-    };
-    return Math.max(onAxis(from.x() - to.x(), map.width()), onAxis(from.y() - to.y(), map.height()));
-}, hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
+const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
     const city = cityRegistry.getByTile(tile);
     if (city === null) {
         return false;
@@ -112,55 +103,6 @@ class SimpleAIClient extends AIClient_1.default {
         // `#randomNumberGenerator` shadowing it, which two `private` fields of the
         // same name cannot express.
         super(player, randomNumberGenerator);
-        this._isACityTile = (tile) => this._dependencies.cityRegistry
-            .getByPlayer(this.player())
-            .some((city) => city.tiles().includes(tile));
-        this._shouldBuildCity = (tile) => {
-            const isEarth = this._dependencies.engine.option('earth', false), hasNoCities = this._dependencies.cityRegistry.getByPlayer(this.player()).length === 0;
-            if (isEarth && hasNoCities) {
-                return true;
-            }
-            const terrainFeatures = this._dependencies.terrainFeatureRegistry.getByTerrain(tile.terrain());
-            return ((tile.terrain() instanceof Terrains_1.Grassland ||
-                tile.terrain() instanceof Terrains_1.River ||
-                tile.terrain() instanceof Terrains_1.Plains ||
-                terrainFeatures.some((feature) => feature instanceof TerrainFeatures_1.Oasis) ||
-                terrainFeatures.some((feature) => feature instanceof TerrainFeatures_1.Game)) &&
-                tile.getSurroundingArea().score(this.player(), [
-                    [Yields_2.Food, 4],
-                    [Yields_2.Production, 2],
-                    [Yields_2.Trade, 1],
-                ]) >= 160 &&
-                !tile
-                    .getSurroundingArea(4)
-                    .filter((tile) => this._dependencies.cityRegistry.getByTile(tile) !== null).length);
-        };
-        this._shouldIrrigate = (tile) => {
-            return ([Terrains_1.Desert, Terrains_1.Plains, Terrains_1.Grassland, Terrains_1.River].some((TerrainType) => tile.terrain() instanceof TerrainType) &&
-                // TODO: doing this a lot already, need to make improvements a value object with a helper method
-                !this._dependencies.tileImprovementRegistry
-                    .getByTile(tile)
-                    .some((improvement) => improvement instanceof TileImprovements_1.Irrigation) &&
-                this._isACityTile(tile) &&
-                [...tile.getAdjacent(), tile].some((tile) => tile.terrain() instanceof Terrains_1.River ||
-                    tile.isCoast() ||
-                    (this._dependencies.tileImprovementRegistry
-                        .getByTile(tile)
-                        .some((improvement) => improvement instanceof TileImprovements_1.Irrigation) &&
-                        this._dependencies.cityRegistry.getByTile(tile) === null)));
-        };
-        this._shouldMine = (tile) => {
-            return ([Terrains_1.Hills, Terrains_1.Mountains].some((TerrainType) => tile.terrain() instanceof TerrainType) &&
-                !this._dependencies.tileImprovementRegistry
-                    .getByTile(tile)
-                    .some((improvement) => improvement instanceof TileImprovements_1.Mine) &&
-                this._isACityTile(tile));
-        };
-        this._shouldRoad = (tile) => {
-            return (!this._dependencies.tileImprovementRegistry
-                .getByTile(tile)
-                .some((improvement) => improvement instanceof TileImprovements_1.Road) && this._isACityTile(tile));
-        };
         this._memory = (0, Memory_1.createMemory)();
         this._dependencies = {
             cityBuildRegistry,
@@ -187,55 +129,18 @@ class SimpleAIClient extends AIClient_1.default {
             workedTileRegistry,
         };
     }
-    // How many more moves an aircraft can make before it must be back in one of our `City`s or `Carrier`s, or `null` for
-    //  any other `Unit`.
-    aircraftFuel(unit) {
-        var _a, _b, _c;
-        const [, range] = (_a = turnEnd_1.aircraftRange.find(([UnitType]) => unit instanceof UnitType)) !== null && _a !== void 0 ? _a : [];
-        if (range === undefined) {
-            return null;
-        }
-        const turnsAloft = (_c = (_b = this._dependencies.strategyNoteRegistry
-            .getByKey((0, turnEnd_1.turnsAloftKey)(unit))) === null || _b === void 0 ? void 0 : _b.value()) !== null && _c !== void 0 ? _c : 0;
-        return (unit.moves().value() +
-            Math.max(0, range - turnsAloft - 1) * unit.movement().value());
-    }
-    // Whether an aircraft can still get home after taking `action`: moving costs 1 and a `Fighter` pays 1 to attack from
-    //  where it is, but a `Bomber`'s attack ends its turn wherever it is.
-    aircraftCanReturn(unit, action) {
-        const fuel = this.aircraftFuel(unit);
-        if (fuel === null) {
-            return true;
-        }
-        const moving = action instanceof Actions_1.Move, from = moving ? action.to() : unit.tile(), remaining = !moving && unit instanceof Units_1.Bomber
-            ? fuel - unit.moves().value()
-            : fuel - 1;
-        return [
-            ...this._dependencies.cityRegistry
-                .getByPlayer(this.player())
-                .map((city) => city.tile()),
-            ...this.carriersFor(unit).map((carrier) => carrier.tile()),
-        ].some((tile) => movesBetween(from, tile) <= remaining);
-    }
-    // Our `Carrier`s that `unit` could land on. One it's already aboard counts even when full: taking off frees its slot.
-    carriersFor(unit) {
-        return this._dependencies.unitRegistry
-            .getByPlayer(this.player())
-            .filter((tileUnit) => tileUnit instanceof Types_1.NavalTransport &&
-            !tileUnit.destroyed() &&
-            (tileUnit.hasCapacity() || tileUnit.cargo().includes(unit)) &&
-            tileUnit.canStow(unit));
-    }
     scoreUnitMove(unit, tile) {
         const actions = unit.actions(tile), { attack, buildIrrigation, buildMine, buildRoad, captureCity, disembark, embark, fortify, foundCity, noOrders, sneakAttack, } = actions.reduce((object, entity) => ({
             ...object,
             [entity.constructor.name.replace(/^./, (char) => char.toLowerCase())]: entity,
         }), {});
-        if (sneakAttack && !this.shouldAttack(sneakAttack.enemy())) {
+        if (sneakAttack &&
+            !(0, shouldAttack_1.default)(this._dependencies, this.player(), sneakAttack.enemy())) {
             return -10;
         }
         const [firstAction] = actions;
-        if (firstAction && !this.aircraftCanReturn(unit, firstAction)) {
+        if (firstAction &&
+            !(0, aircraft_1.aircraftCanReturn)(this._dependencies, this.player(), unit, firstAction)) {
             return -1;
         }
         if (!actions.length ||
@@ -251,10 +156,11 @@ class SimpleAIClient extends AIClient_1.default {
         if (goodyHut !== null) {
             score += 60;
         }
-        if ((foundCity && this._shouldBuildCity(tile)) ||
-            (buildMine && this._shouldMine(tile)) ||
-            (buildIrrigation && this._shouldIrrigate(tile)) ||
-            (buildRoad && this._shouldRoad(tile))) {
+        if ((foundCity && (0, terrain_1.shouldBuildCity)(this._dependencies, this.player(), tile)) ||
+            (buildMine && (0, terrain_1.shouldMine)(this._dependencies, this.player(), tile)) ||
+            (buildIrrigation &&
+                (0, terrain_1.shouldIrrigate)(this._dependencies, this.player(), tile)) ||
+            (buildRoad && (0, terrain_1.shouldRoad)(this._dependencies, this.player(), tile))) {
             score += 24;
         }
         const tileUnits = this._dependencies.unitRegistry
@@ -336,8 +242,9 @@ class SimpleAIClient extends AIClient_1.default {
                     ]
                     : moves;
                 if ((move instanceof Actions_1.SneakCaptureCity &&
-                    !this.shouldAttack(move.enemy())) ||
-                    (move && !this.aircraftCanReturn(unit, move))) {
+                    !(0, shouldAttack_1.default)(this._dependencies, this.player(), move.enemy())) ||
+                    (move &&
+                        !(0, aircraft_1.aircraftCanReturn)(this._dependencies, this.player(), unit, move))) {
                     this._memory.unitPathData.delete(unit);
                     continue;
                 }
@@ -376,7 +283,7 @@ class SimpleAIClient extends AIClient_1.default {
             if (!action ||
                 ((action instanceof Actions_1.SneakAttack ||
                     action instanceof Actions_1.SneakCaptureCity) &&
-                    !this.shouldAttack(action.enemy()))) {
+                    !(0, shouldAttack_1.default)(this._dependencies, this.player(), action.enemy()))) {
                 // TODO: could do something a bit more intelligent here
                 this.noOrders(unit);
                 return;
@@ -449,7 +356,7 @@ class SimpleAIClient extends AIClient_1.default {
                 !existingTarget) {
                 this._memory.targets.seaTilesToExplore.push(tile);
             }
-            if (this._shouldBuildCity(tile) &&
+            if ((0, terrain_1.shouldBuildCity)(this._dependencies, this.player(), tile) &&
                 this._memory.targets.goodSitesForCities.includes(tile) &&
                 !existingTarget) {
                 this._memory.targets.goodSitesForCities.push(tile);
@@ -469,7 +376,7 @@ class SimpleAIClient extends AIClient_1.default {
         this._dependencies.unitRegistry
             .getByPlayer(this.player())
             .flatMap((unit) => unit instanceof Types_1.NavalTransport && !unit.destroyed() ? unit.cargo() : [])
-            .filter((unit) => this.aircraftFuel(unit) !== null && !unit.active())
+            .filter((unit) => (0, aircraft_1.aircraftFuel)(this._dependencies, unit) !== null && !unit.active())
             .forEach((aircraft) => {
             aircraft.setBusy();
             aircraft.setActive();
@@ -480,7 +387,7 @@ class SimpleAIClient extends AIClient_1.default {
             return super.chooseFromList(meta);
         }
         const score = (item) => {
-            const aggressive = this.shouldAttack(item.players().filter((player) => player !== this.player())[0]);
+            const aggressive = (0, shouldAttack_1.default)(this._dependencies, this.player(), item.players().filter((player) => player !== this.player())[0]);
             if (aggressive) {
                 return item instanceof Decline_1.default ? 10 : -1;
             }
@@ -541,7 +448,7 @@ class SimpleAIClient extends AIClient_1.default {
                         // Our `Carrier`s move first, so an aircraft only counts on one being where it'll be at the end of the turn.
                         if (item instanceof Unit_1.default &&
                             !item.waiting() &&
-                            this.aircraftFuel(item) !== null &&
+                            (0, aircraft_1.aircraftFuel)(this._dependencies, item) !== null &&
                             this._dependencies.unitRegistry
                                 .getByPlayer(this.player())
                                 .some((carrier) => carrier instanceof Types_1.NavalTransport &&
@@ -573,16 +480,20 @@ class SimpleAIClient extends AIClient_1.default {
                                 continue;
                             }
                             if (unit instanceof Types_1.Worker) {
-                                if (foundCity && this._shouldBuildCity(tile)) {
+                                if (foundCity &&
+                                    (0, terrain_1.shouldBuildCity)(this._dependencies, this.player(), tile)) {
                                     unit.action(foundCity);
                                 }
-                                else if (buildIrrigation && this._shouldIrrigate(tile)) {
+                                else if (buildIrrigation &&
+                                    (0, terrain_1.shouldIrrigate)(this._dependencies, this.player(), tile)) {
                                     unit.action(buildIrrigation);
                                 }
-                                else if (buildMine && this._shouldMine(tile)) {
+                                else if (buildMine &&
+                                    (0, terrain_1.shouldMine)(this._dependencies, this.player(), tile)) {
                                     unit.action(buildMine);
                                 }
-                                else if (buildRoad && this._shouldRoad(tile)) {
+                                else if (buildRoad &&
+                                    (0, terrain_1.shouldRoad)(this._dependencies, this.player(), tile)) {
                                     unit.action(buildRoad);
                                 }
                                 else if (!target &&
@@ -882,18 +793,6 @@ class SimpleAIClient extends AIClient_1.default {
     }
     noOrders(unit) {
         unit.action(new Actions_1.NoOrders(unit.tile(), unit.tile(), unit, this._dependencies.ruleRegistry));
-    }
-    shouldAttack(player) {
-        // TODO: These scores should be cached, at lest for the duration of the Turn...
-        const ourPower = this._dependencies.unitRegistry
-            .getByPlayer(this.player())
-            .reduce((score, unit) => score + unit.attack().value() + unit.defence().value(), 0), enemyPower = this._dependencies.unitRegistry
-            .getByPlayer(player)
-            .reduce((score, unit) => score + unit.attack().value() + unit.defence().value(), 0), 
-        // TODO: use Traits
-        // confidence = this.player().civilization().leader()!.traits().some((trait) => trait instanceof Militaristic) ? 1.25 : 0.9;
-        confidence = 1;
-        return ourPower * confidence >= enemyPower;
     }
 }
 exports.SimpleAIClient = SimpleAIClient;
