@@ -24,7 +24,6 @@ const WorkedTileRegistry_1 = require("@civ-clone/core-city/WorkedTileRegistry");
 const AIClient_1 = require("@civ-clone/core-ai-client/AIClient");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
 const EndTurn_1 = require("@civ-clone/base-player-action-end-turn/EndTurn");
-const Gold_1 = require("@civ-clone/base-city-yield-gold/Gold");
 const core_pending_effect_1 = require("@civ-clone/core-pending-effect");
 const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment");
 const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
@@ -42,15 +41,10 @@ const scoreUnitMove_1 = require("./lib/Unit/scoreUnitMove");
 const government_1 = require("./lib/Civ1/government");
 const buildItemInCity_1 = require("./lib/Civ1/buildItemInCity");
 const chooseResearch_1 = require("./lib/Science/chooseResearch");
+const cityLost_1 = require("./lib/Events/cityLost");
+const unitDestroyed_1 = require("./lib/Events/unitDestroyed");
 const surveyTargets_1 = require("./lib/Turn/surveyTargets");
 const wakeCarrierAircraft_1 = require("./lib/Turn/wakeCarrierAircraft");
-const hasPlayerCity = (tile, player, cityRegistry = CityRegistry_1.instance) => {
-    const city = cityRegistry.getByTile(tile);
-    if (city === null) {
-        return false;
-    }
-    return city.player() === player;
-};
 class SimpleAIClient extends AIClient_1.default {
     // The working memory under the names it had as fields, for tests and debugging that reach in for it.
     get _lastUnitMoves() {
@@ -223,35 +217,11 @@ class SimpleAIClient extends AIClient_1.default {
         (0, buildItemInCity_1.default)(this._dependencies, this.player(), this._memory.targets, city);
     }
     cityLost(city, player, destroyed) {
-        // Can't retaliate against ourselves, we deserved it...
-        if (!player) {
-            return;
-        }
-        const playerWorld = this._dependencies.playerWorldRegistry.getByPlayer(this.player());
-        if (destroyed) {
-            // REVENGE!
-            this._memory.targets.enemyCitiesToAttack.push(...playerWorld
-                .entries()
-                .filter((playerTile) => hasPlayerCity(playerTile.tile(), this.player(), this._dependencies.cityRegistry))
-                .map((playerTile) => playerTile.tile()));
-            this._memory.targets.enemyUnitsToAttack.push(...playerWorld
-                .entries()
-                .filter((playerTile) => this._dependencies.unitRegistry
-                .getByTile(playerTile.tile())
-                .some((unit) => unit.player() === player))
-                .map((playerTile) => playerTile.tile()));
-            return;
-        }
-        this._memory.targets.citiesToLiberate.push(city.tile());
+        (0, cityLost_1.default)(this._dependencies, this.player(), this._memory.targets, city, player, destroyed);
     }
+    // TODO: `player`, who destroyed the unit, is never used. Kept: #153 changes no play.
     unitDestroyed(unit, player) {
-        const city = this._dependencies.cityRegistry.getByTile(unit.tile()), tileUnits = this._dependencies.unitRegistry.getByTile(unit.tile());
-        if (city && city.player() === this.player() && tileUnits.length < 2) {
-            this.buildItemInCity(city);
-            this._dependencies.playerTreasuryRegistry
-                .getByPlayerAndType(this.player(), Gold_1.default)
-                .buy(city);
-        }
+        (0, unitDestroyed_1.default)(this._dependencies, this.player(), unit, (city) => this.buildItemInCity(city));
     }
 }
 exports.SimpleAIClient = SimpleAIClient;
