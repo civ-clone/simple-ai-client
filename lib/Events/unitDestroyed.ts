@@ -1,4 +1,4 @@
-// Generic: when a unit of the player's dies defending one of its cities and leaves it with fewer than two, the city
+// Generic: when one of the player's units dies defending one of its cities and leaves it with fewer than two, the city
 //  switches production and buys it. Runs during combat, so perhaps during another player's turn.
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';

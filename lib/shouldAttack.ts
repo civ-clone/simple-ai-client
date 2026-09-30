@@ -7,7 +7,7 @@ export const shouldAttack = (
   player: Player,
   enemy: Player
 ): boolean => {
-  // TODO: These scores should be cached, at lest for the duration of the Turn...
+  // TODO: These scores should be cached, at least for the duration of the Turn...
   const ourPower = dependencies.unitRegistry
       .getByPlayer(player)
       .reduce(

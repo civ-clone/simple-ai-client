@@ -17,7 +17,7 @@ export interface Knowledge {
   ): boolean;
   // Arranges which tiles `city`'s citizens work.
   assignWorkers(dependencies: Dependencies, city: City): void;
-  // Whether `unit` is an aircraft, that has to end its turns in a city or on a carrier.
+  // Whether `unit` is an aircraft, and so has to end its turns in a city or on a carrier.
   isAircraft(dependencies: Dependencies, unit: Unit): boolean;
   shouldBuildCity(
     dependencies: Dependencies,

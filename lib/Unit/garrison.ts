@@ -15,7 +15,7 @@ export const garrison = (
   tileUnits: Unit[],
   fortify: Fortify | undefined
 ): boolean => {
-  // TODO: check for defense values and activate weaker for disband/upgrade/scouting
+  // TODO: check for defence values and activate weaker for disband/upgrade/scouting
   const [cityUnitWithLowerDefence] = tileUnits.filter(
       (tileUnit: Unit): boolean =>
         dependencies.unitImprovementRegistry
