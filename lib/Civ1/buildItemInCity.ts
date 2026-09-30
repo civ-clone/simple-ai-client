@@ -122,12 +122,10 @@ export const buildItemInCity = (
   }
 
   if (
-    // TODO: the inner `filter` returns an array, which is always truthy, so this counts every unit on the tile. Kept:
-    //  #153 changes no play.
     tileUnits.filter((unit) =>
       dependencies.unitImprovementRegistry
         .getByUnit(unit)
-        .filter((improvement) => improvement instanceof Fortified)
+        .some((improvement) => improvement instanceof Fortified)
     ).length < 2 ||
     targets.undefendedCities.length
   ) {
