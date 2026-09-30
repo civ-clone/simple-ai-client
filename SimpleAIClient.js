@@ -185,9 +185,9 @@ class SimpleAIClient extends StrategyAIClient_1.default {
     cityLost(city, player, destroyed) {
         (0, cityLost_1.default)(this._dependencies, this.player(), this.memory().targets, city, player, destroyed);
     }
-    // TODO: `player`, who destroyed the unit, is never used. Kept: #153 changes no play.
+    // `player` is whoever destroyed the unit, or `null`.
     unitDestroyed(unit, player) {
-        (0, unitDestroyed_1.default)(this._dependencies, this.player(), unit, (city) => this.buildItemInCity(city));
+        (0, unitDestroyed_1.default)(this._dependencies, this.player(), this.memory(), unit, player, (city) => this.buildItemInCity(city));
     }
 }
 exports.SimpleAIClient = SimpleAIClient;

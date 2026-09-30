@@ -347,10 +347,15 @@ export class SimpleAIClient extends StrategyAIClient {
     );
   }
 
-  // TODO: `player`, who destroyed the unit, is never used. Kept: #153 changes no play.
+  // `player` is whoever destroyed the unit, or `null`.
   unitDestroyed(unit: Unit, player: Player | null): void {
-    unitDestroyed(this._dependencies, this.player(), unit, (city: City) =>
-      this.buildItemInCity(city)
+    unitDestroyed(
+      this._dependencies,
+      this.player(),
+      this.memory(),
+      unit,
+      player,
+      (city: City) => this.buildItemInCity(city)
     );
   }
 }

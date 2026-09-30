@@ -1804,4 +1804,73 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
+  it("should target the destroyer's cities, not its own, when one of its cities is destroyed", async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('49G', 7, 7),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const ours = new City(
+        player,
+        world.get(1, 1),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      theirs = new City(
+        enemy,
+        world.get(5, 5),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      lost = new City(
+        player,
+        world.get(1, 5),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    (client as SimpleAIClient).cityLost(lost, enemy, true);
+
+    expect(memory.targets.enemyCitiesToAttack).include(theirs.tile());
+    expect(memory.targets.enemyCitiesToAttack).not.include(ours.tile());
+
+    cityRegistry.unregister(ours, theirs, lost);
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+  });
+
+  it('should target the units of whoever destroyed one of its units', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
+      attacker = new Horseman(null, enemy, world.get(2, 1), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    (client as SimpleAIClient).unitDestroyed(unit, enemy);
+
+    expect(memory.targets.enemyUnitsToAttack).include(attacker.tile());
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+    unitRegistry.unregister(unit, attacker);
+  });
 });
