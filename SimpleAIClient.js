@@ -144,23 +144,32 @@ class SimpleAIClient extends StrategyAIClient_1.default {
     // TODO: Remove this when it's working as expected
     actionLimitReached(action) {
         const item = action.value();
-        // TODO: raise warning - notification?
-        console.log('');
-        console.log('');
-        console.log(item);
-        if (item instanceof Unit_1.default) {
-            console.log(item.actions());
-            item
-                .tile()
-                .getNeighbours()
-                .forEach((tile) => console.log(item.actions(tile)));
-            console.log(item.active());
-            console.log(item.busy());
-            console.log(item.moves().value());
-            console.log(this._dependencies.unitImprovementRegistry.getByUnit(item));
+        // Anything thrown here is dealt with here, not left to the base loop, which ends the turn after this hook either
+        //  way: a unit that can't even be logged or take `NoOrders` is skipped, as `actionFailed` does, and anything else
+        //  fails the turn.
+        try {
+            // TODO: raise warning - notification?
+            console.log('');
+            console.log('');
+            console.log(item);
+            if (item instanceof Unit_1.default) {
+                console.log(item.actions());
+                item
+                    .tile()
+                    .getNeighbours()
+                    .forEach((tile) => console.log(item.actions(tile)));
+                console.log(item.active());
+                console.log(item.busy());
+                console.log(item.moves().value());
+                console.log(this._dependencies.unitImprovementRegistry.getByUnit(item));
+            }
+            // Do nothing, but shout about it
+            (0, orders_1.noOrders)(this._dependencies, item);
         }
-        // Do nothing, but shout about it
-        (0, orders_1.noOrders)(this._dependencies, item);
+        catch (error) {
+            this.actionFailed(action, error);
+            return;
+        }
         console.error("SimpleAIClient: Couldn't pick an action to do.");
     }
     // The turn ends at the first action no strategy handles, which should be `EndTurn`.

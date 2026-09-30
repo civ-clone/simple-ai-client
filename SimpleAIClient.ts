@@ -286,25 +286,34 @@ export class SimpleAIClient extends StrategyAIClient {
   protected actionLimitReached(action: MandatoryPlayerAction): void {
     const item = action.value();
 
-    // TODO: raise warning - notification?
-    console.log('');
-    console.log('');
-    console.log(item);
+    // Anything thrown here is dealt with here, not left to the base loop, which ends the turn after this hook either
+    //  way: a unit that can't even be logged or take `NoOrders` is skipped, as `actionFailed` does, and anything else
+    //  fails the turn.
+    try {
+      // TODO: raise warning - notification?
+      console.log('');
+      console.log('');
+      console.log(item);
 
-    if (item instanceof Unit) {
-      console.log(item.actions());
-      item
-        .tile()
-        .getNeighbours()
-        .forEach((tile: Tile): void => console.log(item.actions(tile)));
-      console.log(item.active());
-      console.log(item.busy());
-      console.log(item.moves().value());
-      console.log(this._dependencies.unitImprovementRegistry.getByUnit(item));
+      if (item instanceof Unit) {
+        console.log(item.actions());
+        item
+          .tile()
+          .getNeighbours()
+          .forEach((tile: Tile): void => console.log(item.actions(tile)));
+        console.log(item.active());
+        console.log(item.busy());
+        console.log(item.moves().value());
+        console.log(this._dependencies.unitImprovementRegistry.getByUnit(item));
+      }
+
+      // Do nothing, but shout about it
+      noOrders(this._dependencies, item);
+    } catch (error) {
+      this.actionFailed(action, error);
+
+      return;
     }
-
-    // Do nothing, but shout about it
-    noOrders(this._dependencies, item);
 
     console.error("SimpleAIClient: Couldn't pick an action to do.");
   }
