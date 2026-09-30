@@ -1,6 +1,6 @@
-// Generic: one unit's turn, a pipeline of steps: seed its move history, unload a transport, a worker's tile work,
-//  garrison a city, assign a mission, then the move executor. Worker tile work and mission assignment fall through
-//  into the move executor.
+// Generic: one unit's whole turn in one call: read its context (which seeds its move history), unload a transport, a
+//  worker's tile work, garrison a city, assign a mission, then the move executor. Worker tile work and mission
+//  assignment fall through into the move executor. `SimpleAIClient` runs the same steps as separate strategies.
 import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
 import Memory from '../Memory';
@@ -8,8 +8,8 @@ import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
 import { Worker } from '@civ-clone/library-unit/Types';
 import assignMission from './assignMission';
+import createUnitTurnContext from './unitTurnContext';
 import garrison from './garrison';
-import lookupActions from '../actionLookup';
 import moveUnit from './moveUnit';
 import settlerWork from './settlerWork';
 import unloadTransport from './unloadTransport';
@@ -23,17 +23,19 @@ export const takeUnitTurn = (
   knowledge: Knowledge,
   unit: Unit
 ): Promise<void> | null => {
-  const tile = unit.tile(),
-    target = memory.unitTargetData.get(unit),
-    actions = unit.actions(),
-    { buildIrrigation, buildMine, buildRoad, fortify, foundCity, unload } =
-      lookupActions(actions),
-    tileUnits = dependencies.unitRegistry.getByTile(tile),
-    lastUnitMoves = memory.lastUnitMoves.get(unit);
-
-  if (!lastUnitMoves) {
-    memory.lastUnitMoves.set(unit, [unit.tile()]);
-  }
+  const {
+    actions: {
+      buildIrrigation,
+      buildMine,
+      buildRoad,
+      fortify,
+      foundCity,
+      unload,
+    },
+    target,
+    tile,
+    tileUnits,
+  } = createUnitTurnContext(dependencies, memory, unit);
 
   if (unloadTransport(memory, unit, tile, unload)) {
     return null;
