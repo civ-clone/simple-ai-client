@@ -110,8 +110,7 @@ export const scoreUnitMove = (
   }
 
   // TODO: weight attacking dependent on leader's personality
-  // TODO: compares the `Yield`s, not their values, so it's never true. Kept: #153 changes no play.
-  if (attack && unit.attack() > defender.defence()) {
+  if (attack && unit.attack().value() > defender.defence().value()) {
     score += 24 * (unit.attack().value() - defender.defence().value());
   }
 
