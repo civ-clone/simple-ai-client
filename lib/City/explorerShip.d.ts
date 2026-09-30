@@ -3,12 +3,12 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '../Memory';
+export declare const isOnSea: (city: City, seaSize?: number) => boolean;
 export declare const reachesSeaToExplore: (
   dependencies: Dependencies,
   player: Player,
   targets: TargetBoard,
-  city: City,
-  limit?: number
+  city: City
 ) => boolean;
 export declare const explorerShipFor: (
   dependencies: Dependencies,

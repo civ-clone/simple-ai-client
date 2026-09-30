@@ -1572,18 +1572,22 @@ describe('SimpleAIClient', (): void => {
   const shipTest = async (
     ships: number,
     advance: typeof MapMaking | null,
-    inland: boolean = true
+    inland: boolean = true,
+    map: string = '5G5O5G5O5G5O5G5O5G5O',
+    knownUpTo: number = 6
   ): Promise<unknown> => {
     withCivilizations();
 
     const [client] = await createClients(),
-      world = await simpleWorldLoader('5G5O5G5O5G5O5G5O5G5O', 5, 10),
+      world = await simpleWorldLoader(map, 5, 10),
       player = client.player();
 
     playerWorldRegistry
       .getByPlayer(player)
       .register(
-        ...world.entries().filter((tile: Tile): boolean => tile.x() <= 6)
+        ...world
+          .entries()
+          .filter((tile: Tile): boolean => tile.x() <= knownUpTo)
       );
 
     await removeSpawnedSettlers(player);
@@ -1647,6 +1651,13 @@ describe('SimpleAIClient', (): void => {
 
   it('should not build a ship in its only city', async (): Promise<void> => {
     expect(await shipTest(0, MapMaking, false)).not.equal(Trireme);
+  });
+
+  // A lake of three tiles east of the city, whose far shore the player hasn't seen, so it looks like sea to explore.
+  it('should not build a ship on a lake', async (): Promise<void> => {
+    expect(
+      await shipTest(0, MapMaking, true, '10G5GO4G5GO4G5GO4G10G', 5)
+    ).not.equal(Trireme);
   });
 
   it('should target an enemy unit next to one of its units', async (): Promise<void> => {
