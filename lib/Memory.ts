@@ -31,9 +31,17 @@ export const claimedTiles = (memory: Memory): Set<Tile> =>
     ...[...memory.unitPathData.values()].map((path: Path): Tile => path.end()),
   ]);
 
-// Drops the targets and paths of units that have since been destroyed, so they neither leak nor claim tiles.
+// Drops everything remembered about `unit`.
+export const forgetUnit = (memory: Memory, unit: Unit): void => {
+  memory.lastUnitMoves.delete(unit);
+  memory.unitPathData.delete(unit);
+  memory.unitTargetData.delete(unit);
+};
+
+// Drops what's remembered about units that have since been destroyed, however that happened (in combat, founding a
+//  city, disbanded, lost at sea), so the maps don't grow for ever and a dead unit's path or target claims no tile.
 export const forgetDestroyedUnits = (memory: Memory): void =>
-  [memory.unitTargetData, memory.unitPathData].forEach(
+  [memory.lastUnitMoves, memory.unitTargetData, memory.unitPathData].forEach(
     (map: Map<Unit, unknown>): void =>
       [...map.keys()]
         .filter((unit: Unit): boolean => unit.destroyed())

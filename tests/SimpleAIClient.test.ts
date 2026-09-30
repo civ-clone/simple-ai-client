@@ -1873,4 +1873,58 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player, enemy);
     unitRegistry.unregister(unit, attacker);
   });
+  it('should forget a unit destroyed in combat', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+
+    const unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    memory.lastUnitMoves.set(unit, [unit.tile()]);
+    memory.unitTargetData.set(unit, world.get(3, 3));
+    memory.unitPathData.set(
+      unit,
+      Path.for(unit, unit.tile(), world.get(3, 3), pathFinderRegistry)
+    );
+
+    (client as SimpleAIClient).unitDestroyed(unit, enemy);
+
+    expect(memory.lastUnitMoves.has(unit)).false;
+    expect(memory.unitTargetData.has(unit)).false;
+    expect(memory.unitPathData.has(unit)).false;
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+    unitRegistry.unregister(unit);
+  });
+
+  it('should forget units destroyed any other way at the start of its turn', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player(),
+      unit = new Warrior(null, player, world.get(1, 1), ruleRegistry),
+      memory = memoryRegistryInstance.memoryFor(player);
+
+    memory.lastUnitMoves.set(unit, [unit.tile()]);
+
+    unit.destroy();
+
+    (client as SimpleAIClient).preProcessTurn();
+
+    expect(memory.lastUnitMoves.has(unit)).false;
+
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player);
+    playerRegistry.unregister(player);
+    unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+  });
 });
