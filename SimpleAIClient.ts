@@ -97,25 +97,29 @@ import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { instance as rngInstance } from '@civ-clone/core-random';
-import Dependencies from './lib/Dependencies';
-import { Memory, createMemory } from './lib/Memory';
-import Knowledge from './lib/Knowledge';
-import civ1Knowledge from './lib/Civ1/knowledge';
-import reviewCities from './lib/Turn/reviewCities';
-import chooseNegotiationStep from './lib/Diplomacy/chooseNegotiationStep';
-import { noOrders, skipUnit } from './lib/Unit/orders';
-import takeUnitTurn from './lib/Unit/takeUnitTurn';
-import waitForCarrier from './lib/Unit/waitForCarrier';
-import moveUnit from './lib/Unit/moveUnit';
-import scoreUnitMove from './lib/Unit/scoreUnitMove';
 import { pickGovernment, startRevolution } from './lib/Civ1/government';
+import Dependencies from './lib/Dependencies';
+import Knowledge from './lib/Knowledge';
+import { Memory, createMemory } from './lib/Memory';
+import { noOrders, skipUnit } from './lib/Unit/orders';
 import buildItemInCity from './lib/Civ1/buildItemInCity';
+import chooseNegotiationStep from './lib/Diplomacy/chooseNegotiationStep';
 import chooseResearch from './lib/Science/chooseResearch';
 import cityLost from './lib/Events/cityLost';
-import unitDestroyed from './lib/Events/unitDestroyed';
+import civ1Knowledge from './lib/Civ1/knowledge';
+import moveUnit from './lib/Unit/moveUnit';
+import reviewCities from './lib/Turn/reviewCities';
+import scoreUnitMove from './lib/Unit/scoreUnitMove';
 import surveyTargets from './lib/Turn/surveyTargets';
+import takeUnitTurn from './lib/Unit/takeUnitTurn';
+import unitDestroyed from './lib/Events/unitDestroyed';
+import waitForCarrier from './lib/Unit/waitForCarrier';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
+// For its `ChoiceMetaDataMap` entry, which `chooseFromList` below and its callers rely on.
+import './lib/Diplomacy/negotiate';
 
+// Civ1: the computer player. It keeps the player's working memory and runs the turn, and hands every decision to the
+//  modules in `lib/`: generic ones, given Civ1's judgements through `Knowledge`, and Civ1 ones in `lib/Civ1/`.
 export class SimpleAIClient extends AIClient {
   private _dependencies: Dependencies;
   private _knowledge: Knowledge = civ1Knowledge;
