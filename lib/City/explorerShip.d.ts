@@ -11,11 +11,13 @@ export declare const reachesSeaToExplore: (
   targets: TargetBoard,
   city: City
 ) => boolean;
+export declare const explorerShipTurns = 20;
 export declare const explorerShipFor: (
   dependencies: Dependencies,
   player: Player,
   targets: TargetBoard,
   city: City,
-  knowledge: Knowledge
+  knowledge: Knowledge,
+  turns?: number
 ) => typeof Buildable | null;
 export default explorerShipFor;

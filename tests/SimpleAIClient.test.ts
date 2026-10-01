@@ -1573,13 +1573,15 @@ describe('SimpleAIClient', (): void => {
   });
 
   // Land to the west, sea to the east, and the sea beyond x = 6 unexplored. `ships` Triremes are already in the sea,
-  //  and with `inland`, the player has a second city.
+  //  and with `inland`, the player has a second city. The coastal city makes `shields` net shields: by default 2, which
+  //  finish a Trireme (40 shields) in 20 turns.
   const shipTest = async (
     ships: number,
     advance: typeof MapMaking | null,
     inland: boolean = true,
     map: string = '5G5O5G5O5G5O5G5O5G5O',
-    knownUpTo: number = 6
+    knownUpTo: number = 6,
+    shields: number = 2
   ): Promise<unknown> => {
     withCivilizations();
 
@@ -1611,6 +1613,7 @@ describe('SimpleAIClient', (): void => {
       defender = new Warrior(null, player, city.tile(), ruleRegistry);
 
     unitImprovementRegistry.register(new Fortified(defender));
+    city.yields = () => [new ProductionYield(shields)];
 
     if (inland) {
       new City(player, world.get(0, 2), '', ruleRegistry, workedTileRegistry);
@@ -1656,6 +1659,13 @@ describe('SimpleAIClient', (): void => {
 
   it('should not build a ship in its only city', async (): Promise<void> => {
     expect(await shipTest(0, MapMaking, false)).not.equal(Trireme);
+  });
+
+  // civ-clone/web-renderer#212: 40 turns at 1 net shield.
+  it('should not build a ship it cannot finish within 20 turns', async (): Promise<void> => {
+    expect(
+      await shipTest(0, MapMaking, true, undefined, undefined, 1)
+    ).not.equal(Trireme);
   });
 
   // A lake of three tiles east of the city, whose far shore the player hasn't seen, so it looks like sea to explore.
