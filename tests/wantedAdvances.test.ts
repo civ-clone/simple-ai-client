@@ -99,14 +99,12 @@ describe('wantedAdvances', (): void => {
       [MahatmaGandhi, [Robotics, Recycling, NuclearPower]],
       [ElizabethI, [Robotics, Recycling, NuclearPower]],
       [Shaka, [Robotics, Recycling, NuclearPower]],
-      // Civilized: those and the advances behind the late Wonders and the spaceship. Mao Zedong's mood is normal, so
-      //  Recycling and Nuclear Power come from being Civilized alone.
+      // Civilized: the advances behind the late Wonders and the spaceship. Mao Zedong's mood is normal, so not Recycling
+      //  or Nuclear Power.
       [
         MaoZedong,
         [
           Robotics,
-          Recycling,
-          NuclearPower,
           Computers,
           GeneticEngineering,
           SpaceFlight,
@@ -115,6 +113,7 @@ describe('wantedAdvances', (): void => {
           FusionPower,
         ],
       ],
+      // Abraham Lincoln is Friendly as well, so he wants all nine.
       [
         AbrahamLincoln,
         [
@@ -212,8 +211,6 @@ describe('scienceStopped', (): void => {
     const setup = setUp(MaoZedong),
       wanted = [
         Robotics,
-        Recycling,
-        NuclearPower,
         Computers,
         GeneticEngineering,
         SpaceFlight,
