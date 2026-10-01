@@ -255,13 +255,17 @@ describe('buildItemInCity', (): void => {
     });
 
     it('should count Settlers its other cities are building towards the ones it wants', async (): Promise<void> => {
+      // Two cities want 3 + 2 × 0.5 = 4 by the default policy: three are out, and the other city is building the fourth.
       const setup = await setUp({ shields: 2, size: 2 }),
         other = setup.addCity(3, 2);
 
-      unitsOut(setup, 2, Settlers);
+      unitsOut(setup, 3, Settlers);
       setup.game.cityBuilds.getByCity(other).build(Settlers);
 
       expect(setup.choose()).not.equal(Settlers);
+      expect(
+        setup.choose({ ...defaultProductionPolicy, settlersPerCity: 1 })
+      ).equal(Settlers);
     });
   });
 });
