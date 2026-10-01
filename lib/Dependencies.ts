@@ -48,6 +48,10 @@ import {
   instance as playerResearchRegistryInstance,
 } from '@civ-clone/core-science/PlayerResearchRegistry';
 import {
+  PlayerTradeRatesRegistry,
+  instance as playerTradeRatesRegistryInstance,
+} from '@civ-clone/core-trade-rate/PlayerTradeRatesRegistry';
+import {
   PlayerTreasuryRegistry,
   instance as playerTreasuryRegistryInstance,
 } from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
@@ -75,6 +79,10 @@ import {
   TileImprovementRegistry,
   instance as tileImprovementRegistryInstance,
 } from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
+import {
+  TraitRegistry,
+  instance as traitRegistryInstance,
+} from '@civ-clone/core-civilization/TraitRegistry';
 import {
   Turn,
   instance as turnInstance,
@@ -112,6 +120,7 @@ export interface Dependencies {
   pendingEffectRegistry: PendingEffectRegistry;
   playerGovernmentRegistry: PlayerGovernmentRegistry;
   playerResearchRegistry: PlayerResearchRegistry;
+  playerTradeRatesRegistry: PlayerTradeRatesRegistry;
   playerTreasuryRegistry: PlayerTreasuryRegistry;
   playerWorldRegistry: PlayerWorldRegistry;
   randomNumberGenerator: () => number;
@@ -120,6 +129,7 @@ export interface Dependencies {
   strategyNoteRegistry: StrategyNoteRegistry;
   terrainFeatureRegistry: TerrainFeatureRegistry;
   tileImprovementRegistry: TileImprovementRegistry;
+  traitRegistry: TraitRegistry;
   turn: Turn;
   unitImprovementRegistry: UnitImprovementRegistry;
   unitRegistry: UnitRegistry;
@@ -143,6 +153,7 @@ export const createDependencies = (
   pendingEffectRegistry: pendingEffectRegistryInstance,
   playerGovernmentRegistry: playerGovernmentRegistryInstance,
   playerResearchRegistry: playerResearchRegistryInstance,
+  playerTradeRatesRegistry: playerTradeRatesRegistryInstance,
   playerTreasuryRegistry: playerTreasuryRegistryInstance,
   playerWorldRegistry: playerWorldRegistryInstance,
   randomNumberGenerator: rngInstance,
@@ -151,6 +162,7 @@ export const createDependencies = (
   strategyNoteRegistry: strategyNoteRegistryInstance,
   terrainFeatureRegistry: terrainFeatureRegistryInstance,
   tileImprovementRegistry: tileImprovementRegistryInstance,
+  traitRegistry: traitRegistryInstance,
   turn: turnInstance,
   unitImprovementRegistry: unitImprovementRegistryInstance,
   unitRegistry: unitRegistryInstance,

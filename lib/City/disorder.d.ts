@@ -47,6 +47,13 @@ export declare const hurry: (
   city: City,
   share: number
 ) => number;
+export declare const calmCities: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  knowledge: Knowledge,
+  policy: DisorderPolicy
+) => void;
 export declare const preventDisorder: (
   dependencies: Dependencies,
   player: Player,

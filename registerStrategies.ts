@@ -16,12 +16,14 @@ import ReviewCities from './Strategies/Turn/ReviewCities';
 import StartRevolution from './Strategies/Civ1/StartRevolution';
 import Strategy from '@civ-clone/core-strategy/Strategy';
 import SurveyTargets from './Strategies/Turn/SurveyTargets';
+import TradeRates from './Strategies/Turn/TradeRates';
 import UnloadTransport from './Strategies/Unit/UnloadTransport';
 import WaitForCarrier from './Strategies/Unit/WaitForCarrier';
 import WakeCarrierAircraft from './Strategies/Turn/WakeCarrierAircraft';
 import WorkerTurn from './Strategies/Unit/WorkerTurn';
 import civ1DisorderPolicy from './lib/Civ1/disorder';
 import civ1Knowledge from './lib/Civ1/knowledge';
+import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
 
 // The game's registries, as the strategies take them.
 export const dependenciesFor = (game: Game): Dependencies =>
@@ -38,6 +40,7 @@ export const dependenciesFor = (game: Game): Dependencies =>
     pendingEffectRegistry: game.pendingEffects,
     playerGovernmentRegistry: game.playerGovernments,
     playerResearchRegistry: game.playerResearch,
+    playerTradeRatesRegistry: game.playerTradeRates,
     playerTreasuryRegistry: game.playerTreasuries,
     playerWorldRegistry: game.playerWorlds,
     randomNumberGenerator: game.rng,
@@ -46,6 +49,7 @@ export const dependenciesFor = (game: Game): Dependencies =>
     strategyNoteRegistry: game.strategyNotes,
     terrainFeatureRegistry: game.terrainFeatures,
     tileImprovementRegistry: game.tileImprovements,
+    traitRegistry: game.traits,
     turn: game.turn,
     unitImprovementRegistry: game.unitImprovements,
     unitRegistry: game.units,
@@ -78,8 +82,15 @@ export const createStrategies = (
   new ChooseGovernment(dependencies, knowledge),
   // `chooseFromList`.
   new NegotiationAnswers(dependencies, knowledge),
-  // `AfterTurn`, once the player's units have moved.
+  // `AfterTurn`, once the player's units have moved. The rates after the Entertainers, so that luxuries can make up
+  //  for the cities they couldn't calm.
   new PreventDisorder(dependencies, knowledge, civ1DisorderPolicy),
+  new TradeRates(
+    dependencies,
+    knowledge,
+    civ1DisorderPolicy,
+    civ1TradeRatePolicy
+  ),
 ];
 
 export const register = (game: Game): void =>

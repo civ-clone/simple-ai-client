@@ -10,6 +10,7 @@ import { PathFinderRegistry } from '@civ-clone/core-world-path/PathFinderRegistr
 import { PendingEffectRegistry } from '@civ-clone/core-pending-effect';
 import { PlayerGovernmentRegistry } from '@civ-clone/core-government/PlayerGovernmentRegistry';
 import { PlayerResearchRegistry } from '@civ-clone/core-science/PlayerResearchRegistry';
+import { PlayerTradeRatesRegistry } from '@civ-clone/core-trade-rate/PlayerTradeRatesRegistry';
 import { PlayerTreasuryRegistry } from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
 import { PlayerWorldRegistry } from '@civ-clone/core-player-world/PlayerWorldRegistry';
 import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
@@ -17,6 +18,7 @@ import { SpecialistRegistry } from '@civ-clone/core-city/SpecialistRegistry';
 import { StrategyNoteRegistry } from '@civ-clone/core-strategy/StrategyNoteRegistry';
 import { TerrainFeatureRegistry } from '@civ-clone/core-terrain-feature/TerrainFeatureRegistry';
 import { TileImprovementRegistry } from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
+import { TraitRegistry } from '@civ-clone/core-civilization/TraitRegistry';
 import { Turn } from '@civ-clone/core-turn-based-game/Turn';
 import { UnitImprovementRegistry } from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
 import { UnitRegistry } from '@civ-clone/core-unit/UnitRegistry';
@@ -36,6 +38,7 @@ export interface Dependencies {
   pendingEffectRegistry: PendingEffectRegistry;
   playerGovernmentRegistry: PlayerGovernmentRegistry;
   playerResearchRegistry: PlayerResearchRegistry;
+  playerTradeRatesRegistry: PlayerTradeRatesRegistry;
   playerTreasuryRegistry: PlayerTreasuryRegistry;
   playerWorldRegistry: PlayerWorldRegistry;
   randomNumberGenerator: () => number;
@@ -44,6 +47,7 @@ export interface Dependencies {
   strategyNoteRegistry: StrategyNoteRegistry;
   terrainFeatureRegistry: TerrainFeatureRegistry;
   tileImprovementRegistry: TileImprovementRegistry;
+  traitRegistry: TraitRegistry;
   turn: Turn;
   unitImprovementRegistry: UnitImprovementRegistry;
   unitRegistry: UnitRegistry;

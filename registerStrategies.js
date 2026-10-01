@@ -17,12 +17,14 @@ const PreventDisorder_1 = require("./Strategies/City/PreventDisorder");
 const ReviewCities_1 = require("./Strategies/Turn/ReviewCities");
 const StartRevolution_1 = require("./Strategies/Civ1/StartRevolution");
 const SurveyTargets_1 = require("./Strategies/Turn/SurveyTargets");
+const TradeRates_1 = require("./Strategies/Turn/TradeRates");
 const UnloadTransport_1 = require("./Strategies/Unit/UnloadTransport");
 const WaitForCarrier_1 = require("./Strategies/Unit/WaitForCarrier");
 const WakeCarrierAircraft_1 = require("./Strategies/Turn/WakeCarrierAircraft");
 const WorkerTurn_1 = require("./Strategies/Unit/WorkerTurn");
 const disorder_1 = require("./lib/Civ1/disorder");
 const knowledge_1 = require("./lib/Civ1/knowledge");
+const tradeRates_1 = require("./lib/Civ1/tradeRates");
 // The game's registries, as the strategies take them.
 const dependenciesFor = (game) => (0, Dependencies_1.createDependencies)({
     availableSpecialistRegistry: game.availableSpecialists,
@@ -37,6 +39,7 @@ const dependenciesFor = (game) => (0, Dependencies_1.createDependencies)({
     pendingEffectRegistry: game.pendingEffects,
     playerGovernmentRegistry: game.playerGovernments,
     playerResearchRegistry: game.playerResearch,
+    playerTradeRatesRegistry: game.playerTradeRates,
     playerTreasuryRegistry: game.playerTreasuries,
     playerWorldRegistry: game.playerWorlds,
     randomNumberGenerator: game.rng,
@@ -45,6 +48,7 @@ const dependenciesFor = (game) => (0, Dependencies_1.createDependencies)({
     strategyNoteRegistry: game.strategyNotes,
     terrainFeatureRegistry: game.terrainFeatures,
     tileImprovementRegistry: game.tileImprovements,
+    traitRegistry: game.traits,
     turn: game.turn,
     unitImprovementRegistry: game.unitImprovements,
     unitRegistry: game.units,
@@ -74,8 +78,10 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     new ChooseGovernment_1.default(dependencies, knowledge),
     // `chooseFromList`.
     new NegotiationAnswers_1.default(dependencies, knowledge),
-    // `AfterTurn`, once the player's units have moved.
+    // `AfterTurn`, once the player's units have moved. The rates after the Entertainers, so that luxuries can make up
+    //  for the cities they couldn't calm.
     new PreventDisorder_1.default(dependencies, knowledge, disorder_1.default),
+    new TradeRates_1.default(dependencies, knowledge, disorder_1.default, tradeRates_1.default),
 ];
 exports.createStrategies = createStrategies;
 const register = (game) => game.strategies.register(...(0, exports.createStrategies)((0, exports.dependenciesFor)(game)));
