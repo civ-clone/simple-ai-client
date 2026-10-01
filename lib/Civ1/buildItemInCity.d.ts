@@ -10,6 +10,8 @@ export interface ProductionPolicy {
   attackersPerCity: number;
   explorers: number;
   explorersPerCity: number;
+  maxExplorers: number;
+  settlers: number;
   buildTurns: {
     improvement: number;
     unit: number;

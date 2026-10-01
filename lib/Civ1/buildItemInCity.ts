@@ -1,9 +1,12 @@
 // Civ1: what a city builds next: a defender while it has fewer than it wants or martial law could use another unit, explorers while there's land to explore
-//  and the player has fewer out than it wants, Settlers, attackers while there's a war to fight and the player has
-//  fewer than it wants, a defender for a city of the player's that has none, a Wonder in the player's most productive
-//  city, and otherwise a random pick of the rest, never a Palace or a ship. Apart from a missing defender, each is
-//  only started if the city can finish it within the policy's `buildTurns` for its kind, at its net shields; when
-//  nothing is left that it can, the cheapest improvement worth having (civ-clone/web-renderer#212).
+//  that they could reach from the city and the player has fewer out and on order than it wants, Settlers while the
+//  player has fewer out and on order than it wants, attackers while there's a war to fight and the player has fewer
+//  than it wants, a defender for a city of the player's that has none, a Wonder in the player's most productive city,
+//  and otherwise a random pick of the rest, never a Palace or a ship. Apart from a missing defender, each is only
+//  started if the city can finish it within the policy's `buildTurns` for its kind, at its net shields; when nothing is
+//  left that it can, the cheapest improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender
+//  and Settlers, no unit is started that would leave the city no shields to spare once it has to support it
+//  (civ-clone/web-renderer#229).
 import { Attack, Defence } from '@civ-clone/core-unit/Yields';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
@@ -23,6 +26,8 @@ import Player from '@civ-clone/core-player/Player';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '../Memory';
 import civ1Knowledge from './knowledge';
+import reachableLandToExplore from '../City/explorers';
+import unitSupport from './unitSupport';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
@@ -35,9 +40,13 @@ import Yield from '@civ-clone/core-yield/Yield';
 export interface ProductionPolicy {
   // Attackers wanted for each of the player's cities while there's something to attack.
   attackersPerCity: number;
-  // Units wanted out exploring while there's land to explore: `explorers`, and `explorersPerCity` more per city.
+  // Units wanted out exploring while there's land to explore that a city could reach: `explorers`, and
+  //  `explorersPerCity` more per city, but never more than `maxExplorers` (civ-clone/web-renderer#229).
   explorers: number;
   explorersPerCity: number;
+  maxExplorers: number;
+  // Settlers wanted, out and on order.
+  settlers: number;
   // The most turns a city spends on each kind of build, at its net shields (`lib/City/buildTime`). A city builds a
   //  missing defender however long it takes, the soonest it can, and Settlers whatever it makes: the arena found that
   //  any limit on Settlers, even only keeping a city on 0 net shields off them, cost the player cities and score
@@ -55,6 +64,8 @@ export const defaultProductionPolicy: ProductionPolicy = {
   attackersPerCity: 1,
   explorers: 3,
   explorersPerCity: 2,
+  maxExplorers: 6,
+  settlers: 3,
   buildTurns: {
     improvement: 40,
     unit: 10,
@@ -236,10 +247,18 @@ export const buildItemInCity = (
     turnsToBuild = buildTime(dependencies, city, shields),
     isUnitItem = (buildItem: BuildItem): boolean =>
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item()),
-    // The rest, that the city can finish within the policy's turns for a unit or an improvement. Barracks and City
-    //  Walls are only worth building on purpose.
+    // Whether the city would still have shields to spare once it had another unit to support (civ-clone/web-renderer#229).
+    //  Under Monarchy every unit costs a shield, and a city whose units eat all it makes builds nothing else.
+    supportsAnotherUnit = shields - unitSupport(dependencies, city) > 0,
+    affordable = (buildItem: BuildItem): boolean =>
+      supportsAnotherUnit || !isUnitItem(buildItem),
+    // The units the city can support another of, for anything but a defender it's missing.
+    affordableUnits = availableUnits.filter(affordable),
+    // The rest, that the city can finish within the policy's turns for a unit or an improvement, and can support if
+    //  it's a unit. Barracks and City Walls are only worth building on purpose.
     finishable = availableFiltered.filter(
       (buildItem: BuildItem): boolean =>
+        affordable(buildItem) &&
         !onPurposeOnly.includes(buildItem.item() as typeof Barracks) &&
         finishesWithin(
           turnsToBuild(buildItem),
@@ -272,7 +291,7 @@ export const buildItemInCity = (
       chooseUnit(
         dependencies,
         city,
-        availableUnits.filter((buildItem: BuildItem): boolean =>
+        affordableUnits.filter((buildItem: BuildItem): boolean =>
           isAttackerType(dependencies, buildItem.item())
         ),
         Attack,
@@ -292,18 +311,24 @@ export const buildItemInCity = (
     ),
     cities = dependencies.cityRegistry.getByPlayer(player).length;
 
+  // Explorers count whether they're exploring or not: a unit out of the player's cities with nothing left that it can
+  //  reach to explore is still one more than the player needs. And only land a unit from this city could reach counts:
+  //  the coast of another continent, seen from a ship or across the water, kept the list from ever emptying.
   if (
-    targets.landTilesToExplore.length > 0 &&
     unitsAndOrders(
       dependencies,
       player,
       (unit: Unit): boolean => isExploring(dependencies, unit),
       (item: object): boolean => isExplorerType(dependencies, item)
     ) <
-      policy.explorers + policy.explorersPerCity * cities
+      Math.min(
+        policy.maxExplorers,
+        policy.explorers + policy.explorersPerCity * cities
+      ) &&
+    reachableLandToExplore(city, targets.landTilesToExplore) > 0
   ) {
     // The cheapest land unit that can fight, if the city can finish it within the policy's turns.
-    const [explorer] = availableUnits
+    const [explorer] = affordableUnits
       .filter(
         (buildItem: BuildItem): boolean =>
           isExplorerType(dependencies, buildItem.item()) &&
@@ -331,9 +356,13 @@ export const buildItemInCity = (
       .getByCity(cityBuild.city())
       .some((unit: Unit): boolean => unit instanceof Settlers) &&
     // TODO: use expansionist leader trait
-    dependencies.unitRegistry
-      .getByPlayer(player)
-      .filter((unit: Unit): boolean => unit instanceof Settlers).length < 3 &&
+    unitsAndOrders(
+      dependencies,
+      player,
+      (unit: Unit): boolean => unit instanceof Settlers,
+      (item: object): boolean =>
+        item === (Settlers as unknown as typeof Buildable)
+    ) < policy.settlers &&
     cityGrowth.size() > 1
   ) {
     cityBuild.build(Settlers as unknown as typeof Buildable);
@@ -364,7 +393,7 @@ export const buildItemInCity = (
       ? chooseUnit(
           dependencies,
           city,
-          availableUnits,
+          affordableUnits,
           Defence,
           policy,
           false,
@@ -411,11 +440,15 @@ export const buildItemInCity = (
   }
 
   // Nothing it can finish soon, so the cheapest thing worth having once it can: an improvement, as a unit would cost
-  //  shields to support that the city doesn't have. Barracks and City Walls are only worth building on purpose.
-  const [cheapest] = [...availableFiltered].sort(
-    (a: BuildItem, b: BuildItem): number =>
-      fallbackRank(a) - fallbackRank(b) || a.cost().value() - b.cost().value()
-  );
+  //  shields to support that the city doesn't have. Barracks and City Walls are only worth building on purpose. A
+  //  unit it couldn't support only if there's nothing else at all.
+  const affordableItems = availableFiltered.filter(affordable),
+    [cheapest] = [
+      ...(affordableItems.length > 0 ? affordableItems : availableFiltered),
+    ].sort(
+      (a: BuildItem, b: BuildItem): number =>
+        fallbackRank(a) - fallbackRank(b) || a.cost().value() - b.cost().value()
+    );
 
   if (cheapest) {
     cityBuild.build(cheapest.item());
