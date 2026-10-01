@@ -27,12 +27,27 @@ export const surveyTargets = (
 
   const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
     // A tile some unit is already heading for isn't offered as a target again.
-    claimed = claimedTiles(memory);
+    claimed = claimedTiles(memory),
+    // Every unit by tile, in one pass. Asking the registry for each known tile scanned every unit in the game once per
+    //  tile. Destroyed units are included, as `getBy('tile', ...)` included them.
+    unitsByTile = new Map<Tile, Unit[]>();
+
+  dependencies.unitRegistry.forEach((unit: Unit): void => {
+    const tileUnits = unitsByTile.get(unit.tile());
+
+    if (tileUnits) {
+      tileUnits.push(unit);
+
+      return;
+    }
+
+    unitsByTile.set(unit.tile(), [unit]);
+  });
 
   playerWorld.entries().forEach((playerTile: PlayerTile): void => {
     const tile = playerTile.tile(),
       tileCity = dependencies.cityRegistry.getByTile(tile),
-      tileUnits = dependencies.unitRegistry.getBy('tile', tile),
+      tileUnits = unitsByTile.get(tile) ?? [],
       existingTarget = claimed.has(tile);
 
     if (
