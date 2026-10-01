@@ -8,6 +8,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import lookupActions from '../actionLookup';
 import shouldAttack from '../shouldAttack';
+import { terrainFor } from './reachable';
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -123,13 +124,17 @@ export const scoreUnitMove = (
     score += 8;
   }
 
-  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player);
+  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
+    canEnter = terrainFor(unit);
 
+  // Only the unknown tiles the unit could go on to: the sea a land unit can see across would count for ever, as a
+  //  coast it could never reach (civ-clone/web-renderer#230).
   const discoverableTiles = tile
     .getNeighbours()
     .filter(
       (neighbouringTile: Tile): boolean =>
-        !playerWorld.includes(neighbouringTile)
+        !playerWorld.includes(neighbouringTile) &&
+        (canEnter === null || canEnter(neighbouringTile))
     ).length;
 
   if (discoverableTiles > 0) {
