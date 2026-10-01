@@ -30,6 +30,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/WaitForCarrier`          | a unit's action                              | makes an aircraft wait until carriers have moved (handles it only then)        | generic |
 | `Strategies/Unit/UnloadTransport`         | a unit's action                              | unloads a transport at the coast (handles it only then)                        | generic |
 | `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
+| `Strategies/Unit/TerrainWork`             | a `Worker`'s action                          | goes to and does its terrain job, or takes one if it has no city site to settle (handles it only then) | generic |
 | `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves | generic |
 | `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city (handles it only then)                     | generic |
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; handles it unless the unit has nothing to do | generic |
@@ -50,6 +51,18 @@ says so; otherwise it waits in the city it's in, unfortified and ready for the n
 city it can reach (a ship for the sea beside one, then into port), or with none, fortifies where it is. Civ1's policy (`lib/Civ1/standDown.ts`) disbands
 a unit its home city pays shields for when the city has none to spare. Run for one unit, `MissionAndMove` returning
 `false` means the unit has nothing left to explore or attack.
+
+Workers improve the terrain on purpose (civ-clone/web-renderer#234). `TerrainWork` (`lib/Unit/terrainWork.ts`) gives
+a worker a terrain job when it has no city site to settle and none it can reach, or when the player has fewer workers on
+terrain jobs than the ruleset's `TerrainPolicy` wants; until it starts work, a worker on a job goes back to settling if a
+site comes within reach and the player has the terrain workers it wants without it. A job is the tile, on the player's
+cities' tiles and reachable, whose improvement the policy values most for the turns it takes to walk there and do it;
+it's checked against what the worker could actually do there (`unit.actions(tile, tile)`), and no two of the player's
+units claim the same tile, nor a tile one is heading for. Civ1's policy (`civ1TerrainPolicy` in `lib/Civ1/terrain.ts`)
+values irrigation, mines and roads by what `civ1-world`'s yield rules say they add under the player's government (an
+irrigated Grassland or River tile adds nothing under Despotism), food at 2, shields at 1.5 and trade at 1, half as
+much again for whatever the city has at most 1 of to spare, and half for a tile the city doesn't work; it wants a
+terrain worker for every eight cities.
 
 `PreventDisorder` (`lib/City/disorder.ts`) runs once the player's units have moved, since where they stand changes how
 unhappy a city is. For each city the ruleset's `CivilDisorder` rules would find in disorder at the player's next turn
