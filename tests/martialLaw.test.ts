@@ -217,15 +217,15 @@ describe('martial law', (): void => {
 
   it('should want no more units than martial law can use', async (): Promise<void> => {
     // Size 10, as big as a city grows without an Aqueduct: five unhappy citizens, but Civ1's martial law makes at most
-    //  four of them content.
+    //  three of them content (civ-clone/web-renderer#224).
     const setup = await setUp({ size: 10, warriors: 0 });
 
-    expect(wanted(setup)).to.equal(4);
+    expect(wanted(setup)).to.equal(3);
 
-    new Array(4).fill(0).forEach(() => setup.addWarrior());
+    new Array(3).fill(0).forEach(() => setup.addWarrior());
 
-    // A fifth would calm no one.
-    expect(wanted(setup)).to.equal(4);
+    // A fourth would calm no one.
+    expect(wanted(setup)).to.equal(3);
     expect(staysToGarrison(setup, setup.addWarrior())).false;
   });
 
@@ -242,9 +242,8 @@ describe('martial law', (): void => {
   });
 
   it('should not keep a third unit where a Temple would keep the citizen content without it', async (): Promise<void> => {
-    // Size 8 with a Temple and three Warriors. The engine's martial law comes before the Temple, so the three Warriors
-    //  keep all three unhappy citizens content and the Temple has nothing left to do; but two Warriors and the Temple
-    //  would do the same.
+    // Size 8 with a Temple and three Warriors. Martial law comes after the Temple, which keeps one of the three unhappy
+    //  citizens content, so it only uses two of the Warriors; the third does nothing for order.
     const setup = await setUp({ warriors: 3 });
 
     setup.game.cityImprovements.register(
@@ -323,9 +322,9 @@ describe('martial law', (): void => {
     expect(game.cityBuilds.getByCity(city).building()?.item()).to.equal(Temple);
   });
 
-  it("should count a unit that keeps order but couldn't defend the city", async (): Promise<void> => {
-    // Size 8, two Warriors and a Diplomat, which has no defence but is a unit martial law uses all the same: three
-    //  units for three unhappy citizens, so the city needs nothing more.
+  it("should not count a unit martial law can't use", async (): Promise<void> => {
+    // Size 8, two Warriors and a Diplomat. Martial law only uses units that can attack (civ-clone/web-renderer#224),
+    //  so the Diplomat keeps no one content: two units for three unhappy citizens, and the city builds a third.
     const setup = await setUp(),
       { city, dependencies, game, player } = setup,
       diplomat = new Diplomat(city, player, city.tile(), game.rules),
@@ -339,8 +338,9 @@ describe('martial law', (): void => {
     }
 
     expect(defendersIn(dependencies, city).length).to.equal(2);
-    expect(martialLawUnitsIn(city).length).to.equal(3);
-    expect(disorder(setup)).false;
+    expect(martialLawUnitsIn(city).length).to.equal(2);
+    expect(martialLawUnitsIn(city)).not.include(diplomat);
+    expect(disorder(setup)).true;
 
     buildItemInCity(
       lastPick,
@@ -351,6 +351,8 @@ describe('martial law', (): void => {
       civ1Knowledge
     );
 
-    expect(game.cityBuilds.getByCity(city).building()?.item()).to.equal(Temple);
+    expect(game.cityBuilds.getByCity(city).building()?.item()).to.equal(
+      Warrior
+    );
   });
 });
