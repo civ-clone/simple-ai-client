@@ -15,6 +15,7 @@ const MissionAndMove_1 = require("./Strategies/Unit/MissionAndMove");
 const NegotiationAnswers_1 = require("./Strategies/Diplomacy/NegotiationAnswers");
 const PreventDisorder_1 = require("./Strategies/City/PreventDisorder");
 const ReviewCities_1 = require("./Strategies/Turn/ReviewCities");
+const SpendTreasury_1 = require("./Strategies/City/SpendTreasury");
 const StartRevolution_1 = require("./Strategies/Civ1/StartRevolution");
 const SurveyTargets_1 = require("./Strategies/Turn/SurveyTargets");
 const TradeRates_1 = require("./Strategies/Turn/TradeRates");
@@ -24,6 +25,7 @@ const WakeCarrierAircraft_1 = require("./Strategies/Turn/WakeCarrierAircraft");
 const WorkerTurn_1 = require("./Strategies/Unit/WorkerTurn");
 const disorder_1 = require("./lib/Civ1/disorder");
 const knowledge_1 = require("./lib/Civ1/knowledge");
+const spending_1 = require("./lib/Civ1/spending");
 const tradeRates_1 = require("./lib/Civ1/tradeRates");
 const wantedAdvances_1 = require("./lib/Civ1/wantedAdvances");
 // The game's registries, as the strategies take them.
@@ -83,6 +85,9 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     //  for the cities they couldn't calm.
     new PreventDisorder_1.default(dependencies, knowledge, disorder_1.default),
     new TradeRates_1.default(dependencies, knowledge, disorder_1.default, tradeRates_1.default),
+    // Last: what's left of the treasury once disorder has had its share, and with the rates for the turn ahead set from
+    //  the treasury the player earned.
+    new SpendTreasury_1.default(dependencies, knowledge, spending_1.default),
 ];
 exports.createStrategies = createStrategies;
 const register = (game) => game.strategies.register(...(0, exports.createStrategies)((0, exports.dependenciesFor)(game)));
