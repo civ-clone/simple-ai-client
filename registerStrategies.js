@@ -33,6 +33,7 @@ const dependenciesFor = (game) => (0, Dependencies_1.createDependencies)({
     availableSpecialistRegistry: game.availableSpecialists,
     cityBuildRegistry: game.cityBuilds,
     cityGrowthRegistry: game.cityGrowth,
+    cityImprovementRegistry: game.cityImprovements,
     cityRegistry: game.cities,
     clientRegistry: game.clients,
     engine: game.engine,

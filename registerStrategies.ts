@@ -34,6 +34,7 @@ export const dependenciesFor = (game: Game): Dependencies =>
     availableSpecialistRegistry: game.availableSpecialists,
     cityBuildRegistry: game.cityBuilds,
     cityGrowthRegistry: game.cityGrowth,
+    cityImprovementRegistry: game.cityImprovements,
     cityRegistry: game.cities,
     clientRegistry: game.clients,
     engine: game.engine,

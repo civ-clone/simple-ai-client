@@ -1,4 +1,4 @@
-// Civ1: once the Anarchy is over, Monarchy if it's available, otherwise the first government that is. Always handles
+// Civ1: once the Anarchy is over, the government the player would choose now (`lib/Civ1/government`). Always handles
 //  the choice.
 import AIStrategy from '../lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';

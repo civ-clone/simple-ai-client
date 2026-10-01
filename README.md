@@ -26,7 +26,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Turn/SurveyTargets`           | `BeforeTurn`                                 | refills the player's target board from what it can see                         | generic |
 | `Strategies/Turn/ReviewCities`            | `BeforeTurn`                                 | assigns city workers and notes undefended cities                               | generic |
 | `Strategies/Turn/WakeCarrierAircraft`     | `BeforeTurn`                                 | gives orders to aircraft resting on carriers                                   | generic |
-| `Strategies/Civ1/StartRevolution`         | `BeforeTurn`                                 | starts a revolution once Monarchy is known                                     | Civ1    |
+| `Strategies/Civ1/StartRevolution`         | `BeforeTurn`                                 | starts a revolution when the player would choose another government            | Civ1    |
 | `Strategies/Unit/WaitForCarrier`          | a unit's action                              | makes an aircraft wait until carriers have moved (handles it only then)        | generic |
 | `Strategies/Unit/UnloadTransport`         | a unit's action                              | unloads a transport at the coast (handles it only then)                        | generic |
 | `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
@@ -36,7 +36,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/City/BuildExplorerShip`       | a `CityBuild` choice                         | builds a ship to explore with, if the player has 2+ cities and no ship (handles it only then) | generic |
 | `Strategies/Civ1/ChooseProduction`        | a `CityBuild` choice                         | picks what the city builds, by each player's `ProductionPolicy`               | Civ1    |
 | `Strategies/Science/ChooseResearch`       | a `PlayerResearch` choice                    | picks research at random, an advance the leader wants first                    | generic |
-| `Strategies/Civ1/ChooseGovernment`        | a `PlayerGovernment` choice                  | picks Monarchy after Anarchy                                                   | Civ1    |
+| `Strategies/Civ1/ChooseGovernment`        | a `PlayerGovernment` choice                  | picks the government the player would choose, after Anarchy                    | Civ1    |
 | `Strategies/Diplomacy/NegotiationAnswers` | `ChooseFromList` for `negotiation.next-step` | answers each negotiation step; any other list gets a random pick               | generic |
 | `Strategies/City/PreventDisorder`         | `AfterTurn`                                  | keeps cities out of civil disorder, by the ruleset's `DisorderPolicy`          | generic |
 | `Strategies/Turn/TradeRates`              | `AfterTurn`                                  | sets the tax, luxury and science rates, by the ruleset's `TradeRatePolicy`     | generic |
@@ -81,6 +81,14 @@ in the same single random draw. v474.05 stops every AI at Robotics. Civ1's table
 there: Militaristic leaders want nothing more; normal militarism and a Friendly mood add Recycling and Nuclear Power;
 Civilized leaders add Computers, Genetic Engineering, Space Flight, Plastics, Superconductor and Fusion Power. Future
 Technology is never wanted.
+
+`StartRevolution` and `ChooseGovernment` (`lib/Civ1/government.ts`) choose a government the way v474.05's AI does
+(OpenCivOne `AIEngine.cs`, every eighth turn there): The Republic, if known, while the tiles the player's cities work
+that give trade outnumber what its units away from home would cost in unhappiness (7 − Ideology each, 5 − Ideology in a
+city with a Marketplace); otherwise Communism, with more than 10 cities; otherwise Monarchy. Like the original, it never
+chooses Democracy. Unlike it, every change is a revolution, with its Anarchy, so a player leaves Despotism as soon as it
+knows another government and never goes back to it by choice (the original does, when units' upkeep favours it), and
+waits 40 turns after a revolution before the next.
 
 Strategies are game-wide and stateless. Each is a thin adapter over a module in `lib/`. It's given the shared
 registries (`lib/Dependencies.ts`) and the ruleset's judgements (`lib/Knowledge.ts`; Civ1's are in
