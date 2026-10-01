@@ -1,4 +1,8 @@
 import {
+  AvailableSpecialistRegistry,
+  instance as availableSpecialistRegistryInstance,
+} from '@civ-clone/core-city/AvailableSpecialistRegistry';
+import {
   CityBuildRegistry,
   instance as cityBuildRegistryInstance,
 } from '@civ-clone/core-city-build/CityBuildRegistry';
@@ -66,6 +70,10 @@ import {
   UnitImprovementRegistry,
   instance as unitImprovementRegistryInstance,
 } from '@civ-clone/core-unit-improvement/UnitImprovementRegistry';
+import {
+  SpecialistRegistry,
+  instance as specialistRegistryInstance,
+} from '@civ-clone/core-city/SpecialistRegistry';
 import {
   StrategyNoteRegistry,
   instance as strategyNoteRegistryInstance,
@@ -191,7 +199,11 @@ export class SimpleAIClient extends StrategyAIClient {
     // same name cannot express.
     super(player, strategyRegistry, randomNumberGenerator);
 
+    // The specialist registries aren't arguments, so that callers passing the others by position (the arena looks for
+    //  `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the game's own
+    //  (`dependenciesFor`).
     this._dependencies = {
+      availableSpecialistRegistry: availableSpecialistRegistryInstance,
       cityBuildRegistry,
       cityGrowthRegistry,
       cityRegistry,
@@ -208,6 +220,7 @@ export class SimpleAIClient extends StrategyAIClient {
       playerWorldRegistry,
       randomNumberGenerator,
       ruleRegistry,
+      specialistRegistry: specialistRegistryInstance,
       strategyNoteRegistry,
       terrainFeatureRegistry,
       tileImprovementRegistry,

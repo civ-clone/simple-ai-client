@@ -1,7 +1,9 @@
 // Generic: one player's working memory, the targets found each turn and what each of its units is doing.
+import City from '@civ-clone/core-city/City';
 import Path from '@civ-clone/core-world-path/Path';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import { UncalmedReason } from './City/disorder';
 
 // Refilled by the survey at the start of each turn, which empties each list in place. Mission assignment sorts them in
 //  place and takes from them, city production reads them, and `cityLost` adds to them during other players' turns, so
@@ -20,6 +22,9 @@ export interface TargetBoard {
 export interface Memory {
   lastUnitMoves: Map<Unit, Tile[]>;
   targets: TargetBoard;
+  // The cities the end of the player's last turn left in civil disorder, and why (`lib/City/disorder`). Refilled then,
+  //  so it's empty until the player's first turn ends.
+  uncalmedCities: Map<City, UncalmedReason>;
   unitPathData: Map<Unit, Path>;
   unitTargetData: Map<Unit, Tile>;
 }
@@ -59,6 +64,7 @@ export const createMemory = (): Memory => ({
     seaTilesToExplore: [],
     undefendedCities: [],
   },
+  uncalmedCities: new Map(),
   unitPathData: new Map(),
   unitTargetData: new Map(),
 });

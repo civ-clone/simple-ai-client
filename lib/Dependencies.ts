@@ -1,5 +1,9 @@
 // Generic: the registries, engine, random number generator and player memory the AI reads and acts through.
 import {
+  AvailableSpecialistRegistry,
+  instance as availableSpecialistRegistryInstance,
+} from '@civ-clone/core-city/AvailableSpecialistRegistry';
+import {
   CityBuildRegistry,
   instance as cityBuildRegistryInstance,
 } from '@civ-clone/core-city-build/CityBuildRegistry';
@@ -56,6 +60,10 @@ import {
   instance as ruleRegistryInstance,
 } from '@civ-clone/core-rule/RuleRegistry';
 import {
+  SpecialistRegistry,
+  instance as specialistRegistryInstance,
+} from '@civ-clone/core-city/SpecialistRegistry';
+import {
   StrategyNoteRegistry,
   instance as strategyNoteRegistryInstance,
 } from '@civ-clone/core-strategy/StrategyNoteRegistry';
@@ -91,6 +99,7 @@ import { instance as rngInstance } from '@civ-clone/core-random';
 
 // Everything here is shared by every player: the player a routine acts for is always passed alongside, never kept here.
 export interface Dependencies {
+  availableSpecialistRegistry: AvailableSpecialistRegistry;
   cityBuildRegistry: CityBuildRegistry;
   cityGrowthRegistry: CityGrowthRegistry;
   cityRegistry: CityRegistry;
@@ -107,6 +116,7 @@ export interface Dependencies {
   playerWorldRegistry: PlayerWorldRegistry;
   randomNumberGenerator: () => number;
   ruleRegistry: RuleRegistry;
+  specialistRegistry: SpecialistRegistry;
   strategyNoteRegistry: StrategyNoteRegistry;
   terrainFeatureRegistry: TerrainFeatureRegistry;
   tileImprovementRegistry: TileImprovementRegistry;
@@ -120,6 +130,7 @@ export interface Dependencies {
 export const createDependencies = (
   dependencies: Partial<Dependencies> = {}
 ): Dependencies => ({
+  availableSpecialistRegistry: availableSpecialistRegistryInstance,
   cityBuildRegistry: cityBuildRegistryInstance,
   cityGrowthRegistry: cityGrowthRegistryInstance,
   cityRegistry: cityRegistryInstance,
@@ -136,6 +147,7 @@ export const createDependencies = (
   playerWorldRegistry: playerWorldRegistryInstance,
   randomNumberGenerator: rngInstance,
   ruleRegistry: ruleRegistryInstance,
+  specialistRegistry: specialistRegistryInstance,
   strategyNoteRegistry: strategyNoteRegistryInstance,
   terrainFeatureRegistry: terrainFeatureRegistryInstance,
   tileImprovementRegistry: tileImprovementRegistryInstance,

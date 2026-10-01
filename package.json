@@ -17,7 +17,6 @@
     "ts:compile": "tsc --build tsconfig.json"
   },
   "devDependencies": {
-    "@civ-clone/civ1-city-happiness": "github:civ-clone/civ1-city-happiness",
     "@civ-clone/civ1-civilization": "github:civ-clone/civ1-civilization",
     "@civ-clone/civ1-diplomacy": "github:civ-clone/civ1-diplomacy",
     "@civ-clone/civ1-game-year": "github:civ-clone/civ1-game-year",
@@ -50,6 +49,7 @@
     "@civ-clone/base-city-yield-gold": "^0.1.0",
     "@civ-clone/base-player-action-end-turn": "^0.1.0",
     "@civ-clone/civ1-city": "github:civ-clone/civ1-city",
+    "@civ-clone/civ1-city-happiness": "github:civ-clone/civ1-city-happiness",
     "@civ-clone/civ1-city-improvement": "github:civ-clone/civ1-city-improvement",
     "@civ-clone/civ1-government": "github:civ-clone/civ1-government",
     "@civ-clone/civ1-science": "github:civ-clone/civ1-science",
@@ -59,6 +59,7 @@
     "@civ-clone/core-city": "^0.1.0",
     "@civ-clone/core-city-build": "^0.1.0",
     "@civ-clone/core-city-growth": "^0.1.0",
+    "@civ-clone/core-city-happiness": "^0.1.2",
     "@civ-clone/core-client": "^0.1.0",
     "@civ-clone/core-diplomacy": "^0.1.0",
     "@civ-clone/core-engine": "^0.1.0",
@@ -85,6 +86,7 @@
     "@civ-clone/core-world": "^0.1.0",
     "@civ-clone/core-world-path": "^0.1.0",
     "@civ-clone/core-yield": "^0.1.0",
+    "@civ-clone/library-city": "^0.1.4",
     "@civ-clone/library-diplomacy": "^0.1.0",
     "@civ-clone/library-unit": "^0.1.0"
   }

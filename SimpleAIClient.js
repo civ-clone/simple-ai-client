@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SimpleAIClient = void 0;
+const AvailableSpecialistRegistry_1 = require("@civ-clone/core-city/AvailableSpecialistRegistry");
 const CityBuildRegistry_1 = require("@civ-clone/core-city-build/CityBuildRegistry");
 const CityGrowthRegistry_1 = require("@civ-clone/core-city-growth/CityGrowthRegistry");
 const CityRegistry_1 = require("@civ-clone/core-city/CityRegistry");
@@ -18,6 +19,7 @@ const TerrainFeatureRegistry_1 = require("@civ-clone/core-terrain-feature/Terrai
 const TileImprovementRegistry_1 = require("@civ-clone/core-tile-improvement/TileImprovementRegistry");
 const Turn_1 = require("@civ-clone/core-turn-based-game/Turn");
 const UnitImprovementRegistry_1 = require("@civ-clone/core-unit-improvement/UnitImprovementRegistry");
+const SpecialistRegistry_1 = require("@civ-clone/core-city/SpecialistRegistry");
 const StrategyNoteRegistry_1 = require("@civ-clone/core-strategy/StrategyNoteRegistry");
 const UnitRegistry_1 = require("@civ-clone/core-unit/UnitRegistry");
 const WorkedTileRegistry_1 = require("@civ-clone/core-city/WorkedTileRegistry");
@@ -90,7 +92,11 @@ class SimpleAIClient extends StrategyAIClient_1.default {
         // same name cannot express.
         super(player, strategyRegistry, randomNumberGenerator);
         this._knowledge = knowledge_1.default;
+        // The specialist registries aren't arguments, so that callers passing the others by position (the arena looks for
+        //  `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the game's own
+        //  (`dependenciesFor`).
         this._dependencies = {
+            availableSpecialistRegistry: AvailableSpecialistRegistry_1.instance,
             cityBuildRegistry,
             cityGrowthRegistry,
             cityRegistry,
@@ -107,6 +113,7 @@ class SimpleAIClient extends StrategyAIClient_1.default {
             playerWorldRegistry,
             randomNumberGenerator,
             ruleRegistry,
+            specialistRegistry: SpecialistRegistry_1.instance,
             strategyNoteRegistry,
             terrainFeatureRegistry,
             tileImprovementRegistry,

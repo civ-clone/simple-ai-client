@@ -38,13 +38,25 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Science/ChooseResearch`       | a `PlayerResearch` choice                    | picks research at random                                                       | generic |
 | `Strategies/Civ1/ChooseGovernment`        | a `PlayerGovernment` choice                  | picks Monarchy after Anarchy                                                   | Civ1    |
 | `Strategies/Diplomacy/NegotiationAnswers` | `ChooseFromList` for `negotiation.next-step` | answers each negotiation step; any other list gets a random pick               | generic |
+| `Strategies/City/PreventDisorder`         | `AfterTurn`                                  | keeps cities out of civil disorder, by the ruleset's `DisorderPolicy`          | generic |
+
+`PreventDisorder` (`lib/City/disorder.ts`) runs once the player's units have moved, since where they stand changes how
+unhappy a city is. For each city the ruleset's `CivilDisorder` rules would find in disorder at the player's next turn
+start, as it stands or once it has grown, it makes Entertainers from the worked tiles giving the least food, then the
+fewest shields, then the least trade, until the rules find it calm. It stops short of a food deficit, and of stopping a
+city growing to keep it calm at its next size. The cities it can't calm are noted in the player's memory
+(`uncalmedCities`, with why), for civ-clone/web-renderer#154's luxury rate. A city that started the turn in disorder
+also switches to the first improvement it can build of the policy's list, and spends up to the policy's share of the
+treasury on it. Civ1's policy (`lib/Civ1/disorder.ts`) is v474.05's: Temple, Marketplace, Cathedral, Colosseum, and an
+eighth of the treasury. Entertainers made this way are put back to work at the end of the next turn, and remade only if
+they're still needed.
 
 Strategies are game-wide and stateless. Each is a thin adapter over a module in `lib/`. It's given the shared
 registries (`lib/Dependencies.ts`) and the ruleset's judgements (`lib/Knowledge.ts`; Civ1's are in
 `lib/Civ1/knowledge.ts`).
 
 Each player's working memory is looked up by player in `lib/MemoryRegistry.ts`. It holds the player's targets, unit
-paths and recent moves.
+paths and recent moves, and the cities its last turn left in disorder.
 
 The unit strategies share one context per action (`Strategies/lib/unitTurnContextFor.ts`), so a unit's actions are
 read once per turn, however many strategies look at it.

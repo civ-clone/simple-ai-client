@@ -1,3 +1,4 @@
+import { AvailableSpecialistRegistry } from '@civ-clone/core-city/AvailableSpecialistRegistry';
 import { CityBuildRegistry } from '@civ-clone/core-city-build/CityBuildRegistry';
 import { CityGrowthRegistry } from '@civ-clone/core-city-growth/CityGrowthRegistry';
 import { CityRegistry } from '@civ-clone/core-city/CityRegistry';
@@ -12,6 +13,7 @@ import { PlayerResearchRegistry } from '@civ-clone/core-science/PlayerResearchRe
 import { PlayerTreasuryRegistry } from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
 import { PlayerWorldRegistry } from '@civ-clone/core-player-world/PlayerWorldRegistry';
 import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
+import { SpecialistRegistry } from '@civ-clone/core-city/SpecialistRegistry';
 import { StrategyNoteRegistry } from '@civ-clone/core-strategy/StrategyNoteRegistry';
 import { TerrainFeatureRegistry } from '@civ-clone/core-terrain-feature/TerrainFeatureRegistry';
 import { TileImprovementRegistry } from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
@@ -21,6 +23,7 @@ import { UnitRegistry } from '@civ-clone/core-unit/UnitRegistry';
 import { WorkedTileRegistry } from '@civ-clone/core-city/WorkedTileRegistry';
 import { MemoryRegistry } from './MemoryRegistry';
 export interface Dependencies {
+  availableSpecialistRegistry: AvailableSpecialistRegistry;
   cityBuildRegistry: CityBuildRegistry;
   cityGrowthRegistry: CityGrowthRegistry;
   cityRegistry: CityRegistry;
@@ -37,6 +40,7 @@ export interface Dependencies {
   playerWorldRegistry: PlayerWorldRegistry;
   randomNumberGenerator: () => number;
   ruleRegistry: RuleRegistry;
+  specialistRegistry: SpecialistRegistry;
   strategyNoteRegistry: StrategyNoteRegistry;
   terrainFeatureRegistry: TerrainFeatureRegistry;
   tileImprovementRegistry: TileImprovementRegistry;

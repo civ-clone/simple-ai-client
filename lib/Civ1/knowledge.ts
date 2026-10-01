@@ -16,7 +16,9 @@ export const civ1Knowledge: Knowledge = {
       city,
       dependencies.playerWorldRegistry,
       dependencies.cityGrowthRegistry,
-      dependencies.workedTileRegistry
+      dependencies.workedTileRegistry,
+      dependencies.specialistRegistry,
+      dependencies.availableSpecialistRegistry
     ),
   canReturnAfter: (dependencies, player, unit, action) =>
     aircraftCanReturn(dependencies, player, unit, action) &&
