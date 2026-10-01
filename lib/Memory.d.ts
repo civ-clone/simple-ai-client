@@ -1,6 +1,8 @@
+import City from '@civ-clone/core-city/City';
 import Path from '@civ-clone/core-world-path/Path';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import { UncalmedReason } from './City/disorder';
 export interface TargetBoard {
   citiesToLiberate: Tile[];
   enemyCitiesToAttack: Tile[];
@@ -13,6 +15,7 @@ export interface TargetBoard {
 export interface Memory {
   lastUnitMoves: Map<Unit, Tile[]>;
   targets: TargetBoard;
+  uncalmedCities: Map<City, UncalmedReason>;
   unitPathData: Map<Unit, Path>;
   unitTargetData: Map<Unit, Tile>;
 }
