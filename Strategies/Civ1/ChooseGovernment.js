@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChooseGovernment = void 0;
-// Civ1: once the Anarchy is over, Monarchy if it's available, otherwise the first government that is. Always handles
+// Civ1: once the Anarchy is over, the government the player would choose now (`lib/Civ1/government`). Always handles
 //  the choice.
 const AIStrategy_1 = require("../lib/AIStrategy");
 const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment");

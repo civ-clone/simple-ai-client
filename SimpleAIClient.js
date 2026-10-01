@@ -5,6 +5,7 @@ const AvailableSpecialistRegistry_1 = require("@civ-clone/core-city/AvailableSpe
 const CityBuildRegistry_1 = require("@civ-clone/core-city-build/CityBuildRegistry");
 const CityGrowthRegistry_1 = require("@civ-clone/core-city-growth/CityGrowthRegistry");
 const CityRegistry_1 = require("@civ-clone/core-city/CityRegistry");
+const CityImprovementRegistry_1 = require("@civ-clone/core-city-improvement/CityImprovementRegistry");
 const ClientRegistry_1 = require("@civ-clone/core-client/ClientRegistry");
 const Engine_1 = require("@civ-clone/core-engine/Engine");
 const GoodyHutRegistry_1 = require("@civ-clone/core-goody-hut/GoodyHutRegistry");
@@ -96,13 +97,14 @@ class SimpleAIClient extends StrategyAIClient_1.default {
         super(player, strategyRegistry, randomNumberGenerator);
         this._knowledge = knowledge_1.default;
         this._strategies = strategyRegistry;
-        // The specialist, trade rate and trait registries aren't arguments, so that callers passing the others by position
-        //  (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the
-        //  game's own (`dependenciesFor`).
+        // The city improvement, specialist, trade rate and trait registries aren't arguments, so that callers passing the
+        //  others by position (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and
+        //  those are given the game's own (`dependenciesFor`).
         this._dependencies = {
             availableSpecialistRegistry: AvailableSpecialistRegistry_1.instance,
             cityBuildRegistry,
             cityGrowthRegistry,
+            cityImprovementRegistry: CityImprovementRegistry_1.instance,
             cityRegistry,
             clientRegistry,
             engine,

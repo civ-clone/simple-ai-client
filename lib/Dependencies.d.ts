@@ -1,6 +1,7 @@
 import { AvailableSpecialistRegistry } from '@civ-clone/core-city/AvailableSpecialistRegistry';
 import { CityBuildRegistry } from '@civ-clone/core-city-build/CityBuildRegistry';
 import { CityGrowthRegistry } from '@civ-clone/core-city-growth/CityGrowthRegistry';
+import { CityImprovementRegistry } from '@civ-clone/core-city-improvement/CityImprovementRegistry';
 import { CityRegistry } from '@civ-clone/core-city/CityRegistry';
 import { ClientRegistry } from '@civ-clone/core-client/ClientRegistry';
 import { Engine } from '@civ-clone/core-engine/Engine';
@@ -28,6 +29,7 @@ export interface Dependencies {
   availableSpecialistRegistry: AvailableSpecialistRegistry;
   cityBuildRegistry: CityBuildRegistry;
   cityGrowthRegistry: CityGrowthRegistry;
+  cityImprovementRegistry: CityImprovementRegistry;
   cityRegistry: CityRegistry;
   clientRegistry: ClientRegistry;
   engine: Engine;

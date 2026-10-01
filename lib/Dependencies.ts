@@ -12,6 +12,10 @@ import {
   instance as cityGrowthRegistryInstance,
 } from '@civ-clone/core-city-growth/CityGrowthRegistry';
 import {
+  CityImprovementRegistry,
+  instance as cityImprovementRegistryInstance,
+} from '@civ-clone/core-city-improvement/CityImprovementRegistry';
+import {
   CityRegistry,
   instance as cityRegistryInstance,
 } from '@civ-clone/core-city/CityRegistry';
@@ -110,6 +114,7 @@ export interface Dependencies {
   availableSpecialistRegistry: AvailableSpecialistRegistry;
   cityBuildRegistry: CityBuildRegistry;
   cityGrowthRegistry: CityGrowthRegistry;
+  cityImprovementRegistry: CityImprovementRegistry;
   cityRegistry: CityRegistry;
   clientRegistry: ClientRegistry;
   engine: Engine;
@@ -143,6 +148,7 @@ export const createDependencies = (
   availableSpecialistRegistry: availableSpecialistRegistryInstance,
   cityBuildRegistry: cityBuildRegistryInstance,
   cityGrowthRegistry: cityGrowthRegistryInstance,
+  cityImprovementRegistry: cityImprovementRegistryInstance,
   cityRegistry: cityRegistryInstance,
   clientRegistry: clientRegistryInstance,
   engine: engineInstance,

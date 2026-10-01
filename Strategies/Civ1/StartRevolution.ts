@@ -1,4 +1,5 @@
-// Civ1: at the start of each turn, once Monarchy is known, starts a revolution, as a human player would.
+// Civ1: at the start of each turn, starts a revolution, as a human player would, when the player would choose another
+//  government than the one it has (`lib/Civ1/government`).
 import AIStrategy from '../lib/AIStrategy';
 import BeforeTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
