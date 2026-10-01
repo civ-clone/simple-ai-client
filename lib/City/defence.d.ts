@@ -12,9 +12,20 @@ export declare const martialLawUnitsWanted: (
 ) => number;
 export declare const defendersWanted: (
   dependencies: Dependencies,
-  knowledge: Knowledge,
   city: City
 ) => number;
+export declare const martialLawUnitsIn: (city: City) => Unit[];
+export declare const wantsUnit: (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  city: City
+) => boolean;
+export declare const keepsOrder: (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  city: City,
+  unit: Unit
+) => boolean;
 export declare const isDefender: (unit: Unit) => boolean;
 export declare const defendersIn: (
   dependencies: Dependencies,

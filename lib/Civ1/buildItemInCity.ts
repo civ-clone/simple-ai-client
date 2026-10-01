@@ -1,4 +1,4 @@
-// Civ1: what a city builds next: a defender while it has fewer than it wants, explorers while there's land to explore
+// Civ1: what a city builds next: a defender while it has fewer than it wants or martial law could use another unit, explorers while there's land to explore
 //  and the player has fewer out than it wants, Settlers, attackers while there's a war to fight and the player has
 //  fewer than it wants, a defender for a city of the player's that has none, a Wonder in the player's most productive
 //  city, and otherwise a random pick of the rest, never a Palace or a ship.
@@ -8,7 +8,7 @@ import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
-import { defendersIn, defendersWanted } from '../City/defence';
+import { wantsUnit } from '../City/defence';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
 import Knowledge from '../Knowledge';
 import { Land, Naval, Worker } from '@civ-clone/library-unit/Types';
@@ -196,11 +196,7 @@ export const buildItemInCity = (
         )
       );
 
-  if (
-    defendersIn(dependencies, city).length <
-      defendersWanted(dependencies, knowledge, city) &&
-    getDefensiveUnit()
-  ) {
+  if (wantsUnit(dependencies, knowledge, city) && getDefensiveUnit()) {
     cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
 
     return;

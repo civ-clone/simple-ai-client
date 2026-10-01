@@ -1,7 +1,7 @@
-// Generic: a unit in one of the player's cities fortifies there if the city needs more defenders, or if it can relieve
-//  a weaker one.
+// Generic: a unit in one of the player's cities fortifies there if the city needs more defenders, if martial law needs
+//  it there to keep order, or if it can relieve a weaker one.
 import Dependencies from '../Dependencies';
-import { defendersWanted, isDefender } from '../City/defence';
+import { defendersWanted, isDefender, keepsOrder } from '../City/defence';
 import { Fortified } from '@civ-clone/library-unit/UnitImprovements';
 import { Fortify } from '@civ-clone/library-unit/Actions';
 import Knowledge from '../Knowledge';
@@ -35,7 +35,8 @@ export const garrison = (
     city &&
     (cityUnitWithLowerDefence ||
       tileUnits.filter(isDefender).length <=
-        defendersWanted(dependencies, knowledge, city))
+        defendersWanted(dependencies, city) ||
+      keepsOrder(dependencies, knowledge, city, unit))
   ) {
     unit.action(fortify);
 

@@ -89,17 +89,46 @@ export const martialLawUnitsWanted = (
   );
 };
 
-// One defender, and one more for each five sizes over five, or as many units as martial law would use if that's more:
-//  a defender keeps order as well as any unit.
+// One defender, and one more for each five sizes over five.
 export const defendersWanted = (
+  dependencies: Dependencies,
+  city: City
+): number =>
+  Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5);
+
+// The units in `city` that martial law is using now, by the ruleset's own rules. A defender keeps order as well as any
+//  unit, and so might a unit that couldn't defend the city at all.
+export const martialLawUnitsIn = (city: City): Unit[] =>
+  city
+    .yields()
+    .filter((cityYield: Yield): boolean => cityYield instanceof MartialLaw)
+    .map((cityYield: Yield): Unit => (cityYield as MartialLaw).unit());
+
+// Whether `city` wants another unit in it: a defender, or a unit for martial law to use.
+export const wantsUnit = (
   dependencies: Dependencies,
   knowledge: Knowledge,
   city: City
-): number =>
-  Math.max(
-    Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5),
-    martialLawUnitsWanted(dependencies, knowledge, city)
+): boolean =>
+  defendersIn(dependencies, city).length <
+    defendersWanted(dependencies, city) ||
+  martialLawUnitsIn(city).length <
+    martialLawUnitsWanted(dependencies, knowledge, city);
+
+// Whether `city` needs `unit` to keep order: martial law is using it, and wouldn't have the units it wants without it.
+export const keepsOrder = (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  city: City,
+  unit: Unit
+): boolean => {
+  const inUse = martialLawUnitsIn(city);
+
+  return (
+    inUse.includes(unit) &&
+    inUse.length <= martialLawUnitsWanted(dependencies, knowledge, city)
   );
+};
 
 // A unit that could defend a city: not, say, Settlers or a ship.
 export const isDefender = (unit: Unit): boolean =>

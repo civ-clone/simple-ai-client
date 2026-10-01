@@ -8,9 +8,10 @@ import { Monarchy, Republic } from '@civ-clone/civ1-government/Governments';
 import { ShakespearesTheatre } from '@civ-clone/civ1-wonder/Wonders';
 import {
   defendersIn,
-  defendersWanted,
+  martialLawUnitsIn,
   martialLawUnitsWanted,
 } from '../lib/City/defence';
+import { Diplomat, Warrior } from '@civ-clone/civ1-unit/Units';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
 import { CeremonialBurial } from '@civ-clone/civ1-science/Advances';
 import City from '@civ-clone/core-city/City';
@@ -26,7 +27,6 @@ import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import PreventDisorder from '../Strategies/City/PreventDisorder';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-import { Warrior } from '@civ-clone/civ1-unit/Units';
 import cityHappinessRules from '@civ-clone/civ1-city-happiness/registerRules';
 import cityImprovementRules from '@civ-clone/civ1-city-improvement/registerRules';
 import cityRules from '@civ-clone/civ1-city/registerRules';
@@ -161,8 +161,9 @@ const entertainers = ({ city, game }: SetUp): number =>
 const disorder = ({ city, dependencies }: SetUp): boolean =>
   inDisorder(dependencies, city);
 
+// How many units in the city martial law would use.
 const wanted = ({ city, dependencies }: SetUp): number =>
-  defendersWanted(dependencies, civ1Knowledge, city);
+  martialLawUnitsWanted(dependencies, civ1Knowledge, city);
 
 const fortifyAction = (unit: Unit): Fortify | undefined =>
   unit.actions().find((action): boolean => action instanceof Fortify) as
@@ -207,10 +208,7 @@ describe('martial law', (): void => {
   it('should not keep a spare unit where the government has no martial law', async (): Promise<void> => {
     const setup = await setUp({ government: Republic });
 
-    expect(wanted(setup)).to.equal(2);
-    expect(
-      martialLawUnitsWanted(setup.dependencies, civ1Knowledge, setup.city)
-    ).to.equal(0);
+    expect(wanted(setup)).to.equal(0);
 
     const spare = setup.addWarrior();
 
@@ -222,9 +220,6 @@ describe('martial law', (): void => {
     //  four of them content.
     const setup = await setUp({ size: 10, warriors: 0 });
 
-    expect(
-      martialLawUnitsWanted(setup.dependencies, civ1Knowledge, setup.city)
-    ).to.equal(4);
     expect(wanted(setup)).to.equal(4);
 
     new Array(4).fill(0).forEach(() => setup.addWarrior());
@@ -276,10 +271,7 @@ describe('martial law', (): void => {
     );
 
     expect(disorder(setup)).false;
-    expect(
-      martialLawUnitsWanted(setup.dependencies, civ1Knowledge, setup.city)
-    ).to.equal(0);
-    expect(wanted(setup)).to.equal(2);
+    expect(wanted(setup)).to.equal(0);
 
     const [, , third] = setup.dependencies.unitRegistry.getByTile(
       setup.city.tile()
@@ -318,6 +310,37 @@ describe('martial law', (): void => {
         ...dependencies,
         randomNumberGenerator: (): number => 0.999,
       });
+
+    buildItemInCity(
+      lastPick,
+      player,
+      createMemory().targets,
+      city,
+      defaultProductionPolicy,
+      civ1Knowledge
+    );
+
+    expect(game.cityBuilds.getByCity(city).building()?.item()).to.equal(Temple);
+  });
+
+  it("should count a unit that keeps order but couldn't defend the city", async (): Promise<void> => {
+    // Size 8, two Warriors and a Diplomat, which has no defence but is a unit martial law uses all the same: three
+    //  units for three unhappy citizens, so the city needs nothing more.
+    const setup = await setUp(),
+      { city, dependencies, game, player } = setup,
+      diplomat = new Diplomat(city, player, city.tile(), game.rules),
+      lastPick = createDependencies({
+        ...dependencies,
+        randomNumberGenerator: (): number => 0.999,
+      });
+
+    if (!game.units.includes(diplomat)) {
+      game.units.register(diplomat);
+    }
+
+    expect(defendersIn(dependencies, city).length).to.equal(2);
+    expect(martialLawUnitsIn(city).length).to.equal(3);
+    expect(disorder(setup)).false;
 
     buildItemInCity(
       lastPick,
