@@ -13,6 +13,8 @@ const PathFinderRegistry_1 = require("@civ-clone/core-world-path/PathFinderRegis
 const PlayerGovernmentRegistry_1 = require("@civ-clone/core-government/PlayerGovernmentRegistry");
 const PlayerResearchRegistry_1 = require("@civ-clone/core-science/PlayerResearchRegistry");
 const PlayerTreasuryRegistry_1 = require("@civ-clone/core-treasury/PlayerTreasuryRegistry");
+const PlayerTradeRatesRegistry_1 = require("@civ-clone/core-trade-rate/PlayerTradeRatesRegistry");
+const TraitRegistry_1 = require("@civ-clone/core-civilization/TraitRegistry");
 const PlayerWorldRegistry_1 = require("@civ-clone/core-player-world/PlayerWorldRegistry");
 const RuleRegistry_1 = require("@civ-clone/core-rule/RuleRegistry");
 const TerrainFeatureRegistry_1 = require("@civ-clone/core-terrain-feature/TerrainFeatureRegistry");
@@ -92,9 +94,9 @@ class SimpleAIClient extends StrategyAIClient_1.default {
         // same name cannot express.
         super(player, strategyRegistry, randomNumberGenerator);
         this._knowledge = knowledge_1.default;
-        // The specialist registries aren't arguments, so that callers passing the others by position (the arena looks for
-        //  `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the game's own
-        //  (`dependenciesFor`).
+        // The specialist, trade rate and trait registries aren't arguments, so that callers passing the others by position
+        //  (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the
+        //  game's own (`dependenciesFor`).
         this._dependencies = {
             availableSpecialistRegistry: AvailableSpecialistRegistry_1.instance,
             cityBuildRegistry,
@@ -109,6 +111,7 @@ class SimpleAIClient extends StrategyAIClient_1.default {
             pendingEffectRegistry,
             playerGovernmentRegistry,
             playerResearchRegistry,
+            playerTradeRatesRegistry: PlayerTradeRatesRegistry_1.instance,
             playerTreasuryRegistry,
             playerWorldRegistry,
             randomNumberGenerator,
@@ -117,6 +120,7 @@ class SimpleAIClient extends StrategyAIClient_1.default {
             strategyNoteRegistry,
             terrainFeatureRegistry,
             tileImprovementRegistry,
+            traitRegistry: TraitRegistry_1.instance,
             turn,
             unitImprovementRegistry,
             unitRegistry,

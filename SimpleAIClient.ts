@@ -46,6 +46,8 @@ import {
   PlayerTreasuryRegistry,
   instance as playerTreasuryRegistryInstance,
 } from '@civ-clone/core-treasury/PlayerTreasuryRegistry';
+import { instance as playerTradeRatesRegistryInstance } from '@civ-clone/core-trade-rate/PlayerTradeRatesRegistry';
+import { instance as traitRegistryInstance } from '@civ-clone/core-civilization/TraitRegistry';
 import {
   PlayerWorldRegistry,
   instance as playerWorldRegistryInstance,
@@ -199,9 +201,9 @@ export class SimpleAIClient extends StrategyAIClient {
     // same name cannot express.
     super(player, strategyRegistry, randomNumberGenerator);
 
-    // The specialist registries aren't arguments, so that callers passing the others by position (the arena looks for
-    //  `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the game's own
-    //  (`dependenciesFor`).
+    // The specialist, trade rate and trait registries aren't arguments, so that callers passing the others by position
+    //  (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the
+    //  game's own (`dependenciesFor`).
     this._dependencies = {
       availableSpecialistRegistry: availableSpecialistRegistryInstance,
       cityBuildRegistry,
@@ -216,6 +218,7 @@ export class SimpleAIClient extends StrategyAIClient {
       pendingEffectRegistry,
       playerGovernmentRegistry,
       playerResearchRegistry,
+      playerTradeRatesRegistry: playerTradeRatesRegistryInstance,
       playerTreasuryRegistry,
       playerWorldRegistry,
       randomNumberGenerator,
@@ -224,6 +227,7 @@ export class SimpleAIClient extends StrategyAIClient {
       strategyNoteRegistry,
       terrainFeatureRegistry,
       tileImprovementRegistry,
+      traitRegistry: traitRegistryInstance,
       turn,
       unitImprovementRegistry,
       unitRegistry,

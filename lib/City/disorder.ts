@@ -338,6 +338,27 @@ export const hurry = (
   return 0;
 };
 
+// Calms each of the player's cities again (`calmCity`), after something that changes how happy they all are at once,
+//  such as the luxury rate. Unlike `preventDisorder`, it doesn't switch production or buy anything: that was done
+//  already. Notes the cities left in disorder in `memory` afresh.
+export const calmCities = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  knowledge: Knowledge,
+  policy: DisorderPolicy
+): void => {
+  memory.uncalmedCities.clear();
+
+  dependencies.cityRegistry.getByPlayer(player).forEach((city: City): void => {
+    const reason = calmCity(dependencies, knowledge, city, policy);
+
+    if (reason !== null) {
+      memory.uncalmedCities.set(city, reason);
+    }
+  });
+};
+
 // The whole pass over the player's cities, at the end of its turn. Notes in `memory` the cities left in disorder, and
 //  why, for whatever can calm them another way (civ-clone/web-renderer#154's luxury rate).
 export const preventDisorder = (
