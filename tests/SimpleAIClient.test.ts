@@ -2667,6 +2667,35 @@ describe('SimpleAIClient', (): void => {
     expect(picks).not.include(CityWalls);
   });
 
+  it('should not pick Barracks or City Walls at random', async (): Promise<void> => {
+    // At 3 net shields, Barracks (40 shields) take 14 turns and City Walls (120) 40, both within the policy's 40.
+    const picks: unknown[] = [];
+
+    for (const draw of [0, 0.2, 0.4, 0.6, 0.8, 0.999]) {
+      const { city, cleanUp, player } = await productionCity(1, true);
+
+      playerResearchRegistry.getByPlayer(player).addAdvance(Masonry);
+      city.yields = () => [new ProductionYield(3)];
+
+      buildItemInCity(
+        createDependencies({
+          ...dependencies,
+          randomNumberGenerator: (): number => draw,
+        }),
+        player,
+        createMemory().targets,
+        city
+      );
+
+      picks.push(cityBuildRegistry.getByCity(city).building()!.item());
+
+      cleanUp();
+    }
+
+    expect(picks).not.include(Barracks);
+    expect(picks).not.include(CityWalls);
+  });
+
   it('should build the cheapest improvement worth having when it can finish nothing soon', async (): Promise<void> => {
     const { city, cleanUp, player } = await productionCity(1, true);
 

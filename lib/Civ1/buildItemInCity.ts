@@ -194,12 +194,15 @@ const shouldBuildWonder = (
   );
 };
 
+// Improvements only worth building on purpose, never picked at random.
+const onPurposeOnly: (typeof Barracks)[] = [Barracks, CityWalls];
+
 // The order `buildItemInCity` falls back on, when a city can finish nothing soon: improvements worth having, then the
 //  others, then units.
 const fallbackRank = (buildItem: BuildItem): number =>
   Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
     ? 2
-    : [Barracks, CityWalls].includes(buildItem.item() as typeof Barracks)
+    : onPurposeOnly.includes(buildItem.item() as typeof Barracks)
     ? 1
     : 0;
 
@@ -233,14 +236,17 @@ export const buildItemInCity = (
     turnsToBuild = buildTime(dependencies, city, shields),
     isUnitItem = (buildItem: BuildItem): boolean =>
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item()),
-    // The rest, that the city can finish within the policy's turns for a unit or an improvement.
-    finishable = availableFiltered.filter((buildItem: BuildItem): boolean =>
-      finishesWithin(
-        turnsToBuild(buildItem),
-        isUnitItem(buildItem)
-          ? policy.buildTurns.unit
-          : policy.buildTurns.improvement
-      )
+    // The rest, that the city can finish within the policy's turns for a unit or an improvement. Barracks and City
+    //  Walls are only worth building on purpose.
+    finishable = availableFiltered.filter(
+      (buildItem: BuildItem): boolean =>
+        !onPurposeOnly.includes(buildItem.item() as typeof Barracks) &&
+        finishesWithin(
+          turnsToBuild(buildItem),
+          isUnitItem(buildItem)
+            ? policy.buildTurns.unit
+            : policy.buildTurns.improvement
+        )
     ),
     randomSelection =
       finishable[
