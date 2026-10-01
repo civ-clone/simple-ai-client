@@ -2512,6 +2512,29 @@ describe('SimpleAIClient', (): void => {
     cleanUp();
   });
 
+  // Settlers cost 40 shields, and the default policy waits 20 turns for them.
+  [
+    [1, false],
+    [2, true],
+  ].forEach(([shields, builds]): void =>
+    it(`should ${
+      builds ? '' : 'not '
+    }build Settlers in a size 2 city making ${shields} net shields`, async (): Promise<void> => {
+      const { city, cleanUp, player } = await productionCity(1, true);
+
+      cityGrowthRegistry.getByCity(city).grow();
+      city.yields = () => [new ProductionYield(shields as number)];
+
+      buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+      expect(
+        cityBuildRegistry.getByCity(city).building()!.item() === Settlers
+      ).equal(builds);
+
+      cleanUp();
+    })
+  );
+
   // A city's yields come one per tile and unit, so a city making 3 shields has no single Production yield over 1.
   it('should start a Wonder in its most productive city, one at a time', async (): Promise<void> => {
     const { city, cleanUp, player, world } = await productionCity(1, true),
