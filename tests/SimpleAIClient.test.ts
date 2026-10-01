@@ -2315,6 +2315,8 @@ describe('SimpleAIClient', (): void => {
     // So the best defender, a Phalanx, isn't also the cheapest fighter.
     playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
     targets.landTilesToExplore.push(world.get(9, 4));
+    // Enough to finish Warriors (10 shields) within the default policy's 10 turns.
+    city.yields = () => [new ProductionYield(1)];
 
     buildItemInCity(lastPick(), player, targets, city);
 
@@ -2490,6 +2492,22 @@ describe('SimpleAIClient', (): void => {
     ).unitDestroyed(defender, null);
 
     expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
+
+    cleanUp();
+  });
+
+  it('should not build an explorer that it cannot finish soon', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      targets = createMemory().targets;
+
+    targets.landTilesToExplore.push(world.get(9, 4));
+    city.yields = () => [new ProductionYield(0)];
+
+    buildItemInCity(lastPick(), player, targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).not.equal(
+      Warrior
+    );
 
     cleanUp();
   });

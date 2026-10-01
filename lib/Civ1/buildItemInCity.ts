@@ -266,10 +266,12 @@ export const buildItemInCity = (
     ) <
       policy.explorers + policy.explorersPerCity * cities
   ) {
-    // The cheapest land unit that can fight.
+    // The cheapest land unit that can fight, if the city can finish it within the policy's turns.
     const [explorer] = availableUnits
-      .filter((buildItem: BuildItem): boolean =>
-        isExplorerType(dependencies, buildItem.item())
+      .filter(
+        (buildItem: BuildItem): boolean =>
+          isExplorerType(dependencies, buildItem.item()) &&
+          turnsToBuild(buildItem) <= policy.buildTurns.unit
       )
       .sort(
         (a: BuildItem, b: BuildItem): number =>
