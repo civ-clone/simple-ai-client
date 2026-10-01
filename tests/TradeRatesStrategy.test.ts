@@ -2,13 +2,19 @@ import {
   AbrahamLincoln,
   ElizabethI,
   GenghisKhan,
+  MahatmaGandhi,
 } from '@civ-clone/civ1-civilization/Leaders';
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import { Luxuries, Research, Tax } from '@civ-clone/civ1-trade-rate/TradeRates';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
 import { CIVIL_DISORDER } from '@civ-clone/civ1-city-happiness/lib/cityStatus';
-import { CeremonialBurial, Robotics } from '@civ-clone/civ1-science/Advances';
+import {
+  CeremonialBurial,
+  NuclearPower,
+  Recycling,
+  Robotics,
+} from '@civ-clone/civ1-science/Advances';
 import City from '@civ-clone/core-city/City';
 import Civilization from '@civ-clone/core-civilization/Civilization';
 import Dependencies from '../lib/Dependencies';
@@ -228,14 +234,32 @@ describe('TradeRates', (): void => {
     expect(rates(setup)).to.equal('60/40/0');
   });
 
-  it('should stop science once the player has Robotics, as v474.05 does', async (): Promise<void> => {
-    const setup = await setUp({ size: 1 });
+  it('should stop science once Genghis Khan has Robotics', async (): Promise<void> => {
+    const setup = await setUp({ leader: GenghisKhan, size: 1 });
+
+    await setup.afterTurn();
+
+    expect(rates(setup)).to.equal('30/60/10');
+
+    setup.game.playerResearch.getByPlayer(setup.player).addAdvance(Robotics);
+
+    await setup.afterTurn();
+
+    expect(rates(setup)).to.equal('0/90/10');
+  });
+
+  it('should keep Gandhi researching after Robotics until he has Recycling and Nuclear Power', async (): Promise<void> => {
+    const setup = await setUp({ leader: MahatmaGandhi, size: 1 }),
+      playerResearch = setup.game.playerResearch.getByPlayer(setup.player);
+
+    playerResearch.addAdvance(Robotics);
+    playerResearch.addAdvance(Recycling);
 
     await setup.afterTurn();
 
     expect(rates(setup)).to.equal('40/50/10');
 
-    setup.game.playerResearch.getByPlayer(setup.player).addAdvance(Robotics);
+    playerResearch.addAdvance(NuclearPower);
 
     await setup.afterTurn();
 

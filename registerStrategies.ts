@@ -24,6 +24,7 @@ import WorkerTurn from './Strategies/Unit/WorkerTurn';
 import civ1DisorderPolicy from './lib/Civ1/disorder';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
+import civ1WantedAdvances from './lib/Civ1/wantedAdvances';
 
 // The game's registries, as the strategies take them.
 export const dependenciesFor = (game: Game): Dependencies =>
@@ -78,7 +79,7 @@ export const createStrategies = (
   // The other mandatory choices.
   new BuildExplorerShip(dependencies, knowledge),
   new ChooseProduction(dependencies, knowledge),
-  new ChooseResearch(dependencies, knowledge),
+  new ChooseResearch(dependencies, knowledge, civ1WantedAdvances),
   new ChooseGovernment(dependencies, knowledge),
   // `chooseFromList`.
   new NegotiationAnswers(dependencies, knowledge),

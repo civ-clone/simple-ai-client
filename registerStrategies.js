@@ -25,6 +25,7 @@ const WorkerTurn_1 = require("./Strategies/Unit/WorkerTurn");
 const disorder_1 = require("./lib/Civ1/disorder");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const tradeRates_1 = require("./lib/Civ1/tradeRates");
+const wantedAdvances_1 = require("./lib/Civ1/wantedAdvances");
 // The game's registries, as the strategies take them.
 const dependenciesFor = (game) => (0, Dependencies_1.createDependencies)({
     availableSpecialistRegistry: game.availableSpecialists,
@@ -74,7 +75,7 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     // The other mandatory choices.
     new BuildExplorerShip_1.default(dependencies, knowledge),
     new ChooseProduction_1.default(dependencies, knowledge),
-    new ChooseResearch_1.default(dependencies, knowledge),
+    new ChooseResearch_1.default(dependencies, knowledge, wantedAdvances_1.default),
     new ChooseGovernment_1.default(dependencies, knowledge),
     // `chooseFromList`.
     new NegotiationAnswers_1.default(dependencies, knowledge),
