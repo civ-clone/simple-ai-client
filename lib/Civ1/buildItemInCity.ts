@@ -45,8 +45,11 @@ export interface ProductionPolicy {
   explorers: number;
   explorersPerCity: number;
   maxExplorers: number;
-  // Settlers wanted, out and on order.
+  // Settlers wanted, out and on order: `settlers`, and `settlersPerCity` more per city, rounded down. Counting those on
+  //  order kept the Settlers a player has in check, but at 3 for any number of cities it cost players cities by turn 300
+  //  in the arena (civ-clone/web-renderer#229).
   settlers: number;
+  settlersPerCity: number;
   // The most turns a city spends on each kind of build, at its net shields (`lib/City/buildTime`). A city builds a
   //  missing defender however long it takes, the soonest it can, and Settlers whatever it makes: the arena found that
   //  any limit on Settlers, even only keeping a city on 0 net shields off them, cost the player cities and score
@@ -66,6 +69,7 @@ export const defaultProductionPolicy: ProductionPolicy = {
   explorersPerCity: 2,
   maxExplorers: 6,
   settlers: 3,
+  settlersPerCity: 0.5,
   buildTurns: {
     improvement: 40,
     unit: 10,
@@ -362,7 +366,8 @@ export const buildItemInCity = (
       (unit: Unit): boolean => unit instanceof Settlers,
       (item: object): boolean =>
         item === (Settlers as unknown as typeof Buildable)
-    ) < policy.settlers &&
+    ) <
+      policy.settlers + Math.floor(policy.settlersPerCity * cities) &&
     cityGrowth.size() > 1
   ) {
     cityBuild.build(Settlers as unknown as typeof Buildable);
