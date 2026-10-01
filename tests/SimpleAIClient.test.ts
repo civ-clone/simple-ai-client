@@ -166,6 +166,7 @@ import { createStrategies } from '../registerStrategies';
 import Path from '@civ-clone/core-world-path/Path';
 import assignMission, { attackEnemyUnits } from '../lib/Unit/assignMission';
 import reachableTiles from '../lib/Unit/reachable';
+import settlerWork from '../lib/Unit/settlerWork';
 import MandatoryPlayerAction from '@civ-clone/core-player/MandatoryPlayerAction';
 import MissionAndMove from '../Strategies/Unit/MissionAndMove';
 import civ1Knowledge from '../lib/Civ1/knowledge';
@@ -1881,6 +1882,86 @@ describe('SimpleAIClient', (): void => {
     currentPlayerRegistry.unregister(player, enemy);
     playerRegistry.unregister(player, enemy);
     unitRegistry.unregister(unit, unreachable, reachable);
+  });
+
+  it('should have Settlers claim the nearest site they have a path to, searching for none they cannot reach', async (): Promise<void> => {
+    withCivilizations();
+
+    // As above: the settlers at 1,0; a site on the island at 3,0, and a farther one at 0,2 on the same land.
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('2GOGOG4OG4OG4OG4O', 5, 5),
+      player = client.player();
+
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const settlers = new Settlers(null, player, world.get(1, 0), ruleRegistry),
+      island = world.get(3, 0),
+      sameLand = world.get(0, 2),
+      memory = memoryRegistryInstance.memoryFor(player),
+      sites = memory.targets.goodSitesForCities,
+      searchedFor: Tile[] = [],
+      pathFor = Path.for,
+      // Compared as coordinates: a failing assertion on the tiles themselves would format the whole world.
+      at = (tile: Tile | undefined): string | undefined =>
+        tile && `${tile.x()},${tile.y()}`;
+
+    expect(island.distanceFrom(settlers.tile())).lessThan(
+      sameLand.distanceFrom(settlers.tile())
+    );
+
+    Path.for = (unit, start, end, pathFinderRegistry) => {
+      searchedFor.push(end);
+
+      return pathFor(unit, start, end, pathFinderRegistry);
+    };
+
+    try {
+      sites.splice(0, sites.length, island, sameLand);
+
+      settlerWork(
+        dependencies,
+        player,
+        memory,
+        civ1Knowledge,
+        settlers,
+        settlers.tile(),
+        undefined,
+        {}
+      );
+
+      expect(at(memory.unitTargetData.get(settlers))).equal('0,2');
+      expect(at(memory.unitPathData.get(settlers)?.end())).equal('0,2');
+      expect(sites.map(at)).members(['3,0']);
+      expect(searchedFor.map(at)).members(['0,2']);
+
+      // With only the island left, the settlers claim nothing and search for nothing.
+      memory.unitTargetData.delete(settlers);
+      memory.unitPathData.delete(settlers);
+      searchedFor.splice(0);
+
+      settlerWork(
+        dependencies,
+        player,
+        memory,
+        civ1Knowledge,
+        settlers,
+        settlers.tile(),
+        undefined,
+        {}
+      );
+
+      expect(memory.unitTargetData.has(settlers)).false;
+      expect(memory.unitPathData.has(settlers)).false;
+      expect(sites.map(at)).members(['3,0']);
+      expect(searchedFor.map(at)).members([]);
+    } finally {
+      Path.for = pathFor;
+      sites.splice(0);
+      clientRegistry.unregister(client);
+      currentPlayerRegistry.unregister(player);
+      playerRegistry.unregister(player);
+      unitRegistry.unregister(...unitRegistry.getByPlayer(player));
+    }
   });
 
   it('should keep a unit on its way to where it was going when other targets come up', async (): Promise<void> => {
