@@ -36,6 +36,7 @@ export interface ProductionPolicy {
   // The most turns a city spends on each kind of build, at its net shields (`lib/City/buildTime`). A city builds a
   //  missing defender however long it takes, the soonest it can (civ-clone/web-renderer#212).
   buildTurns: {
+    settlers: number;
     unit: number;
   };
 }
@@ -45,6 +46,7 @@ export const defaultProductionPolicy: ProductionPolicy = {
   explorers: 3,
   explorersPerCity: 2,
   buildTurns: {
+    settlers: 20,
     unit: 10,
   },
 };
@@ -285,11 +287,12 @@ export const buildItemInCity = (
     }
   }
 
-  // Always Build Cities
+  // Always Build Cities, with Settlers the city can finish within the policy's turns.
   if (
     available.some(
       (buildItem: BuildItem) =>
-        buildItem.item() === (Settlers as unknown as typeof Buildable)
+        buildItem.item() === (Settlers as unknown as typeof Buildable) &&
+        turnsToBuild(buildItem) <= policy.buildTurns.settlers
     ) &&
     !dependencies.unitRegistry
       .getByCity(cityBuild.city())
