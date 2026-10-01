@@ -17,12 +17,36 @@ import { noOrders } from './orders';
 import scoreUnitMove from './scoreUnitMove';
 import shouldAttack from '../shouldAttack';
 
-export const moveUnit = async (
+// Whether any step from where `unit` stands scores above nothing: a hut, an enemy, unknown tiles it could go on to, a
+//  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
+export const hasStepWorthTaking = (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
   knowledge: Knowledge,
   unit: Unit
+): boolean =>
+  unit
+    .tile()
+    .getNeighbours()
+    .some(
+      (tile: Tile): boolean =>
+        scoreUnitMove(dependencies, player, memory, knowledge, unit, tile) > 0
+    );
+
+export interface MoveOptions {
+  // Whether, with no path, the unit takes a step worth nothing (picked at random among the best) rather than stopping.
+  //  A unit that only wanders walks back and forth for ever (civ-clone/web-renderer#230).
+  wander?: boolean;
+}
+
+export const moveUnit = async (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  knowledge: Knowledge,
+  unit: Unit,
+  { wander = true }: MoveOptions = {}
 ): Promise<void> => {
   let loopCheck = 0;
 
@@ -91,7 +115,9 @@ export const moveUnit = async (
         tile,
         scoreUnitMove(dependencies, player, memory, knowledge, unit, tile),
       ])
-      .filter(([, score]: [Tile, number]): boolean => score > -1)
+      .filter(([, score]: [Tile, number]): boolean =>
+        wander ? score > -1 : score > 0
+      )
       .sort(
         ([, a]: [Tile, number], [, b]: [Tile, number]): number =>
           b - a ||

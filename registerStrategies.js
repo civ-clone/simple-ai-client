@@ -16,6 +16,7 @@ const NegotiationAnswers_1 = require("./Strategies/Diplomacy/NegotiationAnswers"
 const PreventDisorder_1 = require("./Strategies/City/PreventDisorder");
 const ReviewCities_1 = require("./Strategies/Turn/ReviewCities");
 const SpendTreasury_1 = require("./Strategies/City/SpendTreasury");
+const StandDown_1 = require("./Strategies/Unit/StandDown");
 const StartRevolution_1 = require("./Strategies/Civ1/StartRevolution");
 const SurveyTargets_1 = require("./Strategies/Turn/SurveyTargets");
 const TradeRates_1 = require("./Strategies/Turn/TradeRates");
@@ -26,6 +27,7 @@ const WorkerTurn_1 = require("./Strategies/Unit/WorkerTurn");
 const disorder_1 = require("./lib/Civ1/disorder");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const spending_1 = require("./lib/Civ1/spending");
+const standDown_1 = require("./lib/Civ1/standDown");
 const tradeRates_1 = require("./lib/Civ1/tradeRates");
 const wantedAdvances_1 = require("./lib/Civ1/wantedAdvances");
 // The game's registries, as the strategies take them.
@@ -75,6 +77,7 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     new WorkerTurn_1.default(dependencies, knowledge),
     new Garrison_1.default(dependencies, knowledge),
     new MissionAndMove_1.default(dependencies, knowledge),
+    new StandDown_1.default(dependencies, knowledge, standDown_1.default),
     // The other mandatory choices.
     new BuildExplorerShip_1.default(dependencies, knowledge),
     new ChooseProduction_1.default(dependencies, knowledge),
