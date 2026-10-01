@@ -15,10 +15,13 @@ export const netShields = (city: City): number =>
 //  a city's yields isn't cheap.
 export const buildTime = (
   dependencies: Dependencies,
-  city: City
+  city: City,
+  shields: number = netShields(city)
 ): ((buildItem: BuildItem) => number) => {
-  const shields = netShields(city),
-    stored = dependencies.cityBuildRegistry.getByCity(city).progress().value();
+  const stored = dependencies.cityBuildRegistry
+    .getByCity(city)
+    .progress()
+    .value();
 
   return (buildItem: BuildItem): number => {
     const remaining = buildItem.cost().value() - stored;

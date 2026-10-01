@@ -2551,7 +2551,10 @@ describe('SimpleAIClient', (): void => {
     playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
     availableBuildItemsRegistry.register(Colossus as unknown as IBuildable);
 
+    // 5 shields, enough to finish the Colossus (200 shields) within the default policy's 40 turns.
     city.yields = () => [
+      new ProductionYield(1),
+      new ProductionYield(1),
       new ProductionYield(1),
       new ProductionYield(1),
       new ProductionYield(1),
@@ -2572,7 +2575,7 @@ describe('SimpleAIClient', (): void => {
       );
 
       // Now the more productive, but the first city is already building a Wonder.
-      other.yields = () => [new ProductionYield(5)];
+      other.yields = () => [new ProductionYield(6)];
 
       buildItemInCity(lastPick(), player, createMemory().targets, other);
 
@@ -2631,6 +2634,46 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
+  // civ-clone/web-renderer#212: a Wonder in a city with the default policy's 5 net shields and 40 turns to spare.
+  const wonderChoice = async (
+    WonderType: typeof Wonder,
+    shields: number,
+    setUp: (player: Player, city: City) => void = (): void => {}
+  ): Promise<unknown> => {
+    const { city, cleanUp, player } = await productionCity(1, true);
+
+    [BronzeWorking, MapMaking].forEach((advance) =>
+      playerResearchRegistry.getByPlayer(player).addAdvance(advance)
+    );
+    availableBuildItemsRegistry.register(WonderType as unknown as IBuildable);
+    city.yields = () => [new ProductionYield(shields)];
+    setUp(player, city);
+
+    try {
+      buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+      return cityBuildRegistry.getByCity(city).building()!.item();
+    } finally {
+      availableBuildItemsRegistry.unregister(
+        WonderType as unknown as IBuildable
+      );
+      cleanUp();
+    }
+  };
+
+  it('should not start a Wonder it cannot finish within 40 turns', async (): Promise<void> => {
+    // The Colossus costs 200 shields: 50 turns at 4.
+    expect(await wonderChoice(Colossus, 4)).not.equal(Colossus);
+  });
+
+  it('should not start a Wonder in a city making fewer than 5 net shields, even with the shields stored to finish it soon', async (): Promise<void> => {
+    expect(
+      await wonderChoice(Colossus, 4, (player, city) =>
+        cityBuildRegistry.getByCity(city).progress().set(190)
+      )
+    ).not.equal(Colossus);
+  });
+
   it("should target the destroyer's cities, not its own, when one of its cities is destroyed", async (): Promise<void> => {
     withCivilizations();
 

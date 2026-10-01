@@ -4,6 +4,7 @@ import Dependencies from '../Dependencies';
 export declare const netShields: (city: City) => number;
 export declare const buildTime: (
   dependencies: Dependencies,
-  city: City
+  city: City,
+  shields?: number
 ) => (buildItem: BuildItem) => number;
 export default buildTime;

@@ -14,15 +14,13 @@ import Knowledge from '../Knowledge';
 import { Land, Naval, Worker } from '@civ-clone/library-unit/Types';
 import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Player from '@civ-clone/core-player/Player';
-import { Production } from '@civ-clone/civ1-world/Yields';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '../Memory';
 import civ1Knowledge from './knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
-import buildTime from '../City/buildTime';
+import buildTime, { netShields } from '../City/buildTime';
 import Yield from '@civ-clone/core-yield/Yield';
-import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 
 // How many of each kind of unit a player wants, which decides when its cities stop building units and turn to
 //  improvements and Wonders. `ChooseProduction` asks for one per player, which is where civ-clone/web-renderer#157's
@@ -38,7 +36,10 @@ export interface ProductionPolicy {
   buildTurns: {
     settlers: number;
     unit: number;
+    wonder: number;
   };
+  // The fewest net shields a city makes to start a Wonder, however many it has stored.
+  wonderShields: number;
 }
 
 export const defaultProductionPolicy: ProductionPolicy = {
@@ -48,7 +49,9 @@ export const defaultProductionPolicy: ProductionPolicy = {
   buildTurns: {
     settlers: 20,
     unit: 10,
+    wonder: 40,
   },
+  wonderShields: 5,
 };
 
 // A unit built to attack rather than defend.
@@ -112,9 +115,6 @@ const unitsAndOrders = (
 
       return building !== null && isType(building.item());
     }).length;
-
-const production = (city: City): number =>
-  reduceYield(city.yields(), Production);
 
 // The unit among `buildItems` to build for its `YieldType` (`Attack` for an attacker, `Defence` for a defender), its
 //  cost weighed against its strength (civ-clone/web-renderer#212): of the units `city` can finish within the policy's
@@ -180,7 +180,7 @@ const shouldBuildWonder = (
       );
     }) &&
     cities.every(
-      (other: City): boolean => production(other) <= production(city)
+      (other: City): boolean => netShields(other) <= netShields(city)
     )
   );
 };
@@ -217,7 +217,8 @@ export const buildItemInCity = (
           availableFiltered.length * dependencies.randomNumberGenerator()
         )
       ].item(),
-    turnsToBuild = buildTime(dependencies, city),
+    shields = netShields(city),
+    turnsToBuild = buildTime(dependencies, city, shields),
     // A defender for this city: the soonest it can, if it can't finish one within the policy's turns.
     getDefensiveUnit = (
       (UnitType?: typeof Unit): (() => typeof Unit | undefined) =>
@@ -345,13 +346,19 @@ export const buildItemInCity = (
     return;
   }
 
-  // One Wonder at a time, in the city that can build it soonest. (This used to need a single Production yield over 4,
-  //  but a city's yields come one per tile and unit, so no city ever had one.)
+  // One Wonder at a time, in the city that can build it soonest, and only one the city makes enough shields to finish
+  //  within the policy's turns.
+  const usefulWonders = availableWonders.filter(
+    (buildItem: BuildItem): boolean =>
+      turnsToBuild(buildItem) <= policy.buildTurns.wonder
+  );
+
   if (
-    availableWonders.length > 0 &&
+    usefulWonders.length > 0 &&
+    shields >= policy.wonderShields &&
     shouldBuildWonder(dependencies, player, city)
   ) {
-    const wonders = availableWonders.map((cityBuild) => cityBuild.item());
+    const wonders = usefulWonders.map((cityBuild) => cityBuild.item());
 
     cityBuild.build(
       wonders[Math.floor(dependencies.randomNumberGenerator() * wonders.length)]
