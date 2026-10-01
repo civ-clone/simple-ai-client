@@ -35,7 +35,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; always handles it       | generic |
 | `Strategies/City/BuildExplorerShip`       | a `CityBuild` choice                         | builds a ship to explore with, if the player has 2+ cities and no ship (handles it only then) | generic |
 | `Strategies/Civ1/ChooseProduction`        | a `CityBuild` choice                         | picks what the city builds, by each player's `ProductionPolicy`               | Civ1    |
-| `Strategies/Science/ChooseResearch`       | a `PlayerResearch` choice                    | picks research at random                                                       | generic |
+| `Strategies/Science/ChooseResearch`       | a `PlayerResearch` choice                    | picks research at random, an advance the leader wants first                    | generic |
 | `Strategies/Civ1/ChooseGovernment`        | a `PlayerGovernment` choice                  | picks Monarchy after Anarchy                                                   | Civ1    |
 | `Strategies/Diplomacy/NegotiationAnswers` | `ChooseFromList` for `negotiation.next-step` | answers each negotiation step; any other list gets a random pick               | generic |
 | `Strategies/City/PreventDisorder`         | `AfterTurn`                                  | keeps cities out of civil disorder, by the ruleset's `DisorderPolicy`          | generic |
@@ -56,12 +56,19 @@ they're still needed.
 v474.05's routine (`lib/tradeRates.ts`, in tenths): luxuries go up one when a city was in disorder this turn, and down
 one every fourth turn while no city is in disorder or on the edge of it; science is the leader's Ideology
 (`lib/traits.ts`: Militaristic −1, Civilized 1) plus half of what luxuries leave, one more while the treasury holds more
-than the turn number + 100, or none at all once the player has Robotics, as in v474.05; tax takes the rest. A player
+than the turn number + 100, or none at all once the player has stopped researching (below); tax takes the rest. A player
 starts at Ideology + 3 science and 1 luxury. Luxuries also go up one while any city `PreventDisorder` couldn't calm
 would otherwise starve or has no tile left to take an Entertainer from, and whenever the luxury rate changes every city
 is calmed again. One departure from v474.05: luxuries fall all the way back to 0 when no city needs them, where the
 original keeps 1 or 2 for good. Civ1's policy (`lib/Civ1/tradeRates.ts`) reads disorder from `civ1-city-happiness`, and
 takes a city larger than 5 with as many happy citizens as unhappy ones to be on the edge.
+
+A player stops researching for good once it has every advance its leader wants (`lib/Science/wantedAdvances.ts`), by
+the ruleset's `WantedAdvancesPolicy`. Until then `ChooseResearch` picks among the wanted advances available, if any are,
+in the same single random draw. v474.05 stops every AI at Robotics. Civ1's table (`lib/Civ1/wantedAdvances.ts`) starts
+there: Militaristic leaders want nothing more; normal militarism and a Friendly mood add Recycling and Nuclear Power;
+Civilized leaders add those and Computers, Genetic Engineering, Space Flight, Plastics, Superconductor and Fusion
+Power. Future Technology is never wanted.
 
 Strategies are game-wide and stateless. Each is a thin adapter over a module in `lib/`. It's given the shared
 registries (`lib/Dependencies.ts`) and the ruleset's judgements (`lib/Knowledge.ts`; Civ1's are in

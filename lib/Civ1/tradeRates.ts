@@ -4,9 +4,10 @@ import {
   calculateCitizenState,
   citizenSummary,
 } from '@civ-clone/civ1-city-happiness/lib/calculateCitizenState';
-import { Robotics } from '@civ-clone/civ1-science/Advances';
 import { TradeRatePolicy } from '../Turn/adjustTradeRates';
 import civ1DisorderPolicy from './disorder';
+import civ1WantedAdvances from './wantedAdvances';
+import { scienceStopped } from '../Science/wantedAdvances';
 
 export const civ1TradeRatePolicy: TradeRatePolicy = {
   // `civ1-city-happiness` records the disorder it finds at the player's turn start until order is restored.
@@ -29,18 +30,9 @@ export const civ1TradeRatePolicy: TradeRatePolicy = {
 
     return happy === unhappy;
   },
-  // v474.05 stops an AI's science the moment it has Robotics. TODO: civ-clone/web-renderer#155, by the leader's
-  //  personality.
-  scienceStopped: (dependencies, player) => {
-    try {
-      return dependencies.playerResearchRegistry
-        .getByPlayer(player)
-        .completed(Robotics);
-    } catch (e) {
-      // A player with no research.
-      return false;
-    }
-  },
+  // Once the player has every advance its leader wants (`Civ1/wantedAdvances`), where v474.05 stops at Robotics.
+  scienceStopped: (dependencies, player) =>
+    scienceStopped(dependencies, player, civ1WantedAdvances),
 };
 
 export default civ1TradeRatePolicy;
