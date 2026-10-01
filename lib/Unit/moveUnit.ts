@@ -38,6 +38,9 @@ export interface MoveOptions {
   // Whether, with no path, the unit takes a step worth nothing (picked at random among the best) rather than stopping.
   //  A unit that only wanders walks back and forth for ever (civ-clone/web-renderer#230).
   wander?: boolean;
+  // Whether to stop, moves to spare and orders left to the caller, once the unit's path ends or fails, rather than
+  //  carrying on with the greedy step: for a unit that has something to do where its path ends.
+  stopAtPathEnd?: boolean;
 }
 
 export const moveUnit = async (
@@ -46,7 +49,7 @@ export const moveUnit = async (
   memory: Memory,
   knowledge: Knowledge,
   unit: Unit,
-  { wander = true }: MoveOptions = {}
+  { stopAtPathEnd = false, wander = true }: MoveOptions = {}
 ): Promise<void> => {
   let loopCheck = 0;
 
@@ -64,6 +67,10 @@ export const moveUnit = async (
     }
 
     const path = memory.unitPathData.get(unit);
+
+    if (!path && stopAtPathEnd) {
+      return;
+    }
 
     if (path) {
       const target = path.shift(),

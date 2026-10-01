@@ -45,10 +45,12 @@ export const unitsWanted = (
       martialLawUnitsIn(city).length
   );
 
-// How many of the player's units are on their way to `tile`.
-const headingFor = (memory: Memory, tile: Tile): number =>
-  [...memory.unitPathData.values()].filter(
-    (path: Path): boolean => path.end() === tile
+// How many of the player's units that could defend a city are on their way to `tile`: a ship going into port, say,
+//  doesn't make up for a defender the city is short of.
+const defendersHeadingFor = (memory: Memory, tile: Tile): number =>
+  [...memory.unitPathData.entries()].filter(
+    ([unit, path]: [Unit, Path]): boolean =>
+      path.end() === tile && isDefender(unit)
   ).length;
 
 // The player's cities other than the one the unit is in, that it could reach, nearest first.
@@ -189,12 +191,19 @@ export const standDown = async (
   unit: Unit,
   actions: ActionLookup
 ): Promise<void> => {
+  // Along `path`, and no further: arrived with moves to spare, it waits there for `Garrison` or this to decide next
+  //  turn, rather than take a step towards anything it passes.
   const go = async (path: Path): Promise<void> => {
     memory.unitPathData.set(unit, path);
 
     await moveUnit(dependencies, player, memory, knowledge, unit, {
+      stopAtPathEnd: true,
       wander: false,
     });
+
+    if (unit.active() && unit.moves().value() >= 0.1) {
+      noOrders(dependencies, unit);
+    }
   };
 
   // Worked out only if there's a city to look for.
@@ -210,7 +219,7 @@ export const standDown = async (
       reachableCities(),
       (city: City): boolean =>
         unitsWanted(dependencies, knowledge, city) >
-        headingFor(memory, city.tile())
+        defendersHeadingFor(memory, city.tile())
     );
 
     if (path) {
