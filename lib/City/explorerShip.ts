@@ -6,6 +6,7 @@ import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
+import Knowledge from '../Knowledge';
 import { Naval } from '@civ-clone/library-unit/Types';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '../Memory';
@@ -78,7 +79,8 @@ export const explorerShipFor = (
   dependencies: Dependencies,
   player: Player,
   targets: TargetBoard,
-  city: City
+  city: City,
+  knowledge: Knowledge
 ): typeof Buildable | null => {
   const [ship] = dependencies.cityBuildRegistry
     .getByCity(city)
@@ -105,7 +107,7 @@ export const explorerShipFor = (
         return building !== null && isShip(building.item());
       }) ||
     defendersIn(dependencies, city).length <
-      defendersWanted(dependencies, city) ||
+      defendersWanted(dependencies, knowledge, city) ||
     !isOnSea(city) ||
     !reachesSeaToExplore(dependencies, player, targets, city)
   ) {

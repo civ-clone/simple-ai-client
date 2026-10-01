@@ -2106,7 +2106,8 @@ describe('SimpleAIClient', (): void => {
         musketman,
         city.tile(),
         unitRegistry.getByTile(city.tile()),
-        fortify
+        fortify,
+        civ1Knowledge
       )
     ).true;
     expect(warrior.active()).true;
@@ -2220,7 +2221,8 @@ describe('SimpleAIClient', (): void => {
         warrior,
         city.tile(),
         unitRegistry.getByTile(city.tile()),
-        fortify
+        fortify,
+        civ1Knowledge
       )
     ).true;
 

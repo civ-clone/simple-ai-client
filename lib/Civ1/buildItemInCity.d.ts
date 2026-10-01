@@ -1,5 +1,6 @@
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
+import Knowledge from '../Knowledge';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '../Memory';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -15,6 +16,7 @@ export declare const buildItemInCity: (
   player: Player,
   targets: TargetBoard,
   city: City,
-  policy?: ProductionPolicy
+  policy?: ProductionPolicy,
+  knowledge?: Knowledge
 ) => void;
 export default buildItemInCity;

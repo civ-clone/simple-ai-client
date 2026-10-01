@@ -18,7 +18,8 @@ export class BuildExplorerShip extends AIStrategy {
         this.dependencies(),
         player,
         this.memoryFor(player).targets,
-        cityBuild.city()
+        cityBuild.city(),
+        this.knowledge()
       );
 
     if (ship === null) {

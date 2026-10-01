@@ -2,6 +2,7 @@
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
 import Dependencies from './Dependencies';
+import { MartialLawPolicy } from './City/defence';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -20,6 +21,8 @@ export interface Knowledge {
   assignWorkers(dependencies: Dependencies, city: City): void;
   // Whether `unit` is an aircraft, and so has to end its turns in a city or on a carrier.
   isAircraft(dependencies: Dependencies, unit: Unit): boolean;
+  // How many units in a city martial law can use, and so how many the city wants in it.
+  martialLaw: MartialLawPolicy;
   shouldBuildCity(
     dependencies: Dependencies,
     player: Player,

@@ -12,7 +12,7 @@ class BuildExplorerShip extends AIStrategy_1.default {
         return action.value() instanceof CityBuild_1.default;
     }
     attempt(action) {
-        const player = action.player(), cityBuild = action.value(), ship = (0, explorerShip_1.default)(this.dependencies(), player, this.memoryFor(player).targets, cityBuild.city());
+        const player = action.player(), cityBuild = action.value(), ship = (0, explorerShip_1.default)(this.dependencies(), player, this.memoryFor(player).targets, cityBuild.city(), this.knowledge());
         if (ship === null) {
             return false;
         }

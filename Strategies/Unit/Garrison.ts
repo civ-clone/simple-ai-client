@@ -24,7 +24,8 @@ export class Garrison extends AIStrategy {
       action.value(),
       tile,
       tileUnits,
-      fortify
+      fortify,
+      this.knowledge()
     );
   }
 }
