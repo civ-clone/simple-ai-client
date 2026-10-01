@@ -243,6 +243,26 @@ describe('martial law', (): void => {
     expect(wanted(setup)).to.equal(2);
   });
 
+  it('should not keep a third unit where a Temple would keep the citizen content without it', async (): Promise<void> => {
+    // Size 8 with a Temple and three Warriors. The engine's martial law comes before the Temple, so the three Warriors
+    //  keep all three unhappy citizens content and the Temple has nothing left to do; but two Warriors and the Temple
+    //  would do the same.
+    const setup = await setUp({ warriors: 3 });
+
+    setup.game.cityImprovements.register(
+      new Temple(setup.city, setup.game.rules)
+    );
+
+    expect(disorder(setup)).false;
+    expect(wanted(setup)).to.equal(2);
+
+    const [, , third] = setup.dependencies.unitRegistry.getByTile(
+      setup.city.tile()
+    );
+
+    expect(staysToGarrison(setup, third)).false;
+  });
+
   it('should build a unit for martial law in a Monarchy city short of one', async (): Promise<void> => {
     const setup = await setUp(),
       { city, dependencies, game, player } = setup,
