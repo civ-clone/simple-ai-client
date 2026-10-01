@@ -67,8 +67,8 @@ A player stops researching for good once it has every advance its leader wants (
 the ruleset's `WantedAdvancesPolicy`. Until then `ChooseResearch` picks among the wanted advances available, if any are,
 in the same single random draw. v474.05 stops every AI at Robotics. Civ1's table (`lib/Civ1/wantedAdvances.ts`) starts
 there: Militaristic leaders want nothing more; normal militarism and a Friendly mood add Recycling and Nuclear Power;
-Civilized leaders add those and Computers, Genetic Engineering, Space Flight, Plastics, Superconductor and Fusion
-Power. Future Technology is never wanted.
+Civilized leaders add Computers, Genetic Engineering, Space Flight, Plastics, Superconductor and Fusion Power. Future
+Technology is never wanted.
 
 Strategies are game-wide and stateless. Each is a thin adapter over a module in `lib/`. It's given the shared
 registries (`lib/Dependencies.ts`) and the ruleset's judgements (`lib/Knowledge.ts`; Civ1's are in

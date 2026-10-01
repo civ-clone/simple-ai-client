@@ -4,8 +4,8 @@
 //  - Militaristic leaders (Ideology −1) want nothing beyond it. Genghis Khan stops at Robotics, as in Civ1;
 //  - normal militarism adds Recycling and Nuclear Power, which keep cities productive and clean. Gandhi carries on
 //    until he has both;
-//  - Civilized leaders (Ideology 1) add those and the advances behind the late Wonders and the spaceship: Computers,
-//    Genetic Engineering, Space Flight, Plastics, Superconductor and Fusion Power;
+//  - Civilized leaders (Ideology 1) add the advances behind the late Wonders and the spaceship: Computers, Genetic
+//    Engineering, Space Flight, Plastics, Superconductor and Fusion Power;
 //  - a Friendly mood adds Recycling and Nuclear Power, even to a Militaristic leader;
 //  - an Aggressive mood, and a leader's policy (Perfectionist to Expansionist), add nothing.
 // Future Technology (civ-clone/web-renderer#128) is never wanted.
@@ -41,7 +41,6 @@ export const civ1WantedAdvances: WantedAdvancesPolicy = {
     [
       Civilized,
       [
-        ...productiveAndClean,
         Computers,
         GeneticEngineering,
         SpaceFlight,
