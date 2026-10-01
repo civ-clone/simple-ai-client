@@ -8,6 +8,7 @@ import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import reachableTiles from './reachable';
 
 // The site the worker should still be heading for, if any. A site is given up when the worker has reached it, when
 //  it's no longer a good place for a city (say another city was founded nearby), or when the worker has lost its path
@@ -63,8 +64,22 @@ const claimSite = (
     (a: Tile, b: Tile): number => a.distanceFrom(tile) - b.distanceFrom(tile)
   );
 
+  // Only worked out if there's a site to check.
+  let reachable: Set<Tile> | null | undefined;
+
   for (const site of sites) {
     if (site === tile) {
+      continue;
+    }
+
+    if (reachable === undefined) {
+      reachable = reachableTiles(unit);
+    }
+
+    // On another continent: a search would cover the whole of this one and find nothing. Once ships have shown the
+    //  players other continents, most of the board can be sites like that, and searching for each of them, for each
+    //  worker with no site, every turn, was most of the game's time.
+    if (reachable !== null && !reachable.has(site)) {
       continue;
     }
 
