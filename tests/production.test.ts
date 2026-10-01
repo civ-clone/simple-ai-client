@@ -255,12 +255,14 @@ describe('buildItemInCity', (): void => {
     });
 
     it('should count Settlers its other cities are building towards the ones it wants', async (): Promise<void> => {
-      // Two cities want 3 + 2 × 0.5 = 4 by the default policy: three are out, and the other city is building the fourth.
-      const setup = await setUp({ shields: 2, size: 2 }),
-        other = setup.addCity(3, 2);
+      // Three cities want 3 + floor(3 × 0.5) = 4 by the default policy: two are out, and the other two cities are
+      //  building the rest.
+      const setup = await setUp({ shields: 2, size: 2 });
 
-      unitsOut(setup, 3, Settlers);
-      setup.game.cityBuilds.getByCity(other).build(Settlers);
+      unitsOut(setup, 2, Settlers);
+      [setup.addCity(3, 2), setup.addCity(1, 4)].forEach((other: City): void =>
+        setup.game.cityBuilds.getByCity(other).build(Settlers)
+      );
 
       expect(setup.choose()).not.equal(Settlers);
       expect(
