@@ -1,3 +1,4 @@
+import { TerrainPolicy } from '../Unit/terrainWork';
 import Dependencies from '../Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
@@ -26,3 +27,4 @@ export declare const shouldRoad: (
   player: Player,
   tile: Tile
 ) => boolean;
+export declare const civ1TerrainPolicy: TerrainPolicy;
