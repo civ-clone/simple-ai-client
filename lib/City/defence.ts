@@ -1,10 +1,6 @@
 // Generic: how many defenders a city wants, judged the same way by city production and by the units deciding whether to
 //  stay and fortify there. When the two disagreed, cities built a defender, it walked off, and they built another.
-import {
-  CityImprovementContent,
-  MartialLaw,
-  Unhappiness,
-} from '@civ-clone/library-city/Yields';
+import { MartialLaw, Unhappiness } from '@civ-clone/library-city/Yields';
 import City from '@civ-clone/core-city/City';
 import Cost from '@civ-clone/core-city/Rules/Cost';
 import Dependencies from '../Dependencies';
@@ -12,7 +8,6 @@ import { Fortifiable } from '@civ-clone/library-unit/Types';
 import Knowledge from '../Knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
-import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 
 // The ruleset's part of martial law, units in a city keeping its unhappy citizens content (civ-clone/web-renderer#216).
 //  `Civ1/martialLaw` has Civ1's.
@@ -21,24 +16,37 @@ export interface MartialLawPolicy {
   limit(dependencies: Dependencies, city: City): number;
 }
 
-// More unhappy citizens than any city has, for `improvementContent`.
+// More unhappy citizens than any city has, for `calmedWithoutMartialLaw`.
 const CROWD = 100;
 
-// How many unhappy citizens the yields of `YieldType` keep content: `MartialLaw`, say.
-const contentFrom = (yields: Yield[], YieldType: Function): number =>
+// The unhappiness in `yields` before anything calms it (`positive`), and how much of it anything but martial law calms
+//  (`other`): Temples and the like (`CityImprovementContent`), and Wonders, which give a plain negative `Unhappiness`.
+const unhappiness = (yields: Yield[]): { positive: number; other: number } =>
   yields
-    .filter((cityYield: Yield): boolean => cityYield instanceof YieldType)
+    .filter((cityYield: Yield): boolean => cityYield instanceof Unhappiness)
     .reduce(
-      (total: number, cityYield: Yield): number =>
-        total + Math.abs(cityYield.value()),
-      0
+      (totals, cityYield: Yield) => {
+        const value = cityYield.value();
+
+        if (value > 0) {
+          totals.positive += value;
+        } else if (!(cityYield instanceof MartialLaw)) {
+          totals.other -= value;
+        }
+
+        return totals;
+      },
+      { positive: 0, other: 0 }
     );
 
-// How many unhappy citizens `city`'s improvements can make content, by the ruleset's own `Cost` rules, run as
-//  `City#yields` runs them but over nothing but a crowd of unhappy citizens. An improvement only says what it can do
-//  when it has someone to calm: in a city where martial law (or anything that comes before it) has calmed everyone,
-//  it says nothing.
-const improvementContent = (dependencies: Dependencies, city: City): number => {
+// How many unhappy citizens `city`'s improvements, Wonders and anything else but martial law can make content, by the
+//  ruleset's own `Cost` rules, run as `City#yields` runs them but over nothing but a crowd of unhappy citizens. They
+//  only say what they can do when they have someone to calm: in a city where martial law, which the engine applies
+//  first, has calmed everyone, they say nothing.
+const calmedWithoutMartialLaw = (
+  dependencies: Dependencies,
+  city: City
+): number => {
   const yields: Yield[] = [new Unhappiness(CROWD)];
 
   dependencies.ruleRegistry.get(Cost).forEach((rule: Cost): void => {
@@ -53,14 +61,13 @@ const improvementContent = (dependencies: Dependencies, city: City): number => {
     }
   });
 
-  return contentFrom(yields, CityImprovementContent);
+  return unhappiness(yields).other;
 };
 
-// How many units in `city` martial law would use: one for each citizen unhappy before martial law or the city's
-//  improvements calm them, less those the improvements can calm, up to the policy's limit. Those counts are the
-//  ruleset's rules' own, so they're the same whether or not the city has made Entertainers yet, and whichever of martial
-//  law and the improvements its rules apply first. A citizen a unit keeps content leaves its tile worked, where an
-//  Entertainer gives it up.
+// How many units in `city` martial law would use: one for each citizen unhappy before anything calms them, less those
+//  its improvements, Wonders and the rest can calm, up to the policy's limit. Those counts are the ruleset's rules' own,
+//  so they're the same whether or not the city has made Entertainers yet, and whatever order the rules apply in. A
+//  citizen a unit keeps content leaves its tile worked, where an Entertainer gives it up.
 export const martialLawUnitsWanted = (
   dependencies: Dependencies,
   knowledge: Knowledge,
@@ -72,15 +79,13 @@ export const martialLawUnitsWanted = (
     return 0;
   }
 
-  const yields: Yield[] = city.yields(),
-    unhappy =
-      reduceYield(yields, Unhappiness) +
-      contentFrom(yields, MartialLaw) +
-      contentFrom(yields, CityImprovementContent);
-
   return Math.min(
     limit,
-    Math.max(0, unhappy - improvementContent(dependencies, city))
+    Math.max(
+      0,
+      unhappiness(city.yields()).positive -
+        calmedWithoutMartialLaw(dependencies, city)
+    )
   );
 };
 

@@ -5,6 +5,7 @@ import {
   Temple,
 } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import { Monarchy, Republic } from '@civ-clone/civ1-government/Governments';
+import { ShakespearesTheatre } from '@civ-clone/civ1-wonder/Wonders';
 import {
   defendersIn,
   defendersWanted,
@@ -43,6 +44,7 @@ import { inDisorder } from '../lib/City/disorder';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import treasuryRules from '@civ-clone/civ1-treasury/registerRules';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
+import wonderRules from '@civ-clone/civ1-wonder/registerRules';
 import worldRules from '@civ-clone/civ1-world/registerRules';
 
 type SetUp = {
@@ -82,6 +84,7 @@ const setUp = async ({
   governmentRules(game);
   treasuryRules(game);
   unitRules(game);
+  wonderRules(game);
   worldRules(game);
 
   const world = await simpleRLELoader(game.rules, game.terrainFeatures)(
@@ -254,6 +257,28 @@ describe('martial law', (): void => {
     );
 
     expect(disorder(setup)).false;
+    expect(wanted(setup)).to.equal(2);
+
+    const [, , third] = setup.dependencies.unitRegistry.getByTile(
+      setup.city.tile()
+    );
+
+    expect(staysToGarrison(setup, third)).false;
+  });
+
+  it('should not keep units for martial law in a city whose Wonder keeps everyone content', async (): Promise<void> => {
+    // Shakespeare's Theatre makes every unhappy citizen in its city content, with a plain negative `Unhappiness`, and
+    //  comes after martial law: with three Warriors there it has nothing left to do, but it would do it all without them.
+    const setup = await setUp({ warriors: 3 });
+
+    setup.game.wonders.register(
+      new ShakespearesTheatre(setup.city, setup.game.rules)
+    );
+
+    expect(disorder(setup)).false;
+    expect(
+      martialLawUnitsWanted(setup.dependencies, civ1Knowledge, setup.city)
+    ).to.equal(0);
     expect(wanted(setup)).to.equal(2);
 
     const [, , third] = setup.dependencies.unitRegistry.getByTile(
