@@ -32,7 +32,8 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
 | `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves | generic |
 | `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city (handles it only then)                     | generic |
-| `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; always handles it       | generic |
+| `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; handles it unless the unit has nothing to do | generic |
+| `Strategies/Unit/StandDown`               | a unit's action                              | goes to a city that wants it, is disbanded if not worth its upkeep, or waits in or heads for a city; always handles it | generic |
 | `Strategies/City/BuildExplorerShip`       | a `CityBuild` choice                         | builds a ship to explore with, if the player has 2+ cities and no ship (handles it only then) | generic |
 | `Strategies/Civ1/ChooseProduction`        | a `CityBuild` choice                         | picks what the city builds, by each player's `ProductionPolicy`               | Civ1    |
 | `Strategies/Science/ChooseResearch`       | a `PlayerResearch` choice                    | picks research at random, an advance the leader wants first                    | generic |
@@ -40,6 +41,15 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Diplomacy/NegotiationAnswers` | `ChooseFromList` for `negotiation.next-step` | answers each negotiation step; any other list gets a random pick               | generic |
 | `Strategies/City/PreventDisorder`         | `AfterTurn`                                  | keeps cities out of civil disorder, by the ruleset's `DisorderPolicy`          | generic |
 | `Strategies/Turn/TradeRates`              | `AfterTurn`                                  | sets the tax, luxury and science rates, by the ruleset's `TradeRatePolicy`     | generic |
+
+A unit with nothing to do (civ-clone/web-renderer#230), no mission, no path and no step that scores above nothing, is
+passed over by `MissionAndMove` rather than left to wander, and `StandDown` (`lib/Unit/standDown.ts`) takes it: a unit
+that could defend a city goes to the nearest of the player's cities it can reach that still wants a defender or a unit
+for martial law, counting those already on their way; failing that it's disbanded if the ruleset's `StandDownPolicy`
+says so; otherwise it waits in the city it's in, unfortified and ready for the next mission, or heads for the nearest
+city it can reach (a ship for the sea beside one, then into port), or with none, fortifies where it is. Civ1's policy (`lib/Civ1/standDown.ts`) disbands
+a unit its home city pays shields for when the city has none to spare. Run for one unit, `MissionAndMove` returning
+`false` means the unit has nothing left to explore or attack.
 
 `PreventDisorder` (`lib/City/disorder.ts`) runs once the player's units have moved, since where they stand changes how
 unhappy a city is. For each city the ruleset's `CivilDisorder` rules would find in disorder at the player's next turn
@@ -86,8 +96,8 @@ Generic files import only `core-*`, `base-*` and `library-*` packages and other 
 ## Adding to or overriding the pack
 
 The pack registers no `Priority` rules, so it runs in registration order. A plugin strategy registered later with no
-`Priority` rule runs after the whole pack. `MissionAndMove` handles every unit, so a unit strategy registered that way
-never gets to act.
+`Priority` rule runs after the whole pack. `StandDown` handles every unit that reaches it, so a unit strategy registered
+that way never gets to act.
 
 - **To run ahead of the pack**, give your strategy a `Priority` rule (`Rules/Priority` in `core-strategy`). Any
   `Priority` value puts a strategy ahead of one with none. For example, a plugin that adds Caravans registers a

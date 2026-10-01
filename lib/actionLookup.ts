@@ -5,6 +5,7 @@ import {
   BuildMine,
   BuildRoad,
   CaptureCity,
+  Disband,
   Disembark,
   Embark,
   Fortify,
@@ -21,6 +22,7 @@ export type ActionLookup = {
   buildMine?: BuildMine;
   buildRoad?: BuildRoad;
   captureCity?: CaptureCity;
+  disband?: Disband;
   disembark?: Disembark;
   embark?: Embark;
   fortify?: Fortify;

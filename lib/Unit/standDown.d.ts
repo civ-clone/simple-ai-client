@@ -1,24 +1,25 @@
+import { ActionLookup } from '../actionLookup';
+import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
 import Memory from '../Memory';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
-export declare const hasStepWorthTaking: (
-  dependencies: Dependencies,
-  player: Player,
-  memory: Memory,
-  knowledge: Knowledge,
-  unit: Unit
-) => boolean;
-export interface MoveOptions {
-  wander?: boolean;
+export interface StandDownPolicy {
+  disband(dependencies: Dependencies, unit: Unit): boolean;
 }
-export declare const moveUnit: (
+export declare const unitsWanted: (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  city: City
+) => number;
+export declare const standDown: (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
   knowledge: Knowledge,
+  policy: StandDownPolicy,
   unit: Unit,
-  { wander }?: MoveOptions
+  actions: ActionLookup
 ) => Promise<void>;
-export default moveUnit;
+export default standDown;
