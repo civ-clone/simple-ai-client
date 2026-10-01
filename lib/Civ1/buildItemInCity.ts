@@ -25,7 +25,7 @@ import { TargetBoard } from '../Memory';
 import civ1Knowledge from './knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
-import buildTime, { netShields } from '../City/buildTime';
+import buildTime, { finishesWithin, netShields } from '../City/buildTime';
 import isUsefulWonder from './wonders';
 import Yield from '@civ-clone/core-yield/Yield';
 
@@ -56,11 +56,12 @@ export const defaultProductionPolicy: ProductionPolicy = {
   explorersPerCity: 2,
   buildTurns: {
     improvement: 40,
-    settlers: 20,
+    // Any city making net shields: the arena found every limit up to 40 turns cost the player cities.
+    settlers: Infinity,
     unit: 10,
-    wonder: 40,
+    wonder: 100,
   },
-  wonderShields: 5,
+  wonderShields: 2,
 };
 
 // A unit built to attack rather than defend.
@@ -147,8 +148,8 @@ export const chooseUnit = (
         turns: turnsToBuild(buildItem),
       }))
       .filter(({ strength }): boolean => strength > 0),
-    soon = candidates.filter(
-      ({ turns }): boolean => turns <= policy.buildTurns.unit
+    soon = candidates.filter(({ turns }): boolean =>
+      finishesWithin(turns, policy.buildTurns.unit)
     ),
     [best] =
       soon.length > 0 || !orSoonest
@@ -234,12 +235,13 @@ export const buildItemInCity = (
     isUnitItem = (buildItem: BuildItem): boolean =>
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item()),
     // The rest, that the city can finish within the policy's turns for a unit or an improvement.
-    finishable = availableFiltered.filter(
-      (buildItem: BuildItem): boolean =>
-        turnsToBuild(buildItem) <=
-        (isUnitItem(buildItem)
+    finishable = availableFiltered.filter((buildItem: BuildItem): boolean =>
+      finishesWithin(
+        turnsToBuild(buildItem),
+        isUnitItem(buildItem)
           ? policy.buildTurns.unit
-          : policy.buildTurns.improvement)
+          : policy.buildTurns.improvement
+      )
     ),
     randomSelection =
       finishable[
@@ -300,7 +302,7 @@ export const buildItemInCity = (
       .filter(
         (buildItem: BuildItem): boolean =>
           isExplorerType(dependencies, buildItem.item()) &&
-          turnsToBuild(buildItem) <= policy.buildTurns.unit
+          finishesWithin(turnsToBuild(buildItem), policy.buildTurns.unit)
       )
       .sort(
         (a: BuildItem, b: BuildItem): number =>
@@ -319,7 +321,7 @@ export const buildItemInCity = (
     available.some(
       (buildItem: BuildItem) =>
         buildItem.item() === (Settlers as unknown as typeof Buildable) &&
-        turnsToBuild(buildItem) <= policy.buildTurns.settlers
+        finishesWithin(turnsToBuild(buildItem), policy.buildTurns.settlers)
     ) &&
     !dependencies.unitRegistry
       .getByCity(cityBuild.city())
@@ -376,7 +378,7 @@ export const buildItemInCity = (
   //  that the city makes enough shields to finish within the policy's turns.
   const usefulWonders = availableWonders.filter(
     (buildItem: BuildItem): boolean =>
-      turnsToBuild(buildItem) <= policy.buildTurns.wonder &&
+      finishesWithin(turnsToBuild(buildItem), policy.buildTurns.wonder) &&
       isUsefulWonder(
         dependencies,
         player,

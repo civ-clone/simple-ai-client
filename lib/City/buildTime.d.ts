@@ -7,4 +7,5 @@ export declare const buildTime: (
   city: City,
   shields?: number
 ) => (buildItem: BuildItem) => number;
+export declare const finishesWithin: (turns: number, limit: number) => boolean;
 export default buildTime;

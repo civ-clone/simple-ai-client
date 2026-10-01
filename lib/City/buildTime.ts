@@ -34,4 +34,8 @@ export const buildTime = (
   };
 };
 
+// Whether `turns` from `buildTime` is within `limit`. Never for a city making no shields to spare, even with no limit.
+export const finishesWithin = (turns: number, limit: number): boolean =>
+  turns < Infinity && turns <= limit;
+
 export default buildTime;

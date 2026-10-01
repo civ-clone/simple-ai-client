@@ -353,7 +353,7 @@ import buildItemInCity, {
 } from '../lib/Civ1/buildItemInCity';
 import ChooseProduction from '../Strategies/Civ1/ChooseProduction';
 import { createMemory } from '../lib/Memory';
-import { Colossus, Lighthouse } from '@civ-clone/civ1-wonder/Wonders';
+import { Colossus, Lighthouse, Pyramids } from '@civ-clone/civ1-wonder/Wonders';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import { Production as ProductionYield } from '@civ-clone/civ1-world/Yields';
 
@@ -2522,10 +2522,10 @@ describe('SimpleAIClient', (): void => {
     cleanUp();
   });
 
-  // Settlers cost 40 shields, and the default policy waits 20 turns for them.
+  // Settlers cost 40 shields, and the default policy waits for them as long as the city makes net shields.
   [
-    [1, false],
-    [2, true],
+    [0, false],
+    [1, true],
   ].forEach(([shields, builds]): void =>
     it(`should ${
       builds ? '' : 'not '
@@ -2699,7 +2699,7 @@ describe('SimpleAIClient', (): void => {
     cleanUp();
   });
 
-  // civ-clone/web-renderer#212: a Wonder in a city with the default policy's 5 net shields and 40 turns to spare, that
+  // civ-clone/web-renderer#212: a Wonder in a city with the default policy's 2 net shields and 100 turns to spare, that
   //  would do something for the player.
   const wonderChoice = async (
     WonderType: typeof Wonder,
@@ -2708,7 +2708,7 @@ describe('SimpleAIClient', (): void => {
   ): Promise<unknown> => {
     const { city, cleanUp, player } = await productionCity(1, true);
 
-    [BronzeWorking, MapMaking].forEach((advance) =>
+    [BronzeWorking, MapMaking, Masonry].forEach((advance) =>
       playerResearchRegistry.getByPlayer(player).addAdvance(advance)
     );
     availableBuildItemsRegistry.register(WonderType as unknown as IBuildable);
@@ -2727,14 +2727,19 @@ describe('SimpleAIClient', (): void => {
     }
   };
 
-  it('should not start a Wonder it cannot finish within 40 turns', async (): Promise<void> => {
-    // The Colossus costs 200 shields: 50 turns at 4.
-    expect(await wonderChoice(Colossus, 4)).not.equal(Colossus);
+  it('should not start a Wonder it cannot finish within 100 turns', async (): Promise<void> => {
+    // The Pyramids cost 300 shields: 150 turns at 2.
+    expect(await wonderChoice(Pyramids, 2)).not.equal(Pyramids);
   });
 
-  it('should not start a Wonder in a city making fewer than 5 net shields, even with the shields stored to finish it soon', async (): Promise<void> => {
+  it('should start a Wonder it can finish within 100 turns', async (): Promise<void> => {
+    // The Colossus costs 200 shields: 100 turns at 2.
+    expect(await wonderChoice(Colossus, 2)).equal(Colossus);
+  });
+
+  it('should not start a Wonder in a city making fewer than 2 net shields, even with the shields stored to finish it soon', async (): Promise<void> => {
     expect(
-      await wonderChoice(Colossus, 4, (player, city) =>
+      await wonderChoice(Colossus, 1, (player, city) =>
         cityBuildRegistry.getByCity(city).progress().set(190)
       )
     ).not.equal(Colossus);
