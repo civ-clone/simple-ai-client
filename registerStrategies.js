@@ -19,6 +19,7 @@ const SpendTreasury_1 = require("./Strategies/City/SpendTreasury");
 const StandDown_1 = require("./Strategies/Unit/StandDown");
 const StartRevolution_1 = require("./Strategies/Civ1/StartRevolution");
 const SurveyTargets_1 = require("./Strategies/Turn/SurveyTargets");
+const TerrainWork_1 = require("./Strategies/Unit/TerrainWork");
 const TradeRates_1 = require("./Strategies/Turn/TradeRates");
 const UnloadTransport_1 = require("./Strategies/Unit/UnloadTransport");
 const WaitForCarrier_1 = require("./Strategies/Unit/WaitForCarrier");
@@ -28,6 +29,7 @@ const disorder_1 = require("./lib/Civ1/disorder");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const spending_1 = require("./lib/Civ1/spending");
 const standDown_1 = require("./lib/Civ1/standDown");
+const terrain_1 = require("./lib/Civ1/terrain");
 const tradeRates_1 = require("./lib/Civ1/tradeRates");
 const wantedAdvances_1 = require("./lib/Civ1/wantedAdvances");
 // The game's registries, as the strategies take them.
@@ -74,6 +76,7 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     new WaitForCarrier_1.default(dependencies, knowledge),
     new UnloadTransport_1.default(dependencies, knowledge),
     new FoundCapital_1.default(dependencies, knowledge),
+    new TerrainWork_1.default(dependencies, knowledge, terrain_1.civ1TerrainPolicy),
     new WorkerTurn_1.default(dependencies, knowledge),
     new Garrison_1.default(dependencies, knowledge),
     new MissionAndMove_1.default(dependencies, knowledge),

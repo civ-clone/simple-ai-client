@@ -18,6 +18,7 @@ import StandDown from './Strategies/Unit/StandDown';
 import StartRevolution from './Strategies/Civ1/StartRevolution';
 import Strategy from '@civ-clone/core-strategy/Strategy';
 import SurveyTargets from './Strategies/Turn/SurveyTargets';
+import TerrainWork from './Strategies/Unit/TerrainWork';
 import TradeRates from './Strategies/Turn/TradeRates';
 import UnloadTransport from './Strategies/Unit/UnloadTransport';
 import WaitForCarrier from './Strategies/Unit/WaitForCarrier';
@@ -27,6 +28,7 @@ import civ1DisorderPolicy from './lib/Civ1/disorder';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import civ1SpendingPolicy from './lib/Civ1/spending';
 import civ1StandDownPolicy from './lib/Civ1/standDown';
+import { civ1TerrainPolicy } from './lib/Civ1/terrain';
 import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
 import civ1WantedAdvances from './lib/Civ1/wantedAdvances';
 
@@ -78,6 +80,7 @@ export const createStrategies = (
   new WaitForCarrier(dependencies, knowledge),
   new UnloadTransport(dependencies, knowledge),
   new FoundCapital(dependencies, knowledge),
+  new TerrainWork(dependencies, knowledge, civ1TerrainPolicy),
   new WorkerTurn(dependencies, knowledge),
   new Garrison(dependencies, knowledge),
   new MissionAndMove(dependencies, knowledge),
