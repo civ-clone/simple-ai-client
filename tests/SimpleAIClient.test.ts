@@ -347,7 +347,11 @@ import {
 } from '@civ-clone/civ1-unit/Actions';
 import garrison from '../lib/Unit/garrison';
 import Dependencies, { createDependencies } from '../lib/Dependencies';
-import buildItemInCity from '../lib/Civ1/buildItemInCity';
+import buildItemInCity, {
+  ProductionPolicy,
+  defaultProductionPolicy,
+} from '../lib/Civ1/buildItemInCity';
+import ChooseProduction from '../Strategies/Civ1/ChooseProduction';
 import { createMemory } from '../lib/Memory';
 import { Colossus } from '@civ-clone/civ1-wonder/Wonders';
 import Wonder from '@civ-clone/core-wonder/Wonder';
@@ -2384,6 +2388,106 @@ describe('SimpleAIClient', (): void => {
     city.yields = () => [new ProductionYield(0)];
 
     buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
+
+    cleanUp();
+  });
+
+  it("should rebuild a city's last defender by the player's own production policy", async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(1, true),
+      [defender] = unitRegistry.getByTile(city.tile()),
+      policyAskedFor: Player[] = [],
+      // Willing to wait for a Phalanx (20 shields) at 1 shield a turn, where the default policy builds Warriors.
+      patient: ProductionPolicy = {
+        ...defaultProductionPolicy,
+        buildTurns: { ...defaultProductionPolicy.buildTurns, unit: 20 },
+      },
+      ownStrategies = new StrategyRegistry();
+
+    playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
+    city.yields = () => [new ProductionYield(1)];
+    // As `civ1-unit`'s `Defeated` rule leaves it before this client hears of it.
+    unitRegistry.unregister(defender);
+
+    ownStrategies.register(
+      new ChooseProduction(dependencies, civ1Knowledge, (asked: Player) => {
+        policyAskedFor.push(asked);
+
+        return patient;
+      })
+    );
+
+    new SimpleAIClient(
+      player,
+      cityRegistry,
+      cityBuildRegistry,
+      cityGrowthRegistry,
+      goodyHutRegistry,
+      pathFinderRegistry,
+      playerGovernmentRegistry,
+      playerResearchRegistry,
+      playerTreasuryRegistry,
+      playerWorldRegistry,
+      ruleRegistry,
+      terrainFeatureRegistry,
+      tileImprovementRegistry,
+      unitImprovementRegistry,
+      unitRegistry,
+      undefined,
+      clientRegistry,
+      interactionRegistry,
+      turn,
+      undefined,
+      strategyNoteRegistry,
+      workedTileRegistry,
+      pendingEffectRegistry,
+      ownStrategies
+    ).unitDestroyed(defender, null);
+
+    expect(policyAskedFor.length).equal(1);
+    expect(policyAskedFor[0] === player).true;
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+      Spearman
+    );
+
+    cleanUp();
+  });
+
+  it("should rebuild a city's last defender by the default policy with no ChooseProduction to ask", async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(1, true),
+      [defender] = unitRegistry.getByTile(city.tile());
+
+    playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
+    city.yields = () => [new ProductionYield(1)];
+    unitRegistry.unregister(defender);
+
+    new SimpleAIClient(
+      player,
+      cityRegistry,
+      cityBuildRegistry,
+      cityGrowthRegistry,
+      goodyHutRegistry,
+      pathFinderRegistry,
+      playerGovernmentRegistry,
+      playerResearchRegistry,
+      playerTreasuryRegistry,
+      playerWorldRegistry,
+      ruleRegistry,
+      terrainFeatureRegistry,
+      tileImprovementRegistry,
+      unitImprovementRegistry,
+      unitRegistry,
+      undefined,
+      clientRegistry,
+      interactionRegistry,
+      turn,
+      undefined,
+      strategyNoteRegistry,
+      workedTileRegistry,
+      pendingEffectRegistry,
+      new StrategyRegistry()
+    ).unitDestroyed(defender, null);
 
     expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
 

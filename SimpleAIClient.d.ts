@@ -30,6 +30,7 @@ import './lib/Diplomacy/negotiate';
 export declare class SimpleAIClient extends StrategyAIClient {
   private _dependencies;
   private _knowledge;
+  private _strategies;
   private memory;
   private get _lastUnitMoves();
   private get _unitPathData();

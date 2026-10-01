@@ -1,10 +1,11 @@
-// Civ1: what a city builds next. Always handles the choice. `SimpleAIClient#unitDestroyed` also runs the same module
-//  directly, outside the turn.
+// Civ1: what a city builds next. Always handles the choice. `SimpleAIClient#unitDestroyed` also asks it directly,
+//  outside the turn (`choose`).
 import buildItemInCity, {
   ProductionPolicy,
   defaultProductionPolicy,
 } from '../../lib/Civ1/buildItemInCity';
 import AIStrategy from '../lib/AIStrategy';
+import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import Dependencies from '../../lib/Dependencies';
 import Knowledge from '../../lib/Knowledge';
@@ -32,18 +33,22 @@ export class ChooseProduction extends AIStrategy {
   }
 
   attempt(action: PlayerAction<CityBuild>): boolean {
-    const player = action.player();
+    this.choose(action.player(), action.value().city());
 
+    return true;
+  }
+
+  // Picks what `city` builds by `player`'s `ProductionPolicy`. `SimpleAIClient#unitDestroyed` calls this directly, so
+  //  that its emergency rebuild follows the same policy as the player's other choices.
+  choose(player: Player, city: City): void {
     buildItemInCity(
       this.dependencies(),
       player,
       this.memoryFor(player).targets,
-      action.value().city(),
+      city,
       this._policyFor(player),
       this.knowledge()
     );
-
-    return true;
   }
 }
 
