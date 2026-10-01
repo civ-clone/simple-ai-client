@@ -20,6 +20,7 @@ import civ1Knowledge from './knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { netShields } from '../City/buildTime';
+import isUsefulWonder from './wonders';
 import Yield from '@civ-clone/core-yield/Yield';
 
 // How many of each kind of unit a player wants, which decides when its cities stop building units and turn to
@@ -346,11 +347,16 @@ export const buildItemInCity = (
     return;
   }
 
-  // One Wonder at a time, in the city that can build it soonest, and only one the city makes enough shields to finish
-  //  within the policy's turns.
+  // One Wonder at a time, in the city that can build it soonest, and only one that would do something for the player
+  //  that the city makes enough shields to finish within the policy's turns.
   const usefulWonders = availableWonders.filter(
     (buildItem: BuildItem): boolean =>
-      turnsToBuild(buildItem) <= policy.buildTurns.wonder
+      turnsToBuild(buildItem) <= policy.buildTurns.wonder &&
+      isUsefulWonder(
+        dependencies,
+        player,
+        buildItem.item() as unknown as typeof Wonder
+      )
   );
 
   if (

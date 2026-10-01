@@ -353,7 +353,7 @@ import buildItemInCity, {
 } from '../lib/Civ1/buildItemInCity';
 import ChooseProduction from '../Strategies/Civ1/ChooseProduction';
 import { createMemory } from '../lib/Memory';
-import { Colossus } from '@civ-clone/civ1-wonder/Wonders';
+import { Colossus, Lighthouse } from '@civ-clone/civ1-wonder/Wonders';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import { Production as ProductionYield } from '@civ-clone/civ1-world/Yields';
 
@@ -2634,7 +2634,8 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
-  // civ-clone/web-renderer#212: a Wonder in a city with the default policy's 5 net shields and 40 turns to spare.
+  // civ-clone/web-renderer#212: a Wonder in a city with the default policy's 5 net shields and 40 turns to spare, that
+  //  would do something for the player.
   const wonderChoice = async (
     WonderType: typeof Wonder,
     shields: number,
@@ -2672,6 +2673,26 @@ describe('SimpleAIClient', (): void => {
         cityBuildRegistry.getByCity(city).progress().set(190)
       )
     ).not.equal(Colossus);
+  });
+
+  it('should not start a Wonder that is obsolete', async (): Promise<void> => {
+    expect(
+      await wonderChoice(Colossus, 10, (player) =>
+        playerResearchRegistry.getByPlayer(player).addAdvance(Electricity)
+      )
+    ).not.equal(Colossus);
+  });
+
+  it('should not start the Lighthouse with no ships', async (): Promise<void> => {
+    expect(await wonderChoice(Lighthouse, 10)).not.equal(Lighthouse);
+  });
+
+  it('should start the Lighthouse with a ship', async (): Promise<void> => {
+    expect(
+      await wonderChoice(Lighthouse, 10, (player, city) => {
+        new Trireme(null, player, city.tile(), ruleRegistry, transportRegistry);
+      })
+    ).equal(Lighthouse);
   });
 
   it("should target the destroyer's cities, not its own, when one of its cities is destroyed", async (): Promise<void> => {
