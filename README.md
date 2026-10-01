@@ -55,13 +55,13 @@ they're still needed.
 `TradeRates` (`lib/Turn/adjustTradeRates.ts`) runs straight after it and sets the rates for the turn ahead with
 v474.05's routine (`lib/tradeRates.ts`, in tenths): luxuries go up one when a city was in disorder this turn, and down
 one every fourth turn while no city is in disorder or on the edge of it; science is the leader's Ideology
-(`lib/traits.ts`: Militaristic −1, Civilized 1) plus half of what luxuries leave, one more while the treasury holds
-more than the turn number + 100; tax takes the rest. A player starts at Ideology + 3 science and 1 luxury. Luxuries
-also go up one while any city `PreventDisorder` couldn't calm would otherwise starve or has no tile left to take an
-Entertainer from, and whenever the luxury rate changes every city is calmed again. One departure from v474.05:
-luxuries fall all the way back to 0 when no city needs them, where the original keeps 1 or 2 for good. Civ1's policy
-(`lib/Civ1/tradeRates.ts`) reads disorder from `civ1-city-happiness`, and takes a city larger than 5 with as many happy
-citizens as unhappy ones to be on the edge.
+(`lib/traits.ts`: Militaristic −1, Civilized 1) plus half of what luxuries leave, one more while the treasury holds more
+than the turn number + 100, or none at all once the player has Robotics, as in v474.05; tax takes the rest. A player
+starts at Ideology + 3 science and 1 luxury. Luxuries also go up one while any city `PreventDisorder` couldn't calm
+would otherwise starve or has no tile left to take an Entertainer from, and whenever the luxury rate changes every city
+is calmed again. One departure from v474.05: luxuries fall all the way back to 0 when no city needs them, where the
+original keeps 1 or 2 for good. Civ1's policy (`lib/Civ1/tradeRates.ts`) reads disorder from `civ1-city-happiness`, and
+takes a city larger than 5 with as many happy citizens as unhappy ones to be on the edge.
 
 Strategies are game-wide and stateless. Each is a thin adapter over a module in `lib/`. It's given the shared
 registries (`lib/Dependencies.ts`) and the ruleset's judgements (`lib/Knowledge.ts`; Civ1's are in

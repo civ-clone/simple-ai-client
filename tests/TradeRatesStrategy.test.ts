@@ -8,7 +8,7 @@ import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import { Luxuries, Research, Tax } from '@civ-clone/civ1-trade-rate/TradeRates';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
 import { CIVIL_DISORDER } from '@civ-clone/civ1-city-happiness/lib/cityStatus';
-import { CeremonialBurial } from '@civ-clone/civ1-science/Advances';
+import { CeremonialBurial, Robotics } from '@civ-clone/civ1-science/Advances';
 import City from '@civ-clone/core-city/City';
 import Civilization from '@civ-clone/core-civilization/Civilization';
 import Dependencies from '../lib/Dependencies';
@@ -226,6 +226,20 @@ describe('TradeRates', (): void => {
     await setup.afterTurn();
 
     expect(rates(setup)).to.equal('60/40/0');
+  });
+
+  it('should stop science once the player has Robotics, as v474.05 does', async (): Promise<void> => {
+    const setup = await setUp({ size: 1 });
+
+    await setup.afterTurn();
+
+    expect(rates(setup)).to.equal('40/50/10');
+
+    setup.game.playerResearch.getByPlayer(setup.player).addAdvance(Robotics);
+
+    await setup.afterTurn();
+
+    expect(rates(setup)).to.equal('0/90/10');
   });
 
   it('should add a luxury when a city was in disorder this turn', async (): Promise<void> => {

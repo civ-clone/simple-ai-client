@@ -1,9 +1,10 @@
 // Civ1: what v474.05's AI reads when it sets its rates (OpenCivOne `Segment_1ade.cs` `F0_1ade_0006`): which cities
-//  are in civil disorder, and which are on the edge of it.
+//  are in civil disorder, which are on the edge of it, and whether the player has stopped researching.
 import {
   calculateCitizenState,
   citizenSummary,
 } from '@civ-clone/civ1-city-happiness/lib/calculateCitizenState';
+import { Robotics } from '@civ-clone/civ1-science/Advances';
 import { TradeRatePolicy } from '../Turn/adjustTradeRates';
 import civ1DisorderPolicy from './disorder';
 
@@ -28,8 +29,18 @@ export const civ1TradeRatePolicy: TradeRatePolicy = {
 
     return happy === unhappy;
   },
-  // TODO: civ-clone/web-renderer#155, by the leader's personality. v474.05 stops at Robotics.
-  scienceStopped: () => false,
+  // v474.05 stops an AI's science the moment it has Robotics. TODO: civ-clone/web-renderer#155, by the leader's
+  //  personality.
+  scienceStopped: (dependencies, player) => {
+    try {
+      return dependencies.playerResearchRegistry
+        .getByPlayer(player)
+        .completed(Robotics);
+    } catch (e) {
+      // A player with no research.
+      return false;
+    }
+  },
 };
 
 export default civ1TradeRatePolicy;
