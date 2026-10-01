@@ -40,6 +40,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Diplomacy/NegotiationAnswers` | `ChooseFromList` for `negotiation.next-step` | answers each negotiation step; any other list gets a random pick               | generic |
 | `Strategies/City/PreventDisorder`         | `AfterTurn`                                  | keeps cities out of civil disorder, by the ruleset's `DisorderPolicy`          | generic |
 | `Strategies/Turn/TradeRates`              | `AfterTurn`                                  | sets the tax, luxury and science rates, by the ruleset's `TradeRatePolicy`     | generic |
+| `Strategies/City/SpendTreasury`           | `AfterTurn`                                  | spends the treasury over a reserve finishing builds, by the ruleset's `SpendingPolicy` | generic |
 
 `PreventDisorder` (`lib/City/disorder.ts`) runs once the player's units have moved, since where they stand changes how
 unhappy a city is. For each city the ruleset's `CivilDisorder` rules would find in disorder at the player's next turn
@@ -62,6 +63,17 @@ would otherwise starve or has no tile left to take an Entertainer from, and when
 is calmed again. One departure from v474.05: luxuries fall all the way back to 0 when no city needs them, where the
 original keeps 1 or 2 for good. Civ1's policy (`lib/Civ1/tradeRates.ts`) reads disorder from `civ1-city-happiness`, and
 takes a city larger than 5 with as many happy citizens as unhappy ones to be on the edge.
+
+`SpendTreasury` (`lib/City/spendTreasury.ts`) runs last, so that a city in disorder has had its share of the treasury
+and the rates for the turn ahead are set from the gold the player earned. While the treasury holds more than the
+policy's reserve it buys whole builds at the ruleset's own price, the most valuable first: a defender, or a unit for
+martial law, in a city that wants one; then an improvement, or Settlers in a city larger than 1, that the city would
+otherwise take the policy's `minTurns` or more to finish, the most turns saved per gold first; then a Wonder with no
+more than the policy's share of it left to build. As in v474.05, nothing is bought before the city has put a shield
+into it. Civ1's policy (`lib/Civ1/spending.ts`) keeps 30 gold and 10 more per city, buys builds of 5 turns or more, and Wonders
+a quarter from done. With so little kept back, the treasury rarely holds the turn + 100 over which the rates routine
+puts a step more into science, so that step mostly goes to tax, and on to builds: the arena found more improvements and
+population that way, and no fewer advances.
 
 A player stops researching for good once it has every advance its leader wants (`lib/Science/wantedAdvances.ts`), by
 the ruleset's `WantedAdvancesPolicy`. Until then `ChooseResearch` picks among the wanted advances available, if any are,

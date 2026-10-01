@@ -13,6 +13,7 @@ import MissionAndMove from './Strategies/Unit/MissionAndMove';
 import NegotiationAnswers from './Strategies/Diplomacy/NegotiationAnswers';
 import PreventDisorder from './Strategies/City/PreventDisorder';
 import ReviewCities from './Strategies/Turn/ReviewCities';
+import SpendTreasury from './Strategies/City/SpendTreasury';
 import StartRevolution from './Strategies/Civ1/StartRevolution';
 import Strategy from '@civ-clone/core-strategy/Strategy';
 import SurveyTargets from './Strategies/Turn/SurveyTargets';
@@ -23,6 +24,7 @@ import WakeCarrierAircraft from './Strategies/Turn/WakeCarrierAircraft';
 import WorkerTurn from './Strategies/Unit/WorkerTurn';
 import civ1DisorderPolicy from './lib/Civ1/disorder';
 import civ1Knowledge from './lib/Civ1/knowledge';
+import civ1SpendingPolicy from './lib/Civ1/spending';
 import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
 import civ1WantedAdvances from './lib/Civ1/wantedAdvances';
 
@@ -92,6 +94,9 @@ export const createStrategies = (
     civ1DisorderPolicy,
     civ1TradeRatePolicy
   ),
+  // Last: what's left of the treasury once disorder has had its share, and with the rates for the turn ahead set from
+  //  the treasury the player earned.
+  new SpendTreasury(dependencies, knowledge, civ1SpendingPolicy),
 ];
 
 export const register = (game: Game): void =>
