@@ -2556,7 +2556,7 @@ describe('SimpleAIClient', (): void => {
     playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
     availableBuildItemsRegistry.register(Colossus as unknown as IBuildable);
 
-    // 5 shields, enough to finish the Colossus (200 shields) within the default policy's 40 turns.
+    // 5 shields: the Colossus (200 shields) in 40 turns, within the default policy's 100, and over its minimum of 2.
     city.yields = () => [
       new ProductionYield(1),
       new ProductionYield(1),
