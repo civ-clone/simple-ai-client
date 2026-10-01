@@ -1,5 +1,6 @@
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
-import { Sail, Warrior } from '@civ-clone/civ1-unit/Units';
+import { Horseman, Sail, Warrior } from '@civ-clone/civ1-unit/Units';
+import GoodyHut from '@civ-clone/core-goody-hut/GoodyHut';
 import unitGame, { at, paces } from './lib/unitGame';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -67,6 +68,27 @@ describe('StandDown', (): void => {
 
     expect(at(spare)).to.equal('0,1');
     expect(fortified(game, spare)).true;
+  });
+
+  it('should keep a unit that reaches the city it was sent to with moves to spare there', async (): Promise<void> => {
+    //   01234
+    // 0 GGGGG
+    // 1 GGGGG
+    // 2 GGGGG
+    const { game, addCity, addUnit, fortify, takeTurns, world } =
+        await unitGame('15G', 3, 5, Despotism),
+      // Size 6 wants two defenders, and has one.
+      city = addCity(1, 1, 6),
+      // Two moves: one to get there, one to spare.
+      horseman = addUnit(Horseman, 2, 1, city);
+
+    fortify(addUnit(Warrior, 1, 1, city));
+    // Something worth a step from the city, but not from where the Horseman starts.
+    game.goodyHuts.register(new GoodyHut(world.get(0, 1), game.rules));
+
+    await takeTurns(1);
+
+    expect(at(horseman)).to.equal('1,1');
   });
 
   it('should send a unit with nothing to do to the nearest city, and keep it there, ready for a mission', async (): Promise<void> => {
