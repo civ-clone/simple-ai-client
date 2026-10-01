@@ -113,6 +113,7 @@ import { noOrders, skipUnit } from './lib/Unit/orders';
 import buildItemInCity, {
   defaultProductionPolicy,
 } from './lib/Civ1/buildItemInCity';
+import ChooseProduction from './Strategies/Civ1/ChooseProduction';
 import cityLost from './lib/Events/cityLost';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import moveUnit from './lib/Unit/moveUnit';
@@ -131,6 +132,8 @@ import './lib/Diplomacy/negotiate';
 export class SimpleAIClient extends StrategyAIClient {
   private _dependencies: Dependencies;
   private _knowledge: Knowledge = civ1Knowledge;
+  // The registry `StrategyAIClient` keeps privately, for `buildItemInCity` to find the `ChooseProduction` strategy in.
+  private _strategies: StrategyRegistry;
 
   // The player's working memory, which the strategies and the `Rules/` hooks share.
   private memory(): Memory {
@@ -202,6 +205,8 @@ export class SimpleAIClient extends StrategyAIClient {
     // `#randomNumberGenerator` shadowing it, which two `private` fields of the
     // same name cannot express.
     super(player, strategyRegistry, randomNumberGenerator);
+
+    this._strategies = strategyRegistry;
 
     // The specialist, trade rate and trait registries aren't arguments, so that callers passing the others by position
     //  (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the
@@ -346,7 +351,22 @@ export class SimpleAIClient extends StrategyAIClient {
     console.log(`Can't process: '${action.value().constructor.name}'`);
   }
 
+  // As the player's `ChooseProduction` strategy chooses, by its `ProductionPolicy` for the player. Without one in the
+  //  client's registry, by the default policy.
   private buildItemInCity(city: City): void {
+    const chooseProduction = this._strategies
+      .entries()
+      .find(
+        (strategy): strategy is ChooseProduction =>
+          strategy instanceof ChooseProduction
+      );
+
+    if (chooseProduction) {
+      chooseProduction.choose(this.player(), city);
+
+      return;
+    }
+
     buildItemInCity(
       this._dependencies,
       this.player(),

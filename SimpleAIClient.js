@@ -34,6 +34,7 @@ const core_random_1 = require("@civ-clone/core-random");
 const MemoryRegistry_1 = require("./lib/MemoryRegistry");
 const orders_1 = require("./lib/Unit/orders");
 const buildItemInCity_1 = require("./lib/Civ1/buildItemInCity");
+const ChooseProduction_1 = require("./Strategies/Civ1/ChooseProduction");
 const cityLost_1 = require("./lib/Events/cityLost");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const moveUnit_1 = require("./lib/Unit/moveUnit");
@@ -94,6 +95,7 @@ class SimpleAIClient extends StrategyAIClient_1.default {
         // same name cannot express.
         super(player, strategyRegistry, randomNumberGenerator);
         this._knowledge = knowledge_1.default;
+        this._strategies = strategyRegistry;
         // The specialist, trade rate and trait registries aren't arguments, so that callers passing the others by position
         //  (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and those are given the
         //  game's own (`dependenciesFor`).
@@ -190,7 +192,16 @@ class SimpleAIClient extends StrategyAIClient_1.default {
         }
         console.log(`Can't process: '${action.value().constructor.name}'`);
     }
+    // As the player's `ChooseProduction` strategy chooses, by its `ProductionPolicy` for the player. Without one in the
+    //  client's registry, by the default policy.
     buildItemInCity(city) {
+        const chooseProduction = this._strategies
+            .entries()
+            .find((strategy) => strategy instanceof ChooseProduction_1.default);
+        if (chooseProduction) {
+            chooseProduction.choose(this.player(), city);
+            return;
+        }
         (0, buildItemInCity_1.default)(this._dependencies, this.player(), this.memory().targets, city, buildItemInCity_1.defaultProductionPolicy, this._knowledge);
     }
     cityLost(city, player, destroyed) {

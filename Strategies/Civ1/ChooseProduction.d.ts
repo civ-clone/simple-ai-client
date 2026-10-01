@@ -1,5 +1,6 @@
 import { ProductionPolicy } from '../../lib/Civ1/buildItemInCity';
 import AIStrategy from '../lib/AIStrategy';
+import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import Dependencies from '../../lib/Dependencies';
 import Knowledge from '../../lib/Knowledge';
@@ -14,5 +15,6 @@ export declare class ChooseProduction extends AIStrategy {
   );
   handles(action: PlayerAction): boolean;
   attempt(action: PlayerAction<CityBuild>): boolean;
+  choose(player: Player, city: City): void;
 }
 export default ChooseProduction;
