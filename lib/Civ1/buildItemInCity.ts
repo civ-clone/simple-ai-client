@@ -1,7 +1,9 @@
 // Civ1: what a city builds next: a defender while it has fewer than it wants or martial law could use another unit, explorers while there's land to explore
 //  and the player has fewer out than it wants, Settlers, attackers while there's a war to fight and the player has
 //  fewer than it wants, a defender for a city of the player's that has none, a Wonder in the player's most productive
-//  city, and otherwise a random pick of the rest, never a Palace or a ship.
+//  city, and otherwise a random pick of the rest, never a Palace or a ship. Apart from a missing defender, each is
+//  only started if the city can finish it within the policy's `buildTurns` for its kind, at its net shields; when
+//  nothing is left that it can, the cheapest improvement worth having (civ-clone/web-renderer#212).
 import { Attack, Defence } from '@civ-clone/core-unit/Yields';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
@@ -12,7 +14,11 @@ import { wantsUnit } from '../City/defence';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
 import Knowledge from '../Knowledge';
 import { Land, Naval, Worker } from '@civ-clone/library-unit/Types';
-import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
+import {
+  Barracks,
+  CityWalls,
+  Palace,
+} from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Player from '@civ-clone/core-player/Player';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '../Memory';
@@ -35,6 +41,7 @@ export interface ProductionPolicy {
   // The most turns a city spends on each kind of build, at its net shields (`lib/City/buildTime`). A city builds a
   //  missing defender however long it takes, the soonest it can (civ-clone/web-renderer#212).
   buildTurns: {
+    improvement: number;
     settlers: number;
     unit: number;
     wonder: number;
@@ -48,6 +55,7 @@ export const defaultProductionPolicy: ProductionPolicy = {
   explorers: 3,
   explorersPerCity: 2,
   buildTurns: {
+    improvement: 40,
     settlers: 20,
     unit: 10,
     wonder: 40,
@@ -186,6 +194,15 @@ const shouldBuildWonder = (
   );
 };
 
+// The order `buildItemInCity` falls back on, when a city can finish nothing soon: improvements worth having, then the
+//  others, then units.
+const fallbackRank = (buildItem: BuildItem): number =>
+  Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
+    ? 2
+    : [Barracks, CityWalls].includes(buildItem.item() as typeof Barracks)
+    ? 1
+    : 0;
+
 // Also run from `unitDestroyed`, during combat and so perhaps during another player's turn. It draws from the random
 //  number generator on every call, whether or not the draw is used.
 export const buildItemInCity = (
@@ -212,14 +229,22 @@ export const buildItemInCity = (
     availableUnits = availableFiltered.filter((buildItem: BuildItem): boolean =>
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
     ),
-    randomSelection =
-      availableFiltered[
-        Math.floor(
-          availableFiltered.length * dependencies.randomNumberGenerator()
-        )
-      ].item(),
     shields = netShields(city),
     turnsToBuild = buildTime(dependencies, city, shields),
+    isUnitItem = (buildItem: BuildItem): boolean =>
+      Object.prototype.isPrototypeOf.call(Unit, buildItem.item()),
+    // The rest, that the city can finish within the policy's turns for a unit or an improvement.
+    finishable = availableFiltered.filter(
+      (buildItem: BuildItem): boolean =>
+        turnsToBuild(buildItem) <=
+        (isUnitItem(buildItem)
+          ? policy.buildTurns.unit
+          : policy.buildTurns.improvement)
+    ),
+    randomSelection =
+      finishable[
+        Math.floor(finishable.length * dependencies.randomNumberGenerator())
+      ]?.item(),
     // A defender for this city: the soonest it can, if it can't finish one within the policy's turns.
     getDefensiveUnit = (
       (UnitType?: typeof Unit): (() => typeof Unit | undefined) =>
@@ -375,6 +400,19 @@ export const buildItemInCity = (
 
   if (randomSelection) {
     cityBuild.build(randomSelection);
+
+    return;
+  }
+
+  // Nothing it can finish soon, so the cheapest thing worth having once it can: an improvement, as a unit would cost
+  //  shields to support that the city doesn't have. Barracks and City Walls are only worth building on purpose.
+  const [cheapest] = [...availableFiltered].sort(
+    (a: BuildItem, b: BuildItem): number =>
+      fallbackRank(a) - fallbackRank(b) || a.cost().value() - b.cost().value()
+  );
+
+  if (cheapest) {
+    cityBuild.build(cheapest.item());
   }
 };
 

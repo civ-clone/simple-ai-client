@@ -2644,6 +2644,61 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
+  it("should only pick at random among what it can finish within the policy's turns", async (): Promise<void> => {
+    // City Walls cost 120 shields: 120 turns at 1.
+    const picks: unknown[] = [];
+
+    for (const draw of [0, 0.2, 0.4, 0.6, 0.8, 0.999]) {
+      const { city, cleanUp, player } = await productionCity(1, true);
+
+      playerResearchRegistry.getByPlayer(player).addAdvance(Masonry);
+      city.yields = () => [new ProductionYield(1)];
+
+      buildItemInCity(
+        createDependencies({
+          ...dependencies,
+          randomNumberGenerator: (): number => draw,
+        }),
+        player,
+        createMemory().targets,
+        city
+      );
+
+      picks.push(cityBuildRegistry.getByCity(city).building()!.item());
+
+      cleanUp();
+    }
+
+    expect(picks).not.include(CityWalls);
+  });
+
+  it('should build the cheapest improvement worth having when it can finish nothing soon', async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(1, true);
+
+    // A Temple and Barracks cost 40 shields each, Warriors 10.
+    playerResearchRegistry.getByPlayer(player).addAdvance(CeremonialBurial);
+    city.yields = () => [new ProductionYield(0)];
+
+    // The first of anything a random pick could choose, and the last.
+    [0, 0.999].forEach((draw: number): void => {
+      buildItemInCity(
+        createDependencies({
+          ...dependencies,
+          randomNumberGenerator: (): number => draw,
+        }),
+        player,
+        createMemory().targets,
+        city
+      );
+
+      expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+        Temple
+      );
+    });
+
+    cleanUp();
+  });
+
   // civ-clone/web-renderer#212: a Wonder in a city with the default policy's 5 net shields and 40 turns to spare, that
   //  would do something for the player.
   const wonderChoice = async (

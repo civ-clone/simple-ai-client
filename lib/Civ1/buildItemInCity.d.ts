@@ -11,6 +11,7 @@ export interface ProductionPolicy {
   explorers: number;
   explorersPerCity: number;
   buildTurns: {
+    improvement: number;
     settlers: number;
     unit: number;
     wonder: number;
