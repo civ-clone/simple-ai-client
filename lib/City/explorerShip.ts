@@ -6,7 +6,7 @@ import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
-import buildTime from './buildTime';
+import buildTime, { finishesWithin } from './buildTime';
 import Knowledge from '../Knowledge';
 import { Naval } from '@civ-clone/library-unit/Types';
 import Player from '@civ-clone/core-player/Player';
@@ -113,7 +113,7 @@ export const explorerShipFor = (
         return building !== null && isShip(building.item());
       }) ||
     wantsUnit(dependencies, knowledge, city) ||
-    buildTime(dependencies, city)(ship) > turns ||
+    !finishesWithin(buildTime(dependencies, city)(ship), turns) ||
     !isOnSea(city) ||
     !reachesSeaToExplore(dependencies, player, targets, city)
   ) {
