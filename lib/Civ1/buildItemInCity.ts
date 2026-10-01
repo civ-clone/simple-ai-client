@@ -10,12 +10,14 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
 import { defendersIn, defendersWanted } from '../City/defence';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
+import Knowledge from '../Knowledge';
 import { Land, Naval, Worker } from '@civ-clone/library-unit/Types';
 import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Player from '@civ-clone/core-player/Player';
 import { Production } from '@civ-clone/civ1-world/Yields';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '../Memory';
+import civ1Knowledge from './knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import Yield from '@civ-clone/core-yield/Yield';
@@ -136,7 +138,8 @@ export const buildItemInCity = (
   player: Player,
   targets: TargetBoard,
   city: City,
-  policy: ProductionPolicy = defaultProductionPolicy
+  policy: ProductionPolicy = defaultProductionPolicy,
+  knowledge: Knowledge = civ1Knowledge
 ): void => {
   const cityBuild = dependencies.cityBuildRegistry.getByCity(city),
     available = cityBuild.available(),
@@ -195,7 +198,7 @@ export const buildItemInCity = (
 
   if (
     defendersIn(dependencies, city).length <
-      defendersWanted(dependencies, city) &&
+      defendersWanted(dependencies, knowledge, city) &&
     getDefensiveUnit()
   ) {
     cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);

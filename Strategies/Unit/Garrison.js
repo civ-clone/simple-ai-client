@@ -13,7 +13,7 @@ class Garrison extends AIStrategy_1.default {
     }
     attempt(action) {
         const { actions: { fortify }, tile, tileUnits, } = (0, unitTurnContextFor_1.default)(this.dependencies(), action);
-        return (0, garrison_1.default)(this.dependencies(), action.value(), tile, tileUnits, fortify);
+        return (0, garrison_1.default)(this.dependencies(), action.value(), tile, tileUnits, fortify, this.knowledge());
     }
 }
 exports.Garrison = Garrison;

@@ -191,7 +191,7 @@ class SimpleAIClient extends StrategyAIClient_1.default {
         console.log(`Can't process: '${action.value().constructor.name}'`);
     }
     buildItemInCity(city) {
-        (0, buildItemInCity_1.default)(this._dependencies, this.player(), this.memory().targets, city);
+        (0, buildItemInCity_1.default)(this._dependencies, this.player(), this.memory().targets, city, buildItemInCity_1.defaultProductionPolicy, this._knowledge);
     }
     cityLost(city, player, destroyed) {
         (0, cityLost_1.default)(this._dependencies, this.player(), this.memory().targets, city, player, destroyed);

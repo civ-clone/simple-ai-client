@@ -4,6 +4,7 @@ import Dependencies from '../Dependencies';
 import { defendersWanted, isDefender } from '../City/defence';
 import { Fortified } from '@civ-clone/library-unit/UnitImprovements';
 import { Fortify } from '@civ-clone/library-unit/Actions';
+import Knowledge from '../Knowledge';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
@@ -14,7 +15,8 @@ export const garrison = (
   unit: Unit,
   tile: Tile,
   tileUnits: Unit[],
-  fortify: Fortify | undefined
+  fortify: Fortify | undefined,
+  knowledge: Knowledge
 ): boolean => {
   // TODO: check for defence values and activate weaker for disband/upgrade/scouting
   const [cityUnitWithLowerDefence] = tileUnits.filter(
@@ -33,7 +35,7 @@ export const garrison = (
     city &&
     (cityUnitWithLowerDefence ||
       tileUnits.filter(isDefender).length <=
-        defendersWanted(dependencies, city))
+        defendersWanted(dependencies, knowledge, city))
   ) {
     unit.action(fortify);
 

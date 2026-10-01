@@ -18,7 +18,7 @@ class ChooseProduction extends AIStrategy_1.default {
     }
     attempt(action) {
         const player = action.player();
-        (0, buildItemInCity_1.default)(this.dependencies(), player, this.memoryFor(player).targets, action.value().city(), this._policyFor(player));
+        (0, buildItemInCity_1.default)(this.dependencies(), player, this.memoryFor(player).targets, action.value().city(), this._policyFor(player), this.knowledge());
         return true;
     }
 }

@@ -110,7 +110,9 @@ import Knowledge from './lib/Knowledge';
 import Memory from './lib/Memory';
 import { instance as memoryRegistryInstance } from './lib/MemoryRegistry';
 import { noOrders, skipUnit } from './lib/Unit/orders';
-import buildItemInCity from './lib/Civ1/buildItemInCity';
+import buildItemInCity, {
+  defaultProductionPolicy,
+} from './lib/Civ1/buildItemInCity';
 import cityLost from './lib/Events/cityLost';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import moveUnit from './lib/Unit/moveUnit';
@@ -349,7 +351,9 @@ export class SimpleAIClient extends StrategyAIClient {
       this._dependencies,
       this.player(),
       this.memory().targets,
-      city
+      city,
+      defaultProductionPolicy,
+      this._knowledge
     );
   }
 

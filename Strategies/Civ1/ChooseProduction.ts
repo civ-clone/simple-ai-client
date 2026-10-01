@@ -39,7 +39,8 @@ export class ChooseProduction extends AIStrategy {
       player,
       this.memoryFor(player).targets,
       action.value().city(),
-      this._policyFor(player)
+      this._policyFor(player),
+      this.knowledge()
     );
 
     return true;
