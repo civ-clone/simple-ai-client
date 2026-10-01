@@ -39,10 +39,11 @@ export interface ProductionPolicy {
   explorers: number;
   explorersPerCity: number;
   // The most turns a city spends on each kind of build, at its net shields (`lib/City/buildTime`). A city builds a
-  //  missing defender however long it takes, the soonest it can (civ-clone/web-renderer#212).
+  //  missing defender however long it takes, the soonest it can, and Settlers whatever it makes: the arena found that
+  //  any limit on Settlers, even only keeping a city on 0 net shields off them, cost the player cities and score
+  //  (civ-clone/web-renderer#212).
   buildTurns: {
     improvement: number;
-    settlers: number;
     unit: number;
     wonder: number;
   };
@@ -56,8 +57,6 @@ export const defaultProductionPolicy: ProductionPolicy = {
   explorersPerCity: 2,
   buildTurns: {
     improvement: 40,
-    // Any city making net shields: the arena found every limit up to 40 turns cost the player cities.
-    settlers: Infinity,
     unit: 10,
     wonder: 100,
   },
@@ -316,12 +315,11 @@ export const buildItemInCity = (
     }
   }
 
-  // Always Build Cities, with Settlers the city can finish within the policy's turns.
+  // Always Build Cities
   if (
     available.some(
       (buildItem: BuildItem) =>
-        buildItem.item() === (Settlers as unknown as typeof Buildable) &&
-        finishesWithin(turnsToBuild(buildItem), policy.buildTurns.settlers)
+        buildItem.item() === (Settlers as unknown as typeof Buildable)
     ) &&
     !dependencies.unitRegistry
       .getByCity(cityBuild.city())

@@ -2522,24 +2522,19 @@ describe('SimpleAIClient', (): void => {
     cleanUp();
   });
 
-  // Settlers cost 40 shields, and the default policy waits for them as long as the city makes net shields.
-  [
-    [0, false],
-    [1, true],
-  ].forEach(([shields, builds]): void =>
-    it(`should ${
-      builds ? '' : 'not '
-    }build Settlers in a size 2 city making ${shields} net shields`, async (): Promise<void> => {
+  // Settlers cost 40 shields. The arena prefers them built however few shields the city makes.
+  [0, 1].forEach((shields: number): void =>
+    it(`should build Settlers in a size 2 city making ${shields} net shields`, async (): Promise<void> => {
       const { city, cleanUp, player } = await productionCity(1, true);
 
       cityGrowthRegistry.getByCity(city).grow();
-      city.yields = () => [new ProductionYield(shields as number)];
+      city.yields = () => [new ProductionYield(shields)];
 
       buildItemInCity(lastPick(), player, createMemory().targets, city);
 
-      expect(
-        cityBuildRegistry.getByCity(city).building()!.item() === Settlers
-      ).equal(builds);
+      expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+        Settlers
+      );
 
       cleanUp();
     })
