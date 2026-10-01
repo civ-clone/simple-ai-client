@@ -20,6 +20,7 @@ import { TargetBoard } from '../Memory';
 import civ1Knowledge from './knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
+import buildTime from '../City/buildTime';
 import Yield from '@civ-clone/core-yield/Yield';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 
@@ -32,12 +33,20 @@ export interface ProductionPolicy {
   // Units wanted out exploring while there's land to explore: `explorers`, and `explorersPerCity` more per city.
   explorers: number;
   explorersPerCity: number;
+  // The most turns a city spends on each kind of build, at its net shields (`lib/City/buildTime`). A city builds a
+  //  missing defender however long it takes, the soonest it can (civ-clone/web-renderer#212).
+  buildTurns: {
+    unit: number;
+  };
 }
 
 export const defaultProductionPolicy: ProductionPolicy = {
   attackersPerCity: 1,
   explorers: 3,
   explorersPerCity: 2,
+  buildTurns: {
+    unit: 10,
+  },
 };
 
 // A unit built to attack rather than defend.
@@ -105,6 +114,49 @@ const unitsAndOrders = (
 const production = (city: City): number =>
   reduceYield(city.yields(), Production);
 
+// The unit among `buildItems` to build for its `YieldType` (`Attack` for an attacker, `Defence` for a defender), its
+//  cost weighed against its strength (civ-clone/web-renderer#212): of the units `city` can finish within the policy's
+//  `buildTurns.unit`, the most `YieldType` per shield, then the most `YieldType`, then the cheapest. When it can finish
+//  none of them that soon, the one it can finish soonest, then the cheapest, if `orSoonest`; otherwise none. Units with
+//  no `YieldType` aren't considered. Obsolete units are never among `buildItems`: the ruleset doesn't offer them.
+export const chooseUnit = (
+  dependencies: Dependencies,
+  city: City,
+  buildItems: BuildItem[],
+  YieldType: typeof Yield,
+  policy: ProductionPolicy = defaultProductionPolicy,
+  orSoonest: boolean = false,
+  turnsToBuild: (buildItem: BuildItem) => number = buildTime(dependencies, city)
+): typeof Unit | undefined => {
+  const candidates = buildItems
+      .map((buildItem: BuildItem) => ({
+        UnitType: buildItem.item() as unknown as typeof Unit,
+        cost: buildItem.cost().value(),
+        strength: baseYield(dependencies, buildItem.item(), YieldType),
+        turns: turnsToBuild(buildItem),
+      }))
+      .filter(({ strength }): boolean => strength > 0),
+    soon = candidates.filter(
+      ({ turns }): boolean => turns <= policy.buildTurns.unit
+    ),
+    [best] =
+      soon.length > 0 || !orSoonest
+        ? soon.sort(
+            (a, b): number =>
+              b.strength / b.cost - a.strength / a.cost ||
+              b.strength - a.strength ||
+              a.cost - b.cost
+          )
+        : candidates.sort(
+            (a, b): number =>
+              (a.turns === b.turns ? 0 : a.turns - b.turns) ||
+              a.cost - b.cost ||
+              b.strength - a.strength
+          );
+
+  return best?.UnitType;
+};
+
 // Whether `city` should be the one to build the player's next Wonder: none of its cities is building one, and none
 //  produces more.
 const shouldBuildWonder = (
@@ -163,37 +215,34 @@ export const buildItemInCity = (
           availableFiltered.length * dependencies.randomNumberGenerator()
         )
       ].item(),
-    // The unit among `buildItems` with the most `YieldType`, if any.
-    getUnitByYield = (
-      YieldType: typeof Yield,
-      buildItems: BuildItem[] = availableUnits
-    ): typeof Unit | undefined => {
-      const [[UnitType] = []] = buildItems
-        .map((buildItem: BuildItem): [typeof Unit, number] => [
-          buildItem.item() as unknown as typeof Unit,
-          baseYield(dependencies, buildItem.item(), YieldType),
-        ])
-        .sort(
-          (
-            [, a]: [typeof Unit, number],
-            [, b]: [typeof Unit, number]
-          ): number => b - a
-        );
-
-      return UnitType;
-    },
+    turnsToBuild = buildTime(dependencies, city),
+    // A defender for this city: the soonest it can, if it can't finish one within the policy's turns.
     getDefensiveUnit = (
       (UnitType?: typeof Unit): (() => typeof Unit | undefined) =>
       (): typeof Unit | undefined =>
-        UnitType || (UnitType = getUnitByYield(Defence))
+        UnitType ||
+        (UnitType = chooseUnit(
+          dependencies,
+          city,
+          availableUnits,
+          Defence,
+          policy,
+          true,
+          turnsToBuild
+        ))
     )(),
     // Only a unit that counts as an attacker, so that building one gets the player closer to what it wants.
     getOffensiveUnit = (): typeof Unit | undefined =>
-      getUnitByYield(
-        Attack,
+      chooseUnit(
+        dependencies,
+        city,
         availableUnits.filter((buildItem: BuildItem): boolean =>
           isAttackerType(dependencies, buildItem.item())
-        )
+        ),
+        Attack,
+        policy,
+        false,
+        turnsToBuild
       );
 
   if (wantsUnit(dependencies, knowledge, city) && getDefensiveUnit()) {
@@ -271,8 +320,22 @@ export const buildItemInCity = (
     return;
   }
 
-  if (targets.undefendedCities.length && getDefensiveUnit()) {
-    cityBuild.build(getDefensiveUnit() as unknown as typeof Buildable);
+  // A defender for another city, only one this city can finish within the policy's turns.
+  const reinforcement =
+    targets.undefendedCities.length > 0
+      ? chooseUnit(
+          dependencies,
+          city,
+          availableUnits,
+          Defence,
+          policy,
+          false,
+          turnsToBuild
+        )
+      : undefined;
+
+  if (reinforcement) {
+    cityBuild.build(reinforcement as unknown as typeof Buildable);
 
     return;
   }

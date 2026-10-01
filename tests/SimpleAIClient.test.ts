@@ -2277,6 +2277,8 @@ describe('SimpleAIClient', (): void => {
 
     playerResearchRegistry.getByPlayer(player).addAdvance(HorsebackRiding);
     targets.enemyCitiesToAttack.push(world.get(9, 4));
+    // Enough to finish Horsemen (20 shields) within the default policy's 10 turns.
+    city.yields = () => [new ProductionYield(2)];
 
     buildItemInCity(lastPick(), player, targets, city);
 
@@ -2311,6 +2313,77 @@ describe('SimpleAIClient', (): void => {
     targets.landTilesToExplore.push(world.get(9, 4));
 
     buildItemInCity(lastPick(), player, targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
+
+    cleanUp();
+  });
+
+  // civ-clone/web-renderer#212. At 2 shields a turn, the default policy's 10 turns buy a unit of up to 20 shields.
+  it('should build an attacker it can finish soon over a stronger one it cannot', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      targets = createMemory().targets;
+
+    // A Legion (3 attack, 20 shields) and a Catapult (6 attack, 40 shields).
+    playerResearchRegistry.getByPlayer(player).addAdvance(IronWorking);
+    playerResearchRegistry.getByPlayer(player).addAdvance(Mathematics);
+    targets.enemyCitiesToAttack.push(world.get(9, 4));
+    city.yields = () => [new ProductionYield(2)];
+
+    buildItemInCity(lastPick(), player, targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+      Swordman
+    );
+
+    cleanUp();
+  });
+
+  it('should build the stronger attacker when the shields it has stored let it finish soon', async (): Promise<void> => {
+    const { city, cleanUp, player, world } = await productionCity(1, true),
+      targets = createMemory().targets;
+
+    playerResearchRegistry.getByPlayer(player).addAdvance(IronWorking);
+    playerResearchRegistry.getByPlayer(player).addAdvance(Mathematics);
+    targets.enemyCitiesToAttack.push(world.get(9, 4));
+    city.yields = () => [new ProductionYield(2)];
+    cityBuildRegistry.getByCity(city).progress().set(35);
+
+    buildItemInCity(lastPick(), player, targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+      Catapult
+    );
+
+    cleanUp();
+  });
+
+  it('should build a defender it can finish soon over a stronger one it cannot', async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(0, false);
+
+    // Riflemen (5 defence, 30 shields) and Mech. Inf. (6 defence, 50 shields); Gunpowder makes Warriors obsolete.
+    [Gunpowder, Conscription, LaborUnion].forEach((advance) =>
+      playerResearchRegistry.getByPlayer(player).addAdvance(advance)
+    );
+    city.yields = () => [new ProductionYield(3)];
+
+    buildItemInCity(lastPick(), player, createMemory().targets, city);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(
+      Rifleman
+    );
+
+    cleanUp();
+  });
+
+  it('should build the cheapest defender in a city with none that makes no shields to spare', async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(0, false);
+
+    // A Phalanx (2 defence, 20 shields) and Warriors (1 defence, 10 shields).
+    playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
+    city.yields = () => [new ProductionYield(0)];
+
+    buildItemInCity(lastPick(), player, createMemory().targets, city);
 
     expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
 
