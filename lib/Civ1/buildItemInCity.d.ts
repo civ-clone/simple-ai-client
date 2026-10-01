@@ -13,7 +13,9 @@ export interface ProductionPolicy {
   buildTurns: {
     settlers: number;
     unit: number;
+    wonder: number;
   };
+  wonderShields: number;
 }
 export declare const defaultProductionPolicy: ProductionPolicy;
 export declare const isAttacker: (unit: Unit) => boolean;
