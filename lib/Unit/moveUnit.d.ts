@@ -12,6 +12,7 @@ export declare const hasStepWorthTaking: (
 ) => boolean;
 export interface MoveOptions {
   wander?: boolean;
+  stopAtPathEnd?: boolean;
 }
 export declare const moveUnit: (
   dependencies: Dependencies,
@@ -19,6 +20,6 @@ export declare const moveUnit: (
   memory: Memory,
   knowledge: Knowledge,
   unit: Unit,
-  { wander }?: MoveOptions
+  { stopAtPathEnd, wander }?: MoveOptions
 ) => Promise<void>;
 export default moveUnit;
