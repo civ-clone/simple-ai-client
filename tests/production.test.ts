@@ -1,6 +1,11 @@
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import { CeremonialBurial } from '@civ-clone/civ1-science/Advances';
-import { Settlers, Warrior } from '@civ-clone/civ1-unit/Units';
+import {
+  Caravan,
+  Diplomat,
+  Settlers,
+  Warrior,
+} from '@civ-clone/civ1-unit/Units';
 import buildItemInCity, {
   ProductionPolicy,
   defaultProductionPolicy,
@@ -18,7 +23,9 @@ import { Production } from '@civ-clone/civ1-world/Yields';
 import { TargetBoard } from '../lib/Memory';
 import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Unit from '@civ-clone/core-unit/Unit';
+import { UnitSupportProduction } from '@civ-clone/library-city/Yields';
 import World from '@civ-clone/core-world/World';
+import Yield from '@civ-clone/core-yield/Yield';
 import cityImprovementRules from '@civ-clone/civ1-city-improvement/registerRules';
 import cityRules from '@civ-clone/civ1-city/registerRules';
 import { createDependencies } from '../lib/Dependencies';
@@ -28,6 +35,7 @@ import { expect } from 'chai';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
+import unitSupport from '../lib/Civ1/unitSupport';
 import worldRules from '@civ-clone/civ1-world/registerRules';
 
 type SetUp = {
@@ -236,6 +244,26 @@ describe('buildItemInCity', (): void => {
       setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
 
       expect(isUnit(setup.choose())).false;
+    });
+
+    // The engine's rules charge for Diplomats and Caravans too, where v474.05 doesn't.
+    it('should count a shield to support any unit under Monarchy, as the ruleset charges', async (): Promise<void> => {
+      const { city, dependencies, game } = await setUp();
+
+      [Warrior, Settlers, Diplomat, Caravan].forEach((UnitType) => {
+        new UnitType(city, city.player(), city.tile(), game.rules);
+      });
+
+      expect(unitSupport(dependencies, city)).to.equal(1);
+      // The ruleset's own yields, not the test's: the fortified Warrior and the four above, a shield each.
+      expect(
+        City.prototype.yields
+          .call(city)
+          .filter(
+            (cityYield: Yield): boolean =>
+              cityYield instanceof UnitSupportProduction
+          ).length
+      ).to.equal(5);
     });
 
     it('should still build a defender in a city with none, whatever it costs to support', async (): Promise<void> => {
