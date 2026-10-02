@@ -1,5 +1,5 @@
 // Generic: a unit in one of the player's cities fortifies there if the city needs more defenders, or if it can relieve
-//  a weaker one. Handles the action only when it fortifies.
+//  a weaker one, and makes the city its home. Handles the action only when it fortifies.
 import AIStrategy from '../lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -14,7 +14,7 @@ export class Garrison extends AIStrategy {
 
   attempt(action: PlayerAction<Unit>): boolean {
     const {
-      actions: { fortify },
+      actions: { fortify, setHomeCity },
       tile,
       tileUnits,
     } = unitTurnContextFor(this.dependencies(), action);
@@ -25,7 +25,8 @@ export class Garrison extends AIStrategy {
       tile,
       tileUnits,
       fortify,
-      this.knowledge()
+      this.knowledge(),
+      setHomeCity
     );
   }
 }

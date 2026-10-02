@@ -21,6 +21,7 @@ import Unit from '@civ-clone/core-unit/Unit';
 import moveUnit from './moveUnit';
 import { noOrders } from './orders';
 import reachableTiles from './reachable';
+import takeUpStation from './homeCity';
 
 // The ruleset's part: when a unit is worth keeping. `Civ1/standDown` has Civ1's.
 export interface StandDownPolicy {
@@ -237,7 +238,11 @@ export const standDown = async (
 
   // Not fortified: the city has the defenders it wants, so this one waits, ready for a mission when one comes up. A
   //  fortified unit stays fortified for good.
-  if (dependencies.cityRegistry.getByTile(unit.tile())?.player() === player) {
+  const city = dependencies.cityRegistry.getByTile(unit.tile());
+
+  if (city?.player() === player) {
+    // Waiting here, it's this city's: it becomes its home, if it can support it.
+    takeUpStation(dependencies, knowledge, unit, city, actions.setHomeCity);
     noOrders(dependencies, unit);
 
     return;
