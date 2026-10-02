@@ -14,6 +14,7 @@ export interface TargetBoard {
 }
 export interface Memory {
   lastUnitMoves: Map<Unit, Tile[]>;
+  surveyedTurn: number | null;
   targets: TargetBoard;
   uncalmedCities: Map<City, UncalmedReason>;
   unitPathData: Map<Unit, Path>;

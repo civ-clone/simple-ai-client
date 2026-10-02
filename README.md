@@ -23,7 +23,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 
 | Strategy                                  | Handles                                      | Does                                                                           | Kind    |
 | ----------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ | ------- |
-| `Strategies/Turn/SurveyTargets`           | `BeforeTurn`                                 | refills the player's target board from what it can see                         | generic |
+| `Strategies/Turn/SurveyTargets`           | `BeforeTurn`                                 | refills the target board from what it can see, or a mid-turn save's board      | generic |
 | `Strategies/Turn/ReviewCities`            | `BeforeTurn`                                 | assigns city workers and notes undefended cities                               | generic |
 | `Strategies/Turn/WakeCarrierAircraft`     | `BeforeTurn`                                 | gives orders to aircraft resting on carriers                                   | generic |
 | `Strategies/Civ1/StartRevolution`         | `BeforeTurn`                                 | starts a revolution when the player would choose another government            | Civ1    |

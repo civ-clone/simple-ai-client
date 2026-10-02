@@ -1,11 +1,77 @@
 // Generic: the start-of-turn survey of everything the player can see, refilling the target board.
+import Memory, {
+  TargetBoard,
+  claimedTiles,
+  forgetDestroyedUnits,
+} from '../Memory';
 import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
-import Memory, { claimedTiles, forgetDestroyedUnits } from '../Memory';
 import Player from '@civ-clone/core-player/Player';
 import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import { generateKey } from '@civ-clone/core-strategy/StrategyNote';
+
+// The player's target board as a `StrategyNote`, so that it's saved with the game: the survey's turn, and the board
+//  itself, the same object as `Memory#targets`, so a save holds the board as the turn has left it so far.
+export interface SurveyNote {
+  targets: TargetBoard;
+  turn: number;
+}
+
+export const surveyNoteKey = (player: Player): string =>
+  generateKey(player, 'simple-ai-client:survey');
+
+// Takes up the board a loaded game saved part way through the player's turn, rather than surveying again. Resuming
+//  starts the player's turn over, and a survey of the world as it is by then (changed since the turn began, by moves
+//  made before the save or by anything else) offered different targets: the loaded game played on differently from
+//  the game that never stopped. Only for a new memory, so that surveying twice in one turn (`preProcessTurn`) still
+//  surveys afresh.
+const resumeSurvey = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory
+): boolean => {
+  const turn = dependencies.turn.value(),
+    note = dependencies.strategyNoteRegistry.getByKey<SurveyNote>(
+      surveyNoteKey(player)
+    );
+
+  if (memory.surveyedTurn !== null || !note || note.value().turn !== turn) {
+    return false;
+  }
+
+  const { targets } = memory,
+    saved = note.value().targets;
+
+  (Object.keys(targets) as (keyof TargetBoard)[]).forEach(
+    (key: keyof TargetBoard): void => {
+      targets[key].splice(0, targets[key].length, ...(saved[key] ?? []));
+    }
+  );
+
+  note.value().targets = targets;
+  memory.surveyedTurn = turn;
+
+  return true;
+};
+
+// Notes the board just surveyed, for a save to keep. One note per player, kept up to date in place.
+const noteSurvey = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory
+): void => {
+  const turn = dependencies.turn.value(),
+    note = dependencies.strategyNoteRegistry.getOrCreateByKey<SurveyNote>(
+      surveyNoteKey(player),
+      { targets: memory.targets, turn }
+    );
+
+  note.value().targets = memory.targets;
+  note.value().turn = turn;
+  memory.surveyedTurn = turn;
+};
 
 // Each list is emptied in place, not replaced: `Memory` explains why.
 export const surveyTargets = (
@@ -14,6 +80,10 @@ export const surveyTargets = (
   memory: Memory,
   knowledge: Knowledge
 ): void => {
+  if (resumeSurvey(dependencies, player, memory)) {
+    return;
+  }
+
   const { targets } = memory;
 
   targets.citiesToLiberate.splice(0);
@@ -106,6 +176,8 @@ export const surveyTargets = (
       targets.goodSitesForCities.push(tile);
     }
   });
+
+  noteSurvey(dependencies, player, memory);
 };
 
 export default surveyTargets;

@@ -21,6 +21,9 @@ export interface TargetBoard {
 
 export interface Memory {
   lastUnitMoves: Map<Unit, Tile[]>;
+  // The turn the survey last filled `targets` for, or `null` until it first does: a memory that has never surveyed is
+  //  a new one, such as a computer player's in a game just loaded (`lib/Turn/surveyTargets`).
+  surveyedTurn: number | null;
   targets: TargetBoard;
   // The cities the end of the player's last turn left in civil disorder, and why (`lib/City/disorder`). Refilled then,
   //  so it's empty until the player's first turn ends.
@@ -55,6 +58,7 @@ export const forgetDestroyedUnits = (memory: Memory): void =>
 
 export const createMemory = (): Memory => ({
   lastUnitMoves: new Map(),
+  surveyedTurn: null,
   targets: {
     citiesToLiberate: [],
     enemyCitiesToAttack: [],
