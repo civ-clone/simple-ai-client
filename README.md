@@ -81,7 +81,9 @@ for the nearest of the player's cities it can reach that it could join, and join
 join is for the ruleset's `CanJoinCity` rules (`joinableCity` in `base-unit-action-join-city`; Civ1's limit is a city
 under size 10), and which units may join for the rule that offers the action, so neither is written here. With no
 city it could join, it waits in the city it's in, or heads for the nearest, and takes a site or a job on any later
-turn.
+turn. Civ1's production builds Settlers only when they'd have something to do: a city site on the board that they
+could walk to from the city, or a terrain job there that no unit of the player's has claimed (`hasOpenTerrainJob` in
+`lib/Unit/terrainWork.ts`). With neither, they'd only join a city again, and the shields would be lost.
 
 `PreventDisorder` (`lib/City/disorder.ts`) runs once the player's units have moved, since where they stand changes how
 unhappy a city is. For each city the ruleset's `CivilDisorder` rules would find in disorder at the player's next turn

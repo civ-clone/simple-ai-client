@@ -1,12 +1,12 @@
 // Civ1: what a city builds next: a defender while it has fewer than it wants or martial law could use another unit, explorers while there's land to explore
 //  that they could reach from the city and the player has fewer out and on order than it wants, Settlers while the
-//  player has fewer out and on order than it wants, attackers while there's a war to fight and the player has fewer
-//  than it wants, a defender for a city of the player's that has none, a Wonder in the player's most productive city,
-//  and otherwise a random pick of the rest, never a Palace or a ship. Apart from a missing defender, each is only
-//  started if the city can finish it within the policy's `buildTurns` for its kind, at its net shields; when nothing is
-//  left that it can, the cheapest improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender,
-//  explorers and Settlers, no unit is started that would leave the city no shields to spare once it has to support it
-//  (civ-clone/web-renderer#229).
+//  player has fewer out and on order than it wants and they'd have a city site or a terrain job to go to, attackers
+//  while there's a war to fight and the player has fewer than it wants, a defender for a city of the player's that has
+//  none, a Wonder in the player's most productive city, and otherwise a random pick of the rest, never a Palace or a
+//  ship. Apart from a missing defender, each is only started if the city can finish it within the policy's `buildTurns`
+//  for its kind, at its net shields; when nothing is left that it can, the cheapest improvement worth having
+//  (civ-clone/web-renderer#212). Apart from a missing defender, explorers and Settlers, no unit is started that would
+//  leave the city no shields to spare once it has to support it (civ-clone/web-renderer#229).
 import { Attack, Defence } from '@civ-clone/core-unit/Yields';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
@@ -25,10 +25,12 @@ import {
 import Player from '@civ-clone/core-player/Player';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '../Memory';
+import Tile from '@civ-clone/core-world/Tile';
 import civ1Knowledge from './knowledge';
 import reachableLandToExplore from '../City/explorers';
+import { landReachableFrom } from '../City/explorers';
 import { civ1TerrainPolicy } from './terrain';
-import { terrainJobs } from '../Unit/terrainWork';
+import { hasOpenTerrainJob, terrainJobs } from '../Unit/terrainWork';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
@@ -111,6 +113,31 @@ export const isFoundingSettlers = (
     ![...jobs.keys()]
       .slice(0, civ1TerrainPolicy.workersWanted(dependencies, player))
       .includes(unit)
+  );
+};
+
+// Whether Settlers built in `city` would have something to do: a city site on the board they could walk to, or a
+//  terrain job there no unit of the player's has claimed. With neither, they'd join a city (`lib/Unit/idleWorker`),
+//  which gives back the citizen they cost but not the shields.
+const settlersWouldHaveWork = (
+  dependencies: Dependencies,
+  player: Player,
+  targets: TargetBoard,
+  city: City
+): boolean => {
+  const reachable = landReachableFrom(city.tile());
+
+  return (
+    targets.goodSitesForCities.some((tile: Tile): boolean =>
+      reachable.has(tile)
+    ) ||
+    hasOpenTerrainJob(
+      dependencies,
+      player,
+      dependencies.memoryRegistry.memoryFor(player),
+      civ1TerrainPolicy,
+      reachable
+    )
   );
 };
 
@@ -399,7 +426,9 @@ export const buildItemInCity = (
         item === (Settlers as unknown as typeof Buildable)
     ) <
       policy.settlers + Math.floor(policy.settlersPerCity * cities) &&
-    cityGrowth.size() > 1
+    cityGrowth.size() > 1 &&
+    // With no city site they could walk to and no terrain job, they'd join a city (civ-clone/web-renderer#243).
+    settlersWouldHaveWork(dependencies, player, targets, city)
   ) {
     cityBuild.build(Settlers as unknown as typeof Buildable);
 

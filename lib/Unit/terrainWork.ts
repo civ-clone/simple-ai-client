@@ -2,7 +2,7 @@
 //  improvement is worth most for the time it takes to get there and do it, by the ruleset's `TerrainPolicy`, claims
 //  it, walks there, and does it. Then it picks the next. No two of the player's workers claim the same tile, nor a tile
 //  some unit of the player's is heading for, such as a city site.
-import Memory from '../Memory';
+import Memory, { claimedTiles } from '../Memory';
 import { ActionLookup, lookupActions } from '../actionLookup';
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
@@ -204,6 +204,40 @@ export const chooseTerrainJob = (
   }
 
   return null;
+};
+
+// Whether a worker on `reachable` tiles would find a terrain job no unit of the player's has claimed, by the policy:
+//  for production, whether a worker built now would have something to do (`lib/Civ1/buildItemInCity`). It doesn't ask
+//  whether the worker could do the job there, as `chooseTerrainJob` does, which takes a unit.
+export const hasOpenTerrainJob = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  policy: TerrainPolicy,
+  reachable: Set<Tile>
+): boolean => {
+  const claimed = claimedTiles(memory);
+
+  terrainJobs(memory).forEach((job: TerrainJob): void => {
+    claimed.add(job.tile);
+  });
+
+  return dependencies.cityRegistry
+    .getByPlayer(player)
+    .some((city: City): boolean =>
+      city
+        .tiles()
+        .entries()
+        .some(
+          (tile: Tile): boolean =>
+            reachable.has(tile) &&
+            !claimed.has(tile) &&
+            dependencies.cityRegistry.getByTile(tile) === null &&
+            policy
+              .jobs(dependencies, player, tile)
+              .some(({ value }: TerrainJobValue): boolean => value > 0)
+        )
+    );
 };
 
 // Forgets `unit`'s job, and the path to it, so nothing sends the unit on to a job it no longer has.

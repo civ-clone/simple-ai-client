@@ -39,6 +39,13 @@ export declare const chooseTerrainJob: (
   unit: Unit,
   excluded?: Set<Tile>
 ) => TerrainJob | null;
+export declare const hasOpenTerrainJob: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  policy: TerrainPolicy,
+  reachable: Set<Tile>
+) => boolean;
 export declare const dropTerrainJob: (memory: Memory, unit: Unit) => void;
 export declare const terrainWork: (
   dependencies: Dependencies,
