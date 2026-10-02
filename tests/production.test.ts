@@ -366,8 +366,9 @@ describe('buildItemInCity', (): void => {
       expect(game.cities.getByPlayer(player).length).equal(8);
 
       jobs.set(worker, { improvement: 'road', tile: world.get(2, 1) });
-      // Six more out, so seven in all: the terrain worker, homed in the city, keeps it from building neither another nor
-      //  the seventh for founding cities.
+      // Six more out, so seven Settlers in all. The terrain worker is the one the policy wants, so it's left out of the
+      //  founding Settlers: that makes six of the seven wanted, and the city builds the seventh even though the worker is
+      //  its own.
       unitsOut(setup, 6, Settlers);
 
       expect(isFoundingSettlers(dependencies, player, worker)).false;
