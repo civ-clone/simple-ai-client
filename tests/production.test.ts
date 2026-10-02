@@ -34,7 +34,10 @@ import { createDependencies } from '../lib/Dependencies';
 import { createMemory } from '../lib/Memory';
 import { dependenciesFor } from '../registerStrategies';
 import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
-import { terrainJobs } from '../lib/Unit/terrainWork';
+import { hasOpenTerrainJob, terrainJobs } from '../lib/Unit/terrainWork';
+import Tile from '@civ-clone/core-world/Tile';
+import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
+import { landReachableFrom } from '../lib/City/explorers';
 import { expect } from 'chai';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
@@ -339,6 +342,80 @@ describe('buildItemInCity', (): void => {
       unitsOut(setup, 2, Settlers);
 
       expect(setup.choose()).equal(Settlers);
+    });
+
+    // Settlers with no city site and no terrain job would only join a city again (civ-clone/web-renderer#243).
+    it('should not build Settlers with no city site they could walk to and no terrain job', async (): Promise<void> => {
+      // Forest, which isn't worth improving in Civ1.
+      const setup = await setUp({
+        map: '4FO4FO'.repeat(5),
+        shields: 2,
+        size: 2,
+      });
+
+      unitsOut(setup, 2, Settlers);
+
+      expect(setup.choose()).not.equal(Settlers);
+
+      // Only across the water.
+      setup.targets.goodSitesForCities.push(setup.world.get(6, 0));
+
+      expect(setup.choose()).not.equal(Settlers);
+
+      setup.targets.goodSitesForCities.push(setup.world.get(3, 0));
+
+      expect(setup.choose()).equal(Settlers);
+    });
+
+    it('should build Settlers for a terrain job no worker has claimed, with no city site', async (): Promise<void> => {
+      // Grassland, worth a road in Civ1.
+      const setup = await setUp({ shields: 2, size: 2 }),
+        memory = memoryRegistryInstance.memoryFor(setup.player),
+        reachable = landReachableFrom(setup.city.tile());
+
+      unitsOut(setup, 2, Settlers);
+
+      expect(setup.targets.goodSitesForCities).empty;
+      expect(
+        hasOpenTerrainJob(
+          setup.dependencies,
+          setup.player,
+          memory,
+          civ1TerrainPolicy,
+          reachable
+        )
+      ).true;
+      expect(setup.choose()).equal(Settlers);
+
+      // With every one of the city's tiles claimed by a worker's job, none is open.
+      const jobs = terrainJobs(memory),
+        workers = setup.city
+          .tiles()
+          .entries()
+          .map((tile: Tile): Settlers => {
+            const worker = new Settlers(
+              null,
+              setup.player,
+              tile,
+              setup.game.rules
+            );
+
+            jobs.set(worker, { improvement: 'road', tile });
+
+            return worker;
+          });
+
+      expect(
+        hasOpenTerrainJob(
+          setup.dependencies,
+          setup.player,
+          memory,
+          civ1TerrainPolicy,
+          reachable
+        )
+      ).false;
+
+      workers.forEach((worker: Settlers): boolean => jobs.delete(worker));
     });
 
     it('should count its Settlers with no terrain job, and nothing else, towards the ones it wants for founding cities', async (): Promise<void> => {
