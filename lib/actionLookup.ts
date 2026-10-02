@@ -10,6 +10,7 @@ import {
   Embark,
   Fortify,
   FoundCity,
+  JoinCity,
   NoOrders,
   SetHomeCity,
   SneakAttack,
@@ -28,6 +29,7 @@ export type ActionLookup = {
   embark?: Embark;
   fortify?: Fortify;
   foundCity?: FoundCity;
+  joinCity?: JoinCity;
   noOrders?: NoOrders;
   setHomeCity?: SetHomeCity;
   sneakAttack?: SneakAttack;

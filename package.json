@@ -50,6 +50,7 @@
     "@civ-clone/base-trade-rate-luxuries": "^0.1.0",
     "@civ-clone/base-trade-rate-research": "^0.1.0",
     "@civ-clone/base-trade-rate-tax": "^0.1.0",
+    "@civ-clone/base-unit-action-join-city": "^0.1.0",
     "@civ-clone/civ1-city": "github:civ-clone/civ1-city",
     "@civ-clone/civ1-city-happiness": "github:civ-clone/civ1-city-happiness",
     "@civ-clone/civ1-city-improvement": "github:civ-clone/civ1-city-improvement",
@@ -94,6 +95,6 @@
     "@civ-clone/core-yield": "^0.1.0",
     "@civ-clone/library-city": "^0.1.4",
     "@civ-clone/library-diplomacy": "^0.1.0",
-    "@civ-clone/library-unit": "^0.1.0"
+    "@civ-clone/library-unit": "^0.1.5"
   }
 }
