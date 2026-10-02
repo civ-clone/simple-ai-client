@@ -3,8 +3,9 @@ import {
   BronzeWorking,
   CeremonialBurial,
   Masonry,
+  Writing,
 } from '@civ-clone/civ1-science/Advances';
-import { Settlers, Warrior } from '@civ-clone/civ1-unit/Units';
+import { Diplomat, Settlers, Warrior } from '@civ-clone/civ1-unit/Units';
 import spendTreasury, {
   SpendingPolicy,
   purchases,
@@ -32,6 +33,7 @@ import SpendTreasury from '../Strategies/City/SpendTreasury';
 import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import TradeRates from '../Strategies/Turn/TradeRates';
 import World from '@civ-clone/core-world/World';
+import { Unhappiness } from '@civ-clone/library-city/Yields';
 import Yield from '@civ-clone/core-yield/Yield';
 import cityImprovementRules from '@civ-clone/civ1-city-improvement/registerRules';
 import cityRules from '@civ-clone/civ1-city/registerRules';
@@ -60,8 +62,8 @@ type SetUp = {
   player: Player;
   treasury: PlayerTreasury;
   world: World;
-  // A city of `size` at (`x`, 2), making `shields` net shields, building `item` with `progress` shields in it, and
-  //  with a fortified Warrior in it if `defended`.
+  // A city of `size` at (`x`, 2), making `shields` net shields, building `item` with `progress` shields in it, with a
+  //  fortified Warrior in it if `defended`, and `unhappy` unhappy citizens.
   city: (options: {
     x: number;
     item: IBuildable;
@@ -69,6 +71,7 @@ type SetUp = {
     shields?: number;
     size?: number;
     defended?: boolean;
+    unhappy?: number;
   }) => City;
   // What the player's cities are building, by city, once it has spent.
   spend: () => number;
@@ -80,7 +83,14 @@ const setUp = async (gold: number): Promise<SetUp> => {
   const game = new Game();
 
   game.availableCityBuildItems.register(
-    ...([Warrior, Settlers, Temple, Pyramids, Colossus] as IBuildable[])
+    ...([
+      Warrior,
+      Settlers,
+      Diplomat,
+      Temple,
+      Pyramids,
+      Colossus,
+    ] as IBuildable[])
   );
 
   cityRules(game);
@@ -103,6 +113,7 @@ const setUp = async (gold: number): Promise<SetUp> => {
   playerResearch.addAdvance(BronzeWorking);
   playerResearch.addAdvance(CeremonialBurial);
   playerResearch.addAdvance(Masonry);
+  playerResearch.addAdvance(Writing);
   game.playerWorlds.register(new PlayerWorld(player, world));
   game.playerWorlds.getByPlayer(player).register(...world.entries());
   game.playerGovernments.getByPlayer(player).set(new Monarchy());
@@ -120,6 +131,7 @@ const setUp = async (gold: number): Promise<SetUp> => {
       shields = 1,
       size = 1,
       defended = true,
+      unhappy = 0,
     }) => {
       const city = new City(
           player,
@@ -141,7 +153,10 @@ const setUp = async (gold: number): Promise<SetUp> => {
         );
       }
 
-      city.yields = () => [new Production(shields)];
+      city.yields = () => [
+        new Production(shields),
+        ...(unhappy > 0 ? [new Unhappiness(unhappy)] : []),
+      ];
       cityBuild.build(item);
 
       if (progress > 0) {
@@ -218,6 +233,27 @@ describe('spendTreasury (civ-clone/web-renderer#233)', (): void => {
 
     expect(bought(setup, warrior)).true;
     expect(bought(setup, temple)).false;
+  });
+
+  // A Diplomat can't defend a city, nor (attacking nothing) keep order in one.
+  it('should not buy a unit that would not defend a city short of a defender', async (): Promise<void> => {
+    const setup = await setUp(1000),
+      city = setup.city({ x: 1, item: Diplomat, defended: false });
+
+    expect(setup.spend()).to.equal(0);
+    expect(bought(setup, city)).false;
+  });
+
+  it('should buy a unit that martial law would use, in a city short of one', async (): Promise<void> => {
+    // Under Monarchy, with a defender and two unhappy citizens: martial law could use two more units.
+    const setup = await setUp(1000),
+      warrior = setup.city({ x: 1, item: Warrior, unhappy: 2 }),
+      diplomat = setup.city({ x: 5, item: Diplomat, unhappy: 2 });
+
+    setup.spend();
+
+    expect(bought(setup, warrior)).true;
+    expect(bought(setup, diplomat)).false;
   });
 
   it('should not buy a unit other than a missing defender', async (): Promise<void> => {

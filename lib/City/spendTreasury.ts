@@ -3,8 +3,8 @@
 //  build at a time. A treasury that's never spent is no use to anyone.
 //
 // What's worth buying, most valuable first:
-//  1. a defender, or a unit for martial law, in a city that wants one (`City/defence`'s `wantsUnit`), the cheapest
-//     first;
+//  1. a unit that can defend a city short of defenders, or one martial law would use in a city short of those
+//     (`City/defence`), the cheapest first;
 //  2. an improvement, or a worker (Settlers) in a city that can spare the citizen, that the city would otherwise take
 //     at least the policy's `minTurns` to finish at its net shields: the most turns saved per gold first, which is the
 //     city that makes the fewest shields;
@@ -18,7 +18,7 @@ import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import City from '@civ-clone/core-city/City';
 import CityImprovement from '@civ-clone/core-city-improvement/CityImprovement';
 import Dependencies from '../Dependencies';
-import { Fortifiable, Worker } from '@civ-clone/library-unit/Types';
+import { Worker } from '@civ-clone/library-unit/Types';
 import Knowledge from '../Knowledge';
 import Player from '@civ-clone/core-player/Player';
 import PlayerTreasury from '@civ-clone/core-treasury/PlayerTreasury';
@@ -26,7 +26,7 @@ import SpendCost from '@civ-clone/core-treasury/SpendCost';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import { netShields } from './buildTime';
-import { wantsUnit } from './defence';
+import { isDefenderType, wantsDefender, wantsMartialLawUnit } from './defence';
 
 // The ruleset's part. `Civ1/spending` has Civ1's.
 export interface SpendingPolicy {
@@ -89,7 +89,13 @@ const kindOf = (
   const item = building.item();
 
   if (isA(Unit, item)) {
-    if (isA(Fortifiable, item) && wantsUnit(dependencies, knowledge, city)) {
+    // Only a unit that would meet what the city is short of: one that can defend it, or one martial law would use.
+    if (
+      (wantsDefender(dependencies, city) &&
+        isDefenderType(dependencies, item)) ||
+      (wantsMartialLawUnit(dependencies, knowledge, city) &&
+        knowledge.martialLaw.wouldUse(dependencies, item))
+    ) {
       return 'defender';
     }
 
