@@ -56,21 +56,22 @@ const jobsByMemory: WeakMap<Memory, Map<Unit, TerrainJob>> = new WeakMap();
 // How many jobs a worker tries to find a path to in a turn, best first, before giving up until its next turn.
 export const PATH_TRIES = 3;
 
-// How long a worker remembers the tiles it found no path to, so that it doesn't search for one again each turn.
+// How long a worker remembers each tile it found no path to, so that it doesn't search for one again each turn.
 export const UNPATHABLE_TURNS = 10;
 
-// The tiles each of the player's workers found no path to, and the turn it started remembering them.
+// The tiles each of the player's workers found no path to, each with the turn it found none.
 const unpathableByMemory: WeakMap<
   Memory,
-  Map<Unit, { since: number; tiles: Set<Tile> }>
+  Map<Unit, Map<Tile, number>>
 > = new WeakMap();
 
-// The tiles `unit` found no path to in the last `UNPATHABLE_TURNS` turns, to add to.
+// The tiles `unit` found no path to in the last `UNPATHABLE_TURNS` turns, each with the turn it found none, to add to.
+//  Each is forgotten `UNPATHABLE_TURNS` turns after its own turn, however recently the others were found.
 export const unpathableTiles = (
   memory: Memory,
   unit: Unit,
   turn: number
-): Set<Tile> => {
+): Map<Tile, number> => {
   let byUnit = unpathableByMemory.get(memory);
 
   if (!byUnit) {
@@ -83,15 +84,19 @@ export const unpathableTiles = (
     .filter((other: Unit): boolean => other.destroyed())
     .forEach((other: Unit): boolean => byUnit!.delete(other));
 
-  let entry = byUnit.get(unit);
+  let tiles = byUnit.get(unit);
 
-  if (!entry || turn - entry.since >= UNPATHABLE_TURNS) {
-    entry = { since: turn, tiles: new Set() };
+  if (!tiles) {
+    tiles = new Map();
 
-    byUnit.set(unit, entry);
+    byUnit.set(unit, tiles);
   }
 
-  return entry.tiles;
+  [...tiles.entries()]
+    .filter(([, found]): boolean => turn - found >= UNPATHABLE_TURNS)
+    .forEach(([tile]): boolean => tiles!.delete(tile));
+
+  return tiles;
 };
 
 // The player's workers' jobs, less those of workers that have since been destroyed.
@@ -246,8 +251,9 @@ export const terrainWork = async (
   actions: ActionLookup
 ): Promise<boolean> => {
   const jobs = terrainJobs(memory),
+    turn = dependencies.turn.value(),
     // A job's tile can be reachable by its terrain and still have no path to it: those are tried no more for a while.
-    unpathable = unpathableTiles(memory, unit, dependencies.turn.value());
+    unpathable = unpathableTiles(memory, unit, turn);
 
   let job = jobs.get(unit);
 
@@ -267,7 +273,7 @@ export const terrainWork = async (
           memory,
           policy,
           unit,
-          unpathable
+          new Set(unpathable.keys())
         ) ?? undefined;
 
       if (!job) {
@@ -305,7 +311,7 @@ export const terrainWork = async (
       break;
     }
 
-    unpathable.add(job.tile);
+    unpathable.set(job.tile, turn);
     jobs.delete(unit);
     job = undefined;
 
