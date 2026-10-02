@@ -49,7 +49,21 @@ export class MissionAndMove extends AIStrategy {
       memory,
       this.knowledge(),
       unit,
-      { wander: isAircraft }
+      {
+        wander: isAircraft,
+        // A unit whose path ends with moves to spare and no step worth taking takes its next mission straight away,
+        //  rather than standing still for the rest of the turn: an explorer that had walked to the edge of the known
+        //  map stopped there until its next turn.
+        onIdle: (): boolean => {
+          if (memory.unitTargetData.has(unit)) {
+            return false;
+          }
+
+          assignMission(this.dependencies(), memory, unit);
+
+          return memory.unitPathData.has(unit);
+        },
+      }
     );
 
     return true;
