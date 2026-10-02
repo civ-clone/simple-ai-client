@@ -4,8 +4,8 @@
 //  than it wants, a defender for a city of the player's that has none, a Wonder in the player's most productive city,
 //  and otherwise a random pick of the rest, never a Palace or a ship. Apart from a missing defender, each is only
 //  started if the city can finish it within the policy's `buildTurns` for its kind, at its net shields; when nothing is
-//  left that it can, the cheapest improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender
-//  and Settlers, no unit is started that would leave the city no shields to spare once it has to support it
+//  left that it can, the cheapest improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender,
+//  explorers and Settlers, no unit is started that would leave the city no shields to spare once it has to support it
 //  (civ-clone/web-renderer#229).
 import { Attack, Defence } from '@civ-clone/core-unit/Yields';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
@@ -340,8 +340,11 @@ export const buildItemInCity = (
       ) &&
     reachableLandToExplore(city, targets.landTilesToExplore) > 0
   ) {
-    // The cheapest land unit that can fight, if the city can finish it within the policy's turns.
-    const [explorer] = affordableUnits
+    // The cheapest land unit that can fight, if the city can finish it within the policy's turns, whether or not the city
+    //  has shields to spare to support it. With units that have nothing left to do standing down rather than wandering
+    //  (civ-clone/web-renderer#230), explorers are what explores, and keeping them to cities with shields to spare cost
+    //  players a tenth of what they had explored by turn 300 in the arena.
+    const [explorer] = availableUnits
       .filter(
         (buildItem: BuildItem): boolean =>
           isExplorerType(dependencies, buildItem.item()) &&
