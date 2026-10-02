@@ -89,6 +89,15 @@ const isExploring = (dependencies: Dependencies, unit: Unit): boolean =>
   unit.attack().value() > 0 &&
   dependencies.cityRegistry.getByTile(unit.tile()) === null;
 
+// Whether one of the player's units is Settlers it has for founding cities, and so counts towards the policy's
+//  `settlers` (and keeps its home city from building more): all of its Settlers. Settlers kept for other work, such as
+//  terrain jobs (civ-clone/web-renderer#234), can be left out here.
+export const isFoundingSettlers = (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+): boolean => unit instanceof Settlers;
+
 // The value of a unit type's `YieldType` (`Attack`, `Defence`) before anything modifies it.
 const baseYield = (
   dependencies: Dependencies,
@@ -358,12 +367,14 @@ export const buildItemInCity = (
     ) &&
     !dependencies.unitRegistry
       .getByCity(cityBuild.city())
-      .some((unit: Unit): boolean => unit instanceof Settlers) &&
+      .some((unit: Unit): boolean =>
+        isFoundingSettlers(dependencies, player, unit)
+      ) &&
     // TODO: use expansionist leader trait
     unitsAndOrders(
       dependencies,
       player,
-      (unit: Unit): boolean => unit instanceof Settlers,
+      (unit: Unit): boolean => isFoundingSettlers(dependencies, player, unit),
       (item: object): boolean =>
         item === (Settlers as unknown as typeof Buildable)
     ) <
