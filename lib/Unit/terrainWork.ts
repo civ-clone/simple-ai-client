@@ -53,6 +53,47 @@ const actionFor: { [K in TerrainImprovement]: keyof ActionLookup } = {
 // Each player's workers' jobs, kept beside its memory.
 const jobsByMemory: WeakMap<Memory, Map<Unit, TerrainJob>> = new WeakMap();
 
+// How many jobs a worker tries to find a path to in a turn, best first, before giving up until its next turn.
+export const PATH_TRIES = 3;
+
+// How long a worker remembers the tiles it found no path to, so that it doesn't search for one again each turn.
+export const UNPATHABLE_TURNS = 10;
+
+// The tiles each of the player's workers found no path to, and the turn it started remembering them.
+const unpathableByMemory: WeakMap<
+  Memory,
+  Map<Unit, { since: number; tiles: Set<Tile> }>
+> = new WeakMap();
+
+// The tiles `unit` found no path to in the last `UNPATHABLE_TURNS` turns, to add to.
+export const unpathableTiles = (
+  memory: Memory,
+  unit: Unit,
+  turn: number
+): Set<Tile> => {
+  let byUnit = unpathableByMemory.get(memory);
+
+  if (!byUnit) {
+    byUnit = new Map();
+
+    unpathableByMemory.set(memory, byUnit);
+  }
+
+  [...byUnit.keys()]
+    .filter((other: Unit): boolean => other.destroyed())
+    .forEach((other: Unit): boolean => byUnit!.delete(other));
+
+  let entry = byUnit.get(unit);
+
+  if (!entry || turn - entry.since >= UNPATHABLE_TURNS) {
+    entry = { since: turn, tiles: new Set() };
+
+    byUnit.set(unit, entry);
+  }
+
+  return entry.tiles;
+};
+
 // The player's workers' jobs, less those of workers that have since been destroyed.
 export const terrainJobs = (memory: Memory): Map<Unit, TerrainJob> => {
   let jobs = jobsByMemory.get(memory);
@@ -85,13 +126,15 @@ const stillWorthDoing = (
     );
 
 // The best job for `unit` on the tiles of the player's cities: worth most for the turns it takes to walk there and do
-//  it, on a tile it can reach that no other unit of the player's has claimed, and that it could actually do there.
+//  it, on a tile it can reach that no other unit of the player's has claimed, and that it could actually do there. Not
+//  on any of `excluded`.
 export const chooseTerrainJob = (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
   policy: TerrainPolicy,
-  unit: Unit
+  unit: Unit,
+  excluded: Set<Tile> = new Set()
 ): TerrainJob | null => {
   const jobs = terrainJobs(memory),
     reachable = reachableTiles(unit),
@@ -128,6 +171,7 @@ export const chooseTerrainJob = (
         tile.isLand() &&
         dependencies.cityRegistry.getByTile(tile) === null &&
         !claimed.has(tile) &&
+        !excluded.has(tile) &&
         (reachable === null || reachable.has(tile))
     )
     .flatMap((tile: Tile): [TerrainJob, number][] =>
@@ -201,7 +245,9 @@ export const terrainWork = async (
   unit: Unit,
   actions: ActionLookup
 ): Promise<boolean> => {
-  const jobs = terrainJobs(memory);
+  const jobs = terrainJobs(memory),
+    // A job's tile can be reachable by its terrain and still have no path to it: those are tried no more for a while.
+    unpathable = unpathableTiles(memory, unit, dependencies.turn.value());
 
   let job = jobs.get(unit);
 
@@ -211,29 +257,41 @@ export const terrainWork = async (
     job = undefined;
   }
 
-  if (!job) {
-    job =
-      chooseTerrainJob(dependencies, player, memory, policy, unit) ?? undefined;
-
+  // The job, and a path to it: the next best each time there's none, up to `PATH_TRIES` searches.
+  for (let searches = 0; ; ) {
     if (!job) {
+      job =
+        chooseTerrainJob(
+          dependencies,
+          player,
+          memory,
+          policy,
+          unit,
+          unpathable
+        ) ?? undefined;
+
+      if (!job) {
+        return false;
+      }
+
+      jobs.set(unit, job);
+    }
+
+    if (startJob(unit, job, actions)) {
+      return true;
+    }
+
+    if (unit.tile() === job.tile) {
+      // It can't do the job after all.
+      dropTerrainJob(memory, unit);
+
       return false;
     }
 
-    jobs.set(unit, job);
-  }
+    if (memory.unitPathData.get(unit)?.end() === job.tile) {
+      break;
+    }
 
-  if (startJob(unit, job, actions)) {
-    return true;
-  }
-
-  if (unit.tile() === job.tile) {
-    // It can't do the job after all.
-    dropTerrainJob(memory, unit);
-
-    return false;
-  }
-
-  if (memory.unitPathData.get(unit)?.end() !== job.tile) {
     const path = Path.for(
       unit,
       unit.tile(),
@@ -241,13 +299,19 @@ export const terrainWork = async (
       dependencies.pathFinderRegistry
     );
 
-    if (!path) {
-      jobs.delete(unit);
+    if (path) {
+      memory.unitPathData.set(unit, path);
 
-      return false;
+      break;
     }
 
-    memory.unitPathData.set(unit, path);
+    unpathable.add(job.tile);
+    jobs.delete(unit);
+    job = undefined;
+
+    if (++searches >= PATH_TRIES) {
+      return false;
+    }
   }
 
   await moveUnit(dependencies, player, memory, knowledge, unit, {

@@ -23,13 +23,21 @@ export interface TerrainJob {
   improvement: TerrainImprovement;
   tile: Tile;
 }
+export declare const PATH_TRIES = 3;
+export declare const UNPATHABLE_TURNS = 10;
+export declare const unpathableTiles: (
+  memory: Memory,
+  unit: Unit,
+  turn: number
+) => Set<Tile>;
 export declare const terrainJobs: (memory: Memory) => Map<Unit, TerrainJob>;
 export declare const chooseTerrainJob: (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
   policy: TerrainPolicy,
-  unit: Unit
+  unit: Unit,
+  excluded?: Set<Tile>
 ) => TerrainJob | null;
 export declare const dropTerrainJob: (memory: Memory, unit: Unit) => void;
 export declare const terrainWork: (
