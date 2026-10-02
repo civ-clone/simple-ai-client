@@ -284,28 +284,30 @@ describe('government (civ-clone/web-renderer#231)', (): void => {
 
   it(`should wait 40 turns after one revolution before the next`, async (): Promise<void> => {
     const setup = await setUp(JuliusCaesar, MonarchyAdvance),
-      city = setup.city(2, 2, 3);
+      { dependencies, game, player, playerGovernment } = setup;
+
+    setup.city(2, 2, 3);
+
+    // The turn the first revolution starts, not the turn its Anarchy ends.
+    const revolution = game.turn.value();
 
     revolt(setup);
 
     expect(governmentName(setup)).to.equal('Monarchy');
 
-    const revolution = setup.game.turn.value();
-
-    setup.game.playerResearch.getByPlayer(setup.player).addAdvance(TheRepublic);
+    game.playerResearch.getByPlayer(player).addAdvance(TheRepublic);
     expect(setup.preferred()).to.equal(Republic);
 
-    // The revolution started a few turns before Monarchy was chosen.
-    setup.game.turn.set(revolution + 30);
-    startRevolution(setup.dependencies, setup.player);
+    game.turn.set(revolution + 39);
+    startRevolution(dependencies, player);
 
+    expect(pendingRevolution(playerGovernment, game.pendingEffects)).null;
     expect(governmentName(setup)).to.equal('Monarchy');
 
-    setup.game.turn.set(revolution + 45);
-    revolt(setup);
+    game.turn.set(revolution + 40);
+    startRevolution(dependencies, player);
 
-    expect(governmentName(setup)).to.equal('Republic');
-    expect(city.player()).to.equal(setup.player);
+    expect(pendingRevolution(playerGovernment, game.pendingEffects)).not.null;
   });
 
   it('should stay in Monarchy rather than go back to Despotism, however many units it has', async (): Promise<void> => {
