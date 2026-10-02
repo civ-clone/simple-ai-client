@@ -14,7 +14,9 @@
 //    would cost it Anarchy twice over, to and from it (and the save that raised the issue had a player stuck in it);
 //  - once out of Despotism, it changes government only when the choice above comes out differently, and no sooner than
 //    the policy's `revolutionTurns` after its last revolution;
-//  - with none of 2-4 to choose, it takes the first of Monarchy, Communism and The Republic it knows.
+//  - with none of 2-4 to choose, it takes the first of Monarchy, Communism and The Republic it knows, and Democracy only
+//    when it knows none of those: Civ1's Democracy needs Philosophy and Literacy, not The Republic, so it can be the
+//    first government a player learns, where the original would stay in Despotism.
 import {
   Anarchy,
   Communism,
