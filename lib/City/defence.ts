@@ -4,16 +4,20 @@ import { MartialLaw, Unhappiness } from '@civ-clone/library-city/Yields';
 import City from '@civ-clone/core-city/City';
 import Cost from '@civ-clone/core-city/Rules/Cost';
 import Dependencies from '../Dependencies';
+import { Defence } from '@civ-clone/core-unit/Yields';
 import { Fortifiable } from '@civ-clone/library-unit/Types';
 import Knowledge from '../Knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
+import baseYieldOf from '../Unit/unitType';
 
 // The ruleset's part of martial law, units in a city keeping its unhappy citizens content (civ-clone/web-renderer#216).
 //  `Civ1/martialLaw` has Civ1's.
 export interface MartialLawPolicy {
   // How many units in `city` martial law can use at most under its player's government: 0 where there's none.
   limit(dependencies: Dependencies, city: City): number;
+  // Whether martial law would use a unit of `UnitType`.
+  wouldUse(dependencies: Dependencies, UnitType: object): boolean;
 }
 
 // More unhappy citizens than any city has, for `calmedWithoutMartialLaw`.
@@ -105,16 +109,30 @@ export const martialLawUnitsIn = (city: City): Unit[] =>
     .filter((cityYield: Yield): boolean => cityYield instanceof MartialLaw)
     .map((cityYield: Yield): Unit => (cityYield as MartialLaw).unit());
 
+// Whether `city` wants another defender in it.
+export const wantsDefender = (
+  dependencies: Dependencies,
+  city: City
+): boolean =>
+  defendersIn(dependencies, city).length < defendersWanted(dependencies, city);
+
+// Whether `city` wants another unit in it for martial law to use.
+export const wantsMartialLawUnit = (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  city: City
+): boolean =>
+  martialLawUnitsIn(city).length <
+  martialLawUnitsWanted(dependencies, knowledge, city);
+
 // Whether `city` wants another unit in it: a defender, or a unit for martial law to use.
 export const wantsUnit = (
   dependencies: Dependencies,
   knowledge: Knowledge,
   city: City
 ): boolean =>
-  defendersIn(dependencies, city).length <
-    defendersWanted(dependencies, city) ||
-  martialLawUnitsIn(city).length <
-    martialLawUnitsWanted(dependencies, knowledge, city);
+  wantsDefender(dependencies, city) ||
+  wantsMartialLawUnit(dependencies, knowledge, city);
 
 // Whether `city` needs `unit` to keep order: martial law is using it, and wouldn't have the units it wants without it.
 export const keepsOrder = (
@@ -134,6 +152,14 @@ export const keepsOrder = (
 // A unit that could defend a city: not, say, Settlers or a ship.
 export const isDefender = (unit: Unit): boolean =>
   unit instanceof Fortifiable && unit.defence().value() > 0;
+
+// A type of unit that could defend a city, as `isDefender` judges a unit: not, say, a Diplomat.
+export const isDefenderType = (
+  dependencies: Dependencies,
+  UnitType: object
+): boolean =>
+  Object.prototype.isPrototypeOf.call(Fortifiable, UnitType) &&
+  baseYieldOf(dependencies, UnitType, Defence) > 0;
 
 // The units on the city's tile that could defend it, fortified or not.
 export const defendersIn = (dependencies: Dependencies, city: City): Unit[] =>

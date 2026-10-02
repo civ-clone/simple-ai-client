@@ -6,7 +6,9 @@ import {
   martialLawGovernments,
   martialLawUnitLimit,
 } from '@civ-clone/civ1-city-happiness/martialLaw';
+import { Attack } from '@civ-clone/core-unit/Yields';
 import { MartialLawPolicy } from '../City/defence';
+import baseYieldOf from '../Unit/unitType';
 
 export const civ1MartialLawPolicy: MartialLawPolicy = {
   limit: (dependencies, city) =>
@@ -15,6 +17,9 @@ export const civ1MartialLawPolicy: MartialLawPolicy = {
       .is(...martialLawGovernments)
       ? martialLawUnitLimit
       : 0,
+  // As `civ1-city-happiness`'s `keepsMartialLaw` judges a unit: any whose attack isn't 0.
+  wouldUse: (dependencies, UnitType) =>
+    baseYieldOf(dependencies, UnitType, Attack) > 0,
 };
 
 export default civ1MartialLawPolicy;
