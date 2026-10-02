@@ -61,9 +61,9 @@ cities' tiles and reachable, whose improvement the policy values most for the tu
 it's checked against what the worker could actually do there (`unit.actions(tile, tile)`), and no two of the player's
 units claim the same tile, nor a tile one is heading for. Civ1's policy (`civ1TerrainPolicy` in `lib/Civ1/terrain.ts`)
 values irrigation, mines and roads by what `civ1-world`'s yield rules say they add under the player's government (an
-irrigated Grassland or River tile adds nothing under Despotism), food at 2, shields at 1.5 and trade at 1, half as
-much again for whatever the city has at most 1 of to spare, and half for a tile the city doesn't work; it wants a
-terrain worker for every eight cities.
+irrigated Grassland or River tile adds nothing under Despotism), food at 2, shields at 1.5 and trade at 1, food or
+shields half as much again when the city has at most 1 of it to spare, and half for a tile the city doesn't work; it
+wants a terrain worker for every eight cities.
 
 `PreventDisorder` (`lib/City/disorder.ts`) runs once the player's units have moved, since where they stand changes how
 unhappy a city is. For each city the ruleset's `CivilDisorder` rules would find in disorder at the player's next turn
