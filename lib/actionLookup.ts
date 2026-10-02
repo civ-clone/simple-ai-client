@@ -11,6 +11,7 @@ import {
   Fortify,
   FoundCity,
   NoOrders,
+  SetHomeCity,
   SneakAttack,
   Unload,
 } from '@civ-clone/library-unit/Actions';
@@ -28,6 +29,7 @@ export type ActionLookup = {
   fortify?: Fortify;
   foundCity?: FoundCity;
   noOrders?: NoOrders;
+  setHomeCity?: SetHomeCity;
   sneakAttack?: SneakAttack;
   unload?: Unload;
 };

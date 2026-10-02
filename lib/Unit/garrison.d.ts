@@ -1,6 +1,7 @@
 import Dependencies from '../Dependencies';
 import { Fortify } from '@civ-clone/library-unit/Actions';
 import Knowledge from '../Knowledge';
+import { SetHomeCity } from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 export declare const garrison: (
@@ -9,6 +10,7 @@ export declare const garrison: (
   tile: Tile,
   tileUnits: Unit[],
   fortify: Fortify | undefined,
-  knowledge: Knowledge
+  knowledge: Knowledge,
+  setHomeCity?: SetHomeCity
 ) => boolean;
 export default garrison;
