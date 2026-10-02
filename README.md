@@ -31,7 +31,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/UnloadTransport`         | a unit's action                              | unloads a transport at the coast (handles it only then)                        | generic |
 | `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
 | `Strategies/Unit/TerrainWork`             | a `Worker`'s action                          | goes to and does its terrain job, or takes one if it has no city site to settle (handles it only then) | generic |
-| `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves | generic |
+| `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves; with none of that, joins a city | generic |
 | `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city, which becomes its home (handles it only then) | generic |
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; handles it unless the unit has nothing to do | generic |
 | `Strategies/Unit/StandDown`               | a unit's action                              | goes to a city that wants it, is disbanded if not worth its upkeep, or waits in or heads for a city; always handles it | generic |
@@ -72,6 +72,16 @@ shields half as much again when the city has at most 1 of it to spare, and half 
 wants a terrain worker for every eight cities. Those terrain workers don't count towards the Settlers Civ1's production
 builds for founding cities (`isFoundingSettlers` in `lib/Civ1/buildItemInCity.ts`); any more on terrain jobs, which took
 one for want of a site, do.
+
+A worker with no city site it can reach, no terrain job and no step that scores above nothing joins one of the
+player's cities (civ-clone/web-renderer#243, #230), as v474.05's computer players have a spare Settlers do
+(OpenCivOne's `AIEngine.cs`, L1468-1483), rather than walk back and forth: `WorkerTurn` hands it to
+`lib/Unit/idleWorker.ts`, which joins the city it's standing in if the unit is offered `JoinCity` there, or else heads
+for the nearest of the player's cities it can reach that it could join, and joins on arriving. Which cities it could
+join is for the ruleset's `CanJoinCity` rules (`joinableCity` in `base-unit-action-join-city`; Civ1's limit is a city
+under size 10), and which units may join for the rule that offers the action, so neither is written here. With no
+city it could join, it waits in the city it's in, or heads for the nearest, and takes a site or a job on any later
+turn.
 
 `PreventDisorder` (`lib/City/disorder.ts`) runs once the player's units have moved, since where they stand changes how
 unhappy a city is. For each city the ruleset's `CivilDisorder` rules would find in disorder at the player's next turn

@@ -55,7 +55,7 @@ const defendersHeadingFor = (memory: Memory, tile: Tile): number =>
   ).length;
 
 // The player's cities other than the one the unit is in, that it could reach, nearest first.
-const citiesInReach = (
+export const citiesInReach = (
   dependencies: Dependencies,
   player: Player,
   unit: Unit
@@ -140,7 +140,7 @@ const pathInto = (
 };
 
 // The first of `cities` that `wanted` accepts and the unit has a path into, with the path.
-const firstPath = (
+export const firstPath = (
   dependencies: Dependencies,
   unit: Unit,
   cities: City[],
@@ -169,6 +169,29 @@ const firstPath = (
   return null;
 };
 
+// Along `path`, and no further, rather than take a step towards anything it passes: arrived with moves to spare, the
+//  unit does `arrived`.
+export const goAlong = async (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  knowledge: Knowledge,
+  unit: Unit,
+  path: Path,
+  arrived: () => void
+): Promise<void> => {
+  memory.unitPathData.set(unit, path);
+
+  await moveUnit(dependencies, player, memory, knowledge, unit, {
+    stopAtPathEnd: true,
+    wander: false,
+  });
+
+  if (unit.active() && unit.moves().value() >= 0.1) {
+    arrived();
+  }
+};
+
 const stay = (
   dependencies: Dependencies,
   unit: Unit,
@@ -192,20 +215,11 @@ export const standDown = async (
   unit: Unit,
   actions: ActionLookup
 ): Promise<void> => {
-  // Along `path`, and no further: arrived with moves to spare, it waits there for `Garrison` or this to decide next
-  //  turn, rather than take a step towards anything it passes.
-  const go = async (path: Path): Promise<void> => {
-    memory.unitPathData.set(unit, path);
-
-    await moveUnit(dependencies, player, memory, knowledge, unit, {
-      stopAtPathEnd: true,
-      wander: false,
-    });
-
-    if (unit.active() && unit.moves().value() >= 0.1) {
-      noOrders(dependencies, unit);
-    }
-  };
+  // Arrived with moves to spare, it waits there for `Garrison` or this to decide next turn.
+  const go = (path: Path): Promise<void> =>
+    goAlong(dependencies, player, memory, knowledge, unit, path, () =>
+      noOrders(dependencies, unit)
+    );
 
   // Worked out only if there's a city to look for.
   let cities: City[] | undefined;
