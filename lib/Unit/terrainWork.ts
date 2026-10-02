@@ -50,9 +50,6 @@ const actionFor: { [K in TerrainImprovement]: keyof ActionLookup } = {
   road: 'buildRoad',
 };
 
-// How many of the best-scored jobs are checked against what the worker could actually do there before giving up.
-const JOBS_TRIED = 5;
-
 // Each player's workers' jobs, kept beside its memory.
 const jobsByMemory: WeakMap<Memory, Map<Unit, TerrainJob>> = new WeakMap();
 
@@ -150,13 +147,30 @@ export const chooseTerrainJob = (
     )
     .sort(([, a], [, b]): number => b - a);
 
-  for (const [job] of ranked.slice(0, JOBS_TRIED)) {
+  // Best first, until one the worker could do: each tile is asked about once however many of its jobs are ranked.
+  for (const [job] of ranked) {
     if (actionsAt(job.tile)[actionFor[job.improvement]]) {
       return job;
     }
   }
 
   return null;
+};
+
+// Forgets `unit`'s job, and the path to it, so nothing sends the unit on to a job it no longer has.
+export const dropTerrainJob = (memory: Memory, unit: Unit): void => {
+  const jobs = terrainJobs(memory),
+    job = jobs.get(unit);
+
+  if (!job) {
+    return;
+  }
+
+  jobs.delete(unit);
+
+  if (memory.unitPathData.get(unit)?.end() === job.tile) {
+    memory.unitPathData.delete(unit);
+  }
 };
 
 // Starts `job` if `unit` is on its tile and can. Returns whether it did.
@@ -192,7 +206,7 @@ export const terrainWork = async (
   let job = jobs.get(unit);
 
   if (job && !stillWorthDoing(dependencies, player, policy, job)) {
-    jobs.delete(unit);
+    dropTerrainJob(memory, unit);
 
     job = undefined;
   }
@@ -214,7 +228,7 @@ export const terrainWork = async (
 
   if (unit.tile() === job.tile) {
     // It can't do the job after all.
-    jobs.delete(unit);
+    dropTerrainJob(memory, unit);
 
     return false;
   }

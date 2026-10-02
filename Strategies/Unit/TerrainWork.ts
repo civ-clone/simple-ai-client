@@ -1,12 +1,14 @@
 // Generic: a worker improves the terrain around the player's cities (civ-clone/web-renderer#234): it takes a terrain
 //  job, or carries on with one, when it has no city site to settle and none it can reach, or when the player wants
-//  more workers on terrain jobs than it has, by the ruleset's `TerrainPolicy` (`lib/Unit/terrainWork`). Handles the
-//  action only when the worker has a job to get on with; otherwise `WorkerTurn` carries on as usual.
+//  more workers on terrain jobs than it has, by the ruleset's `TerrainPolicy` (`lib/Unit/terrainWork`). Otherwise it
+//  drops any job it has. Handles the action only when the worker has a job to get on with; otherwise `WorkerTurn`
+//  carries on as usual.
 //
 // For one worker of a human player's ("automate Settlers"), `attempt` does the next sensible terrain job: with no
 //  survey in the player's memory, there's no city site to keep it from one.
 import terrainWork, {
   TerrainPolicy,
+  dropTerrainJob,
   terrainJobs,
 } from '../../lib/Unit/terrainWork';
 import AIStrategy from '../lib/AIStrategy';
@@ -46,37 +48,23 @@ export class TerrainWork extends AIStrategy {
         action
       );
 
-    const job = jobs.get(unit);
+    // A worker settles rather than improves terrain if it can: it's on its way to a city site or standing on one, or
+    //  there's a site it can reach and the player has the terrain workers it wants without it. Asked of every worker
+    //  this is offered to: one at work is busy, and isn't offered.
+    const others = [...jobs.keys()].filter(
+      (other: Unit): boolean => other !== unit
+    ).length;
 
-    // Until it has started work, a worker settles rather than improves terrain if it can: it's on its way to a city
-    //  site or standing on one, or there's a site it can reach and the player has the terrain workers it wants without
-    //  it.
-    if (!job || job.tile !== tile) {
-      const others = [...jobs.keys()].filter(
-        (other: Unit): boolean => other !== unit
-      ).length;
+    if (
+      target ||
+      (actions.foundCity &&
+        this.knowledge().shouldBuildCity(this.dependencies(), player, tile)) ||
+      (others >= this._policy.workersWanted(this.dependencies(), player) &&
+        this.siteInReach(unit, tile, memory.targets.goodSitesForCities))
+    ) {
+      dropTerrainJob(memory, unit);
 
-      if (
-        target ||
-        (actions.foundCity &&
-          this.knowledge().shouldBuildCity(
-            this.dependencies(),
-            player,
-            tile
-          )) ||
-        (others >= this._policy.workersWanted(this.dependencies(), player) &&
-          this.siteInReach(unit, tile, memory.targets.goodSitesForCities))
-      ) {
-        if (job) {
-          jobs.delete(unit);
-
-          if (memory.unitPathData.get(unit)?.end() === job.tile) {
-            memory.unitPathData.delete(unit);
-          }
-        }
-
-        return false;
-      }
+      return false;
     }
 
     return terrainWork(
