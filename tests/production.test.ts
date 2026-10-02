@@ -353,24 +353,43 @@ describe('buildItemInCity', (): void => {
       expect(isFoundingSettlers(dependencies, player, warrior)).false;
     });
 
-    it('should not count Settlers on a terrain job towards the ones it wants for founding cities (civ-clone/web-renderer#234)', async (): Promise<void> => {
+    it("should not count Settlers on terrain jobs towards the ones it wants for founding cities, as many as Civ1's terrain policy wants (civ-clone/web-renderer#234)", async (): Promise<void> => {
+      // Eight cities: Civ1 wants a terrain worker, and 3 + floor(8 × 0.5) = 7 Settlers for founding cities.
       const setup = await setUp({ shields: 2, size: 2 }),
         { dependencies, game, player, world } = setup,
-        worker = new Settlers(setup.city, player, world.get(2, 1), game.rules),
-        jobs = terrainJobs(memoryRegistryInstance.memoryFor(player));
+        jobs = terrainJobs(memoryRegistryInstance.memoryFor(player)),
+        worker = new Settlers(setup.city, player, world.get(2, 1), game.rules);
+
+      [0, 1, 2, 3, 4, 6, 7].forEach((y: number): void => {
+        setup.addCity(y < 5 ? 3 : 0, y % 5);
+      });
+      expect(game.cities.getByPlayer(player).length).equal(8);
 
       jobs.set(worker, { improvement: 'road', tile: world.get(2, 1) });
+      // Six more out, so seven in all: the terrain worker, homed in the city, keeps it from building neither another nor
+      //  the seventh for founding cities.
+      unitsOut(setup, 6, Settlers);
 
       expect(isFoundingSettlers(dependencies, player, worker)).false;
-      // Three founding Settlers out, of the three it wants: the terrain worker, homed in the city, doesn't keep it
-      //  from building another.
-      unitsOut(setup, 2, Settlers);
       expect(setup.choose()).equal(Settlers);
 
+      // A second terrain worker is one more than the policy wants: it counts.
+      const extra = new Settlers(null, player, world.get(3, 1), game.rules);
+
+      jobs.set(extra, { improvement: 'road', tile: world.get(3, 1) });
+
+      expect(isFoundingSettlers(dependencies, player, worker)).false;
+      expect(isFoundingSettlers(dependencies, player, extra)).true;
+      expect(setup.choose()).not.equal(Settlers);
+
+      // With no job, the first counts too, and the second is the terrain worker the policy wants.
       jobs.delete(worker);
 
       expect(isFoundingSettlers(dependencies, player, worker)).true;
+      expect(isFoundingSettlers(dependencies, player, extra)).false;
       expect(setup.choose()).not.equal(Settlers);
+
+      jobs.delete(extra);
     });
 
     it('should count Settlers its other cities are building towards the ones it wants', async (): Promise<void> => {
