@@ -207,13 +207,14 @@ describe('buildItemInCity', (): void => {
   });
 
   describe('unit support (civ-clone/web-renderer#229)', (): void => {
-    it('should not start an explorer that would leave it no shields to spare', async (): Promise<void> => {
-      // Under Monarchy every unit costs a shield, so a city making 1 has none to spare for another.
+    // Under Monarchy every unit costs a shield, so a city making 1 has none to spare for another. Explorers are built
+    //  all the same: with idle units standing down, they're what explores.
+    it('should start an explorer for land it can reach, even if it would leave it no shields to spare', async (): Promise<void> => {
       const setup = await setUp({ shields: 1 });
 
       setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
 
-      expect(isUnit(setup.choose())).false;
+      expect(setup.choose()).equal(Warrior);
     });
 
     it('should not pick a unit at random that would leave it no shields to spare', async (): Promise<void> => {
@@ -231,7 +232,22 @@ describe('buildItemInCity', (): void => {
       ).false;
     });
 
-    it('should start an explorer under Despotism while the city supports fewer units than its size', async (): Promise<void> => {
+    // Warriors first, then a Temple: a pick of 0 would be Warriors.
+    const pickAtRandom = (setup: SetUp): unknown => {
+      buildItemInCity(
+        createDependencies({
+          ...setup.dependencies,
+          randomNumberGenerator: (): number => 0,
+        }),
+        setup.player,
+        setup.targets,
+        setup.city
+      );
+
+      return setup.game.cityBuilds.getByCity(setup.city).building()?.item();
+    };
+
+    it('should pick a unit at random under Despotism while the city supports fewer units than its size', async (): Promise<void> => {
       // Size 2 with one unit of its own: Despotism supports a second for nothing.
       const setup = await setUp({
         government: Despotism,
@@ -239,17 +255,16 @@ describe('buildItemInCity', (): void => {
         size: 2,
       });
 
-      setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
+      // As many Settlers as it wants, so it doesn't build more.
+      unitsOut(setup, 3, Settlers);
 
-      expect(setup.choose()).equal(Warrior);
+      expect(pickAtRandom(setup)).equal(Warrior);
     });
 
-    it('should not start an explorer under Despotism once the city supports as many units as its size', async (): Promise<void> => {
+    it('should not pick a unit at random under Despotism once the city supports as many units as its size', async (): Promise<void> => {
       const setup = await setUp({ government: Despotism, shields: 1 });
 
-      setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
-
-      expect(isUnit(setup.choose())).false;
+      expect(isUnit(pickAtRandom(setup))).false;
     });
 
     // The engine's rules charge for Diplomats and Caravans too, where v474.05 doesn't.
