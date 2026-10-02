@@ -85,11 +85,11 @@ Technology is never wanted.
 `StartRevolution` and `ChooseGovernment` (`lib/Civ1/government.ts`) choose a government the way v474.05's AI does
 (OpenCivOne `AIEngine.cs`, every eighth turn there): The Republic, if known, while the tiles the player's cities work
 that give trade outnumber what its units away from home would cost in unhappiness (7 − Ideology each, 5 − Ideology in a
-city with a Marketplace); otherwise Communism, with more than 10 cities; otherwise Monarchy. Like the original, it
-chooses Democracy only when it knows no other government but Despotism, where the original stays in Despotism. Unlike
-it, every change is a revolution, with its Anarchy, so a player leaves Despotism as soon as it knows another government
-and never goes back to it by choice (the original does, when units' upkeep favours it), and waits 40 turns after a
-revolution before the next.
+city with a Marketplace); otherwise Communism, with more than 10 cities; otherwise Monarchy. The original never chooses
+Democracy; this does only when it knows no other government but Despotism, where the original would stay in Despotism.
+Every change is a revolution, with its Anarchy (the original changes on the spot), so a player leaves Despotism as soon
+as it knows another government and never goes back to it by choice (the original does, when units' upkeep favours it),
+and waits 40 turns after a revolution before the next.
 
 Strategies are game-wide and stateless. Each is a thin adapter over a module in `lib/`. It's given the shared
 registries (`lib/Dependencies.ts`) and the ruleset's judgements (`lib/Knowledge.ts`; Civ1's are in
