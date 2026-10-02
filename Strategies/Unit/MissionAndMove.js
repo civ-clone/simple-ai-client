@@ -27,7 +27,19 @@ class MissionAndMove extends AIStrategy_1.default {
             !(0, moveUnit_1.hasStepWorthTaking)(this.dependencies(), player, memory, this.knowledge(), unit)) {
             return false;
         }
-        await (0, moveUnit_1.default)(this.dependencies(), player, memory, this.knowledge(), unit, { wander: isAircraft });
+        await (0, moveUnit_1.default)(this.dependencies(), player, memory, this.knowledge(), unit, {
+            wander: isAircraft,
+            // A unit whose path ends with moves to spare and no step worth taking takes its next mission straight away,
+            //  rather than standing still for the rest of the turn: an explorer that had walked to the edge of the known
+            //  map stopped there until its next turn.
+            onIdle: () => {
+                if (memory.unitTargetData.has(unit)) {
+                    return false;
+                }
+                (0, assignMission_1.default)(this.dependencies(), memory, unit);
+                return memory.unitPathData.has(unit);
+            },
+        });
         return true;
     }
 }

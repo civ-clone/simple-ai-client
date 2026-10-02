@@ -41,7 +41,13 @@ export interface MoveOptions {
   // Whether to stop, moves to spare and orders left to the caller, once the unit's path ends or fails, rather than
   //  carrying on with the greedy step: for a unit that has something to do where its path ends.
   stopAtPathEnd?: boolean;
+  // With no path and no step worth taking, a chance to give the unit something else to do with the moves it has left,
+  //  such as a new mission once the last one's path has ended: returns whether it set the unit a new path. Asked at
+  //  most `IDLE_CHECKS` times a turn.
+  onIdle?: () => boolean;
 }
+
+const IDLE_CHECKS = 3;
 
 export const moveUnit = async (
   dependencies: Dependencies,
@@ -49,9 +55,10 @@ export const moveUnit = async (
   memory: Memory,
   knowledge: Knowledge,
   unit: Unit,
-  { stopAtPathEnd = false, wander = true }: MoveOptions = {}
+  { stopAtPathEnd = false, wander = true, onIdle }: MoveOptions = {}
 ): Promise<void> => {
-  let loopCheck = 0;
+  let loopCheck = 0,
+    idleChecks = 0;
 
   while (unit.active() && unit.moves().value() >= 0.1) {
     if (loopCheck++ > 1e3) {
@@ -134,6 +141,10 @@ export const moveUnit = async (
       .map(([tile]: [Tile, number]): Tile => tile);
 
     if (!target) {
+      if (onIdle && idleChecks++ < IDLE_CHECKS && onIdle()) {
+        continue;
+      }
+
       // TODO: could do something a bit more intelligent here
       noOrders(dependencies, unit);
 
