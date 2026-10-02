@@ -301,6 +301,18 @@ describe('spendTreasury (civ-clone/web-renderer#233)', (): void => {
     expect(bought(setup, colossus)).true;
   });
 
+  it('should buy an improvement before a Wonder that is nearly done', async (): Promise<void> => {
+    // Over the reserve, enough for the Temple (78) or the Colossus (50 shields left: 100), not both.
+    const setup = await setUp(100 + 100),
+      temple = setup.city({ x: 1, item: Temple }),
+      colossus = setup.city({ x: 5, item: Colossus, progress: 150 });
+
+    setup.spend();
+
+    expect(bought(setup, temple)).true;
+    expect(bought(setup, colossus)).false;
+  });
+
   it("should keep 30 gold and 10 more for each city, by Civ1's policy", async (): Promise<void> => {
     const setup = await setUp(1000);
 
