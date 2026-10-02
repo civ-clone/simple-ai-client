@@ -314,9 +314,11 @@ export const civ1TerrainPolicy: TerrainPolicy = {
       })
       .filter(({ value }: TerrainJobValue): boolean => value > 0);
   },
-  // One for every eight cities. Settlers on terrain jobs count towards the three Settlers a player builds at most
-  //  (`buildItemInCity`), so each is one fewer settling: with one for every six, players founded a city fewer by turn
-  //  300; with one for every three, three fewer.
+  // One for every eight cities. These don't count towards the Settlers a player builds for founding cities
+  //  (`isFoundingSettlers` in `buildItemInCity`); any more on terrain jobs do. While they all counted, players founded a
+  //  city fewer by turn 300 with one for every six, and three fewer with one for every three. Without them counting, one
+  //  for every four or six gave more improved tiles but no more trade or population, and one for every four explored
+  //  less (civ-clone/web-renderer#234).
   workersWanted: (dependencies, player) =>
     Math.floor(dependencies.cityRegistry.getByPlayer(player).length / 8),
 };
