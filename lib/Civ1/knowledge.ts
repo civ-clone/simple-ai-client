@@ -10,6 +10,7 @@ import Knowledge from '../Knowledge';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
 import civ1MartialLawPolicy from './martialLaw';
 import triremeCanReturn from './trireme';
+import unitSupport from './unitSupport';
 
 export const civ1Knowledge: Knowledge = {
   assignWorkers: (dependencies, city) =>
@@ -30,6 +31,7 @@ export const civ1Knowledge: Knowledge = {
   shouldIrrigate,
   shouldMine,
   shouldRoad,
+  unitSupport,
 };
 
 export default civ1Knowledge;

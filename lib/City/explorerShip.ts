@@ -6,7 +6,7 @@ import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
-import buildTime, { finishesWithin } from './buildTime';
+import buildTime, { finishesWithin, netShields } from './buildTime';
 import Knowledge from '../Knowledge';
 import { Naval } from '@civ-clone/library-unit/Types';
 import Player from '@civ-clone/core-player/Player';
@@ -78,8 +78,9 @@ export const reachesSeaToExplore = (
 export const explorerShipTurns = 20;
 
 // The cheapest ship `city` can build, if the player has another city, no ship and none on order, the city has its
-//  defenders, it's on a sea it can explore, and it can finish the ship within `turns`. Otherwise `null`. A player's
-//  only city has better things to build.
+//  defenders, it's on a sea it can explore, it can finish the ship within `turns`, and it would still have shields to
+//  spare once it supported the ship (civ-clone/web-renderer#229). Otherwise `null`. A player's only city has better
+//  things to build.
 export const explorerShipFor = (
   dependencies: Dependencies,
   player: Player,
@@ -113,6 +114,7 @@ export const explorerShipFor = (
         return building !== null && isShip(building.item());
       }) ||
     wantsUnit(dependencies, knowledge, city) ||
+    netShields(city) - knowledge.unitSupport(dependencies, city) <= 0 ||
     !finishesWithin(buildTime(dependencies, city)(ship), turns) ||
     !isOnSea(city) ||
     !reachesSeaToExplore(dependencies, player, targets, city)
