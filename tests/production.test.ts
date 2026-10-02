@@ -9,6 +9,7 @@ import {
 import buildItemInCity, {
   ProductionPolicy,
   defaultProductionPolicy,
+  isFoundingSettlers,
 } from '../lib/Civ1/buildItemInCity';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../lib/Dependencies';
@@ -280,6 +281,18 @@ describe('buildItemInCity', (): void => {
       unitsOut(setup, 2, Settlers);
 
       expect(setup.choose()).equal(Settlers);
+    });
+
+    it('should count all of its Settlers, and nothing else, towards the ones it wants for founding cities', async (): Promise<void> => {
+      const setup = await setUp({ shields: 2, size: 2 }),
+        { dependencies, game, player, world } = setup,
+        settlers = new Settlers(null, player, world.get(2, 0), game.rules),
+        homed = new Settlers(setup.city, player, world.get(2, 1), game.rules),
+        warrior = new Warrior(null, player, world.get(2, 2), game.rules);
+
+      expect(isFoundingSettlers(dependencies, player, settlers)).true;
+      expect(isFoundingSettlers(dependencies, player, homed)).true;
+      expect(isFoundingSettlers(dependencies, player, warrior)).false;
     });
 
     it('should count Settlers its other cities are building towards the ones it wants', async (): Promise<void> => {
