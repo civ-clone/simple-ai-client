@@ -33,6 +33,8 @@ import cityRules from '@civ-clone/civ1-city/registerRules';
 import { createDependencies } from '../lib/Dependencies';
 import { createMemory } from '../lib/Memory';
 import { dependenciesFor } from '../registerStrategies';
+import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
+import { terrainJobs } from '../lib/Unit/terrainWork';
 import { expect } from 'chai';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
@@ -339,7 +341,7 @@ describe('buildItemInCity', (): void => {
       expect(setup.choose()).equal(Settlers);
     });
 
-    it('should count all of its Settlers, and nothing else, towards the ones it wants for founding cities', async (): Promise<void> => {
+    it('should count its Settlers with no terrain job, and nothing else, towards the ones it wants for founding cities', async (): Promise<void> => {
       const setup = await setUp({ shields: 2, size: 2 }),
         { dependencies, game, player, world } = setup,
         settlers = new Settlers(null, player, world.get(2, 0), game.rules),
@@ -349,6 +351,26 @@ describe('buildItemInCity', (): void => {
       expect(isFoundingSettlers(dependencies, player, settlers)).true;
       expect(isFoundingSettlers(dependencies, player, homed)).true;
       expect(isFoundingSettlers(dependencies, player, warrior)).false;
+    });
+
+    it('should not count Settlers on a terrain job towards the ones it wants for founding cities (civ-clone/web-renderer#234)', async (): Promise<void> => {
+      const setup = await setUp({ shields: 2, size: 2 }),
+        { dependencies, game, player, world } = setup,
+        worker = new Settlers(setup.city, player, world.get(2, 1), game.rules),
+        jobs = terrainJobs(memoryRegistryInstance.memoryFor(player));
+
+      jobs.set(worker, { improvement: 'road', tile: world.get(2, 1) });
+
+      expect(isFoundingSettlers(dependencies, player, worker)).false;
+      // Three founding Settlers out, of the three it wants: the terrain worker, homed in the city, doesn't keep it
+      //  from building another.
+      unitsOut(setup, 2, Settlers);
+      expect(setup.choose()).equal(Settlers);
+
+      jobs.delete(worker);
+
+      expect(isFoundingSettlers(dependencies, player, worker)).true;
+      expect(setup.choose()).not.equal(Settlers);
     });
 
     it('should count Settlers its other cities are building towards the ones it wants', async (): Promise<void> => {

@@ -27,6 +27,7 @@ import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '../Memory';
 import civ1Knowledge from './knowledge';
 import reachableLandToExplore from '../City/explorers';
+import { terrainJobs } from '../Unit/terrainWork';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
@@ -89,13 +90,15 @@ const isExploring = (dependencies: Dependencies, unit: Unit): boolean =>
   dependencies.cityRegistry.getByTile(unit.tile()) === null;
 
 // Whether one of the player's units is Settlers it has for founding cities, and so counts towards the policy's
-//  `settlers` (and keeps its home city from building more): all of its Settlers. Settlers kept for other work, such as
-//  terrain jobs (civ-clone/web-renderer#234), can be left out here.
+//  `settlers` (and keeps its home city from building more): all of its Settlers but those on terrain jobs
+//  (civ-clone/web-renderer#234), whose number the terrain policy decides.
 export const isFoundingSettlers = (
   dependencies: Dependencies,
   player: Player,
   unit: Unit
-): boolean => unit instanceof Settlers;
+): boolean =>
+  unit instanceof Settlers &&
+  !terrainJobs(dependencies.memoryRegistry.memoryFor(player)).has(unit);
 
 // The value of a unit type's `YieldType` (`Attack`, `Defence`) before anything modifies it.
 const baseYield = (
