@@ -27,5 +27,6 @@ export interface Knowledge {
   ): boolean;
   shouldMine(dependencies: Dependencies, player: Player, tile: Tile): boolean;
   shouldRoad(dependencies: Dependencies, player: Player, tile: Tile): boolean;
+  unitSupport(dependencies: Dependencies, city: City): number;
 }
 export default Knowledge;

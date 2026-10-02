@@ -27,7 +27,6 @@ import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '../Memory';
 import civ1Knowledge from './knowledge';
 import reachableLandToExplore from '../City/explorers';
-import unitSupport from './unitSupport';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
@@ -262,7 +261,8 @@ export const buildItemInCity = (
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item()),
     // Whether the city would still have shields to spare once it had another unit to support (civ-clone/web-renderer#229).
     //  Under Monarchy every unit costs a shield, and a city whose units eat all it makes builds nothing else.
-    supportsAnotherUnit = shields - unitSupport(dependencies, city) > 0,
+    supportsAnotherUnit =
+      shields - knowledge.unitSupport(dependencies, city) > 0,
     affordable = (buildItem: BuildItem): boolean =>
       supportsAnotherUnit || !isUnitItem(buildItem),
     // The units the city can support another of, for anything but a defender it's missing.

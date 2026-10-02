@@ -1,9 +1,10 @@
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
-import { CeremonialBurial } from '@civ-clone/civ1-science/Advances';
+import { CeremonialBurial, MapMaking } from '@civ-clone/civ1-science/Advances';
 import {
   Caravan,
   Diplomat,
   Settlers,
+  Trireme,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
 import buildItemInCity, {
@@ -37,6 +38,8 @@ import governmentRules from '@civ-clone/civ1-government/registerRules';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
 import unitSupport from '../lib/Civ1/unitSupport';
+import explorerShipFor from '../lib/City/explorerShip';
+import civ1Knowledge from '../lib/Civ1/knowledge';
 import worldRules from '@civ-clone/civ1-world/registerRules';
 
 type SetUp = {
@@ -61,11 +64,13 @@ const twoContinents = '4GO4GO'.repeat(5);
 const setUp = async ({
   defended = true,
   government = Monarchy,
+  map = twoContinents,
   shields = 1,
   size = 1,
 }: {
   defended?: boolean;
   government?: typeof Government;
+  map?: string;
   shields?: number;
   size?: number;
 } = {}): Promise<SetUp> => {
@@ -73,7 +78,7 @@ const setUp = async ({
 
   game.availableGovernments.register(Despotism, Monarchy);
   game.availableCityBuildItems.register(
-    ...([Warrior, Settlers, Temple] as unknown as IBuildable[])
+    ...([Warrior, Settlers, Temple, Trireme] as unknown as IBuildable[])
   );
 
   cityRules(game);
@@ -83,7 +88,7 @@ const setUp = async ({
   worldRules(game);
 
   const world = await simpleRLELoader(game.rules, game.terrainFeatures)(
-      twoContinents,
+      map,
       5,
       10
     ),
@@ -271,6 +276,42 @@ describe('buildItemInCity', (): void => {
       const setup = await setUp({ defended: false, shields: 1 });
 
       expect(setup.choose()).equal(Warrior);
+    });
+  });
+
+  describe('explorer ships (civ-clone/web-renderer#229)', (): void => {
+    // Land at x 0-4 and sea at x 5-9, unexplored beyond x 7: a second city on the coast at (4, 2), with a fortified
+    //  Warrior of its own and 20 of a Trireme's 40 shields stored, so that it can finish one within 20 turns even at 1
+    //  net shield.
+    const shipFor = async (shields: number): Promise<unknown> => {
+      const setup = await setUp({ map: '5G5O'.repeat(5) }),
+        { dependencies, game, player, targets, world } = setup,
+        city = setup.addCity(4, 2);
+
+      game.playerResearch.getByPlayer(player).addAdvance(MapMaking);
+      game.unitImprovements.register(
+        new Fortified(new Warrior(city, player, city.tile(), game.rules))
+      );
+      city.yields = () => [new Production(shields)];
+      game.cityBuilds.getByCity(city).build(Warrior);
+      game.cityBuilds.getByCity(city).add(new Yield(20));
+      targets.seaTilesToExplore.push(world.get(7, 2));
+
+      return explorerShipFor(
+        dependencies,
+        player,
+        targets,
+        city,
+        civ1Knowledge
+      );
+    };
+
+    it('should start a ship to explore with in a city with shields to spare for it', async (): Promise<void> => {
+      expect(await shipFor(2)).equal(Trireme);
+    });
+
+    it('should not start a ship to explore with that would leave the city no shields to spare', async (): Promise<void> => {
+      expect(await shipFor(1)).null;
     });
   });
 
