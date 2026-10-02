@@ -7,6 +7,8 @@ import Unit from '@civ-clone/core-unit/Unit';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import { Warrior } from '@civ-clone/civ1-unit/Units';
 import { expect } from 'chai';
+import civ1StandDownPolicy from '../lib/Civ1/standDown';
+import { Production } from '@civ-clone/library-city/Yields';
 import { netShields } from '../lib/City/buildTime';
 
 // Two cities of the player's, `home` at (0, 1), of `homeSize`, and `there` at (4, 1), of size 1. `home` has a fortified
@@ -87,6 +89,34 @@ describe('homeCity', (): void => {
 
     expect(at(warrior)).to.equal('5,1');
     expect(warrior.city() === home).true;
+  });
+
+  it('should make a city the home of a unit waiting there before weighing what its old home can afford', async (): Promise<void> => {
+    // Grassland round `home` (x 6, where the map wraps, to 2) and Plains round `there` (x 3-5), under Monarchy. `home`, of
+    //  1, makes a shield and pays it for the spare Warrior: kept there, the Warrior would be disbanded. `there`, of 3,
+    //  supports its defender and `home`'s and has shields to spare for a third.
+    const { addCity, addUnit, dependencies, fortify, takeTurns } =
+        await unitGame('3G3P4G3P4G3P1G', 3, 7, Monarchy),
+      home = addCity(0, 1),
+      there = addCity(4, 1, 3);
+
+    fortify(addUnit(Warrior, 0, 1, there));
+    fortify(addUnit(Warrior, 4, 1, there));
+
+    // Whatever its tiles, `there` makes shields to spare for another unit.
+    const yields = there.yields.bind(there);
+
+    there.yields = () => [...yields(), new Production(5)];
+
+    const spare = addUnit(Warrior, 4, 1, home);
+
+    expect(civ1StandDownPolicy.disband(dependencies, spare)).true;
+
+    await takeTurns(1);
+
+    expect(at(spare)).to.equal('4,1');
+    expect(spare.destroyed()).false;
+    expect(spare.city() === there).true;
   });
 
   it('should leave a unit homed where it is when the city it defends could not support it', async (): Promise<void> => {
