@@ -9,12 +9,14 @@
 //     at least the policy's `minTurns` to finish at its net shields: the most turns saved per gold first, which is the
 //     city that makes the fewest shields;
 //  3. a Wonder, but only once no more than the policy's `wonderRemaining` share of it is left to build.
-// Nothing else: other units are only built when a city can make them soon.
+// Nothing else: other units are only built when a city can make them soon, and anything else a ruleset lets a city
+//  build (Civ1's spaceship parts) isn't an improvement.
 //
 // As in v474.05 (OpenCivOne `CityWorker.cs`, where the AI buys only into a build with shields in it already), nothing
 //  is bought before the city has put a shield into it: the ruleset charges double for a build not yet started.
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import City from '@civ-clone/core-city/City';
+import CityImprovement from '@civ-clone/core-city-improvement/CityImprovement';
 import Dependencies from '../Dependencies';
 import { Fortifiable, Worker } from '@civ-clone/library-unit/Types';
 import Knowledge from '../Knowledge';
@@ -105,7 +107,9 @@ const kindOf = (
       : null;
   }
 
-  return turnsLeft >= policy.minTurns ? 'build' : null;
+  return isA(CityImprovement, item) && turnsLeft >= policy.minTurns
+    ? 'build'
+    : null;
 };
 
 // What's worth buying in the player's cities, most valuable first, at today's prices.

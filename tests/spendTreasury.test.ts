@@ -10,6 +10,13 @@ import spendTreasury, {
   purchases,
 } from '../lib/City/spendTreasury';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
+import Buildable from '@civ-clone/core-city-build/Buildable';
+import CityBuild from '@civ-clone/core-city-build/CityBuild';
+import Criterion from '@civ-clone/core-rule/Criterion';
+import Effect from '@civ-clone/core-rule/Effect';
+import Spend from '@civ-clone/core-treasury/Rules/Spend';
+import SpendCost from '@civ-clone/core-treasury/SpendCost';
+import { buildCost } from '@civ-clone/core-city-build/Rules/BuildCost';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '../lib/Dependencies';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
@@ -253,6 +260,33 @@ describe('spendTreasury (civ-clone/web-renderer#233)', (): void => {
 
     expect(bought(setup, small)).false;
     expect(bought(setup, large)).true;
+  });
+
+  it('should not buy anything a city can build that is neither a unit nor an improvement', async (): Promise<void> => {
+    // As Civ1's spaceship parts are, which `civ1-spaceship` prices too.
+    class Gadget extends Buildable {}
+
+    const setup = await setUp(1000);
+
+    setup.game.availableCityBuildItems.register(Gadget);
+    setup.game.rules.register(
+      ...buildCost(Gadget, 40),
+      new Spend(
+        new Criterion(
+          (cityBuild: CityBuild): boolean =>
+            cityBuild.building()?.item() === Gadget
+        ),
+        new Effect(
+          (cityBuild: CityBuild): SpendCost =>
+            new SpendCost(setup.treasury.yield(), cityBuild.remaining() * 2)
+        )
+      )
+    );
+
+    const city = setup.city({ x: 1, item: Gadget });
+
+    expect(setup.spend()).to.equal(0);
+    expect(bought(setup, city)).false;
   });
 
   it('should not buy a Wonder until no more than a quarter of it is left', async (): Promise<void> => {
