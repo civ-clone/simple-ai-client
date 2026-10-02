@@ -32,7 +32,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
 | `Strategies/Unit/TerrainWork`             | a `Worker`'s action                          | goes to and does its terrain job, or takes one if it has no city site to settle (handles it only then) | generic |
 | `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves | generic |
-| `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city (handles it only then)                     | generic |
+| `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city, which becomes its home (handles it only then) | generic |
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; handles it unless the unit has nothing to do | generic |
 | `Strategies/Unit/StandDown`               | a unit's action                              | goes to a city that wants it, is disbanded if not worth its upkeep, or waits in or heads for a city; always handles it | generic |
 | `Strategies/City/BuildExplorerShip`       | a `CityBuild` choice                         | builds a ship to explore with, if the player has 2+ cities and no ship (handles it only then) | generic |
@@ -51,7 +51,13 @@ for martial law, counting those already on their way; failing that it's disbande
 says so; otherwise it waits in the city it's in, unfortified and ready for the next mission, or heads for the nearest
 city it can reach (a ship for the sea beside one, then into port), or with none, fortifies where it is. Civ1's policy (`lib/Civ1/standDown.ts`) disbands
 a unit its home city pays shields for when the city has none to spare. Run for one unit, `MissionAndMove` returning
-`false` means the unit has nothing left to explore or attack.
+`false` means the unit has nothing left to explore or attack. A unit whose path ends with moves to spare and no step
+worth taking is given its next mission straight away (`moveUnit`'s `onIdle`).
+
+A unit that takes up station in one of the player's cities, fortified there by `Garrison` or left waiting there by
+`StandDown`, makes that city its home (`lib/Unit/homeCity.ts`), under any government, so that a city's defenders are its
+own units: unless the city couldn't support another unit without going to zero net shields (`Knowledge#unitSupport`),
+when it stays homed where it is. Units passing through, or on their way somewhere, keep their home.
 
 Workers improve the terrain on purpose (civ-clone/web-renderer#234). `TerrainWork` (`lib/Unit/terrainWork.ts`) gives
 a worker a terrain job when it has no city site to settle and none it can reach, or when the player has fewer workers on
