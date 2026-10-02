@@ -254,7 +254,7 @@ describe('government (civ-clone/web-renderer#231)', (): void => {
     expect(setup.preferred()).to.equal(Communism);
   });
 
-  it('should never choose Democracy, as v474.05 never does', async (): Promise<void> => {
+  it('should choose The Republic over Democracy, as v474.05 never chooses Democracy', async (): Promise<void> => {
     const setup = await setUp(
       JuliusCaesar,
       Banking,
@@ -265,6 +265,21 @@ describe('government (civ-clone/web-renderer#231)', (): void => {
     setup.city(2, 2, 3);
 
     expect(setup.preferred()).to.equal(Republic);
+  });
+
+  // Civ1's Democracy needs Philosophy and Literacy, not The Republic.
+  it('should leave Despotism for Democracy only when it knows no other government', async (): Promise<void> => {
+    const setup = await setUp(JosephStalin, DemocracyAdvance);
+
+    setup.city(2, 2, 3);
+
+    expect(setup.preferred()).to.equal(Democracy);
+
+    setup.game.playerResearch
+      .getByPlayer(setup.player)
+      .addAdvance(MonarchyAdvance);
+
+    expect(setup.preferred()).to.equal(Monarchy);
   });
 
   it(`should wait 40 turns after one revolution before the next`, async (): Promise<void> => {
