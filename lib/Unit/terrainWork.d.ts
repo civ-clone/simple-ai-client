@@ -29,7 +29,7 @@ export declare const unpathableTiles: (
   memory: Memory,
   unit: Unit,
   turn: number
-) => Set<Tile>;
+) => Map<Tile, number>;
 export declare const terrainJobs: (memory: Memory) => Map<Unit, TerrainJob>;
 export declare const chooseTerrainJob: (
   dependencies: Dependencies,

@@ -1,5 +1,6 @@
 import terrainWork, {
   TerrainPolicy,
+  UNPATHABLE_TURNS,
   terrainJobs,
 } from '../lib/Unit/terrainWork';
 import { Despotism } from '@civ-clone/civ1-government/Governments';
@@ -47,10 +48,14 @@ describe('TerrainWork paths', (): void => {
       settlers = setup.addUnit(Settlers, 0, 0, city),
       best = setup.world.get(3, 0),
       next = setup.world.get(0, 2),
+      // The tiles with a job on them: both, unless a test says otherwise.
+      offered = new Set<Tile>([best, next]),
       // A road at 3,0 is worth most, then one at 0,2: nothing else is worth doing.
       policy: TerrainPolicy = {
         jobs: (dependencies, player, tile) =>
-          tile === best
+          !offered.has(tile)
+            ? []
+            : tile === best
             ? [{ improvement: 'road', value: 10, turns: 1 }]
             : tile === next
             ? [{ improvement: 'road', value: 5, turns: 1 }]
@@ -69,7 +74,7 @@ describe('TerrainWork paths', (): void => {
           {}
         );
 
-    return { ...setup, best, memory, next, settlers, work };
+    return { ...setup, best, memory, next, offered, settlers, work };
   };
 
   it('should take the next best job when there is no path to the best', async (): Promise<void> => {
@@ -111,5 +116,55 @@ describe('TerrainWork paths', (): void => {
       asked.filter((tile: Tile): boolean => tile === next).length
     ).to.equal(1);
     expect(asked.length).to.equal(2);
+  });
+
+  it('should remember each tile it found no path to for its own ten turns', async (): Promise<void> => {
+    const { best, dependencies, next, offered, work } = await setUp(),
+      // Advances the game `turns` turns, then has the worker work, and returns the tiles it searched for a path to.
+      after = async (turns: number): Promise<Tile[]> => {
+        for (let i = 0; i < turns; i++) {
+          dependencies.turn.increment();
+        }
+
+        return withoutPathsTo(
+          new Set([best, next]),
+          async (): Promise<void> => {
+            await work();
+          }
+        );
+      },
+      count = (asked: Tile[], tile: Tile): number =>
+        asked.filter((other: Tile): boolean => other === tile).length;
+
+    // The first turn there's only the job at 3,0, and no path to it.
+    offered.delete(next);
+
+    const first = await after(0);
+
+    expect(count(first, best)).to.equal(1);
+    expect(first.length).to.equal(1);
+
+    // The tenth turn there's the job at 0,2 as well, and no path to it either.
+    offered.add(next);
+
+    const tenth = await after(UNPATHABLE_TURNS - 1);
+
+    expect(count(tenth, best)).to.equal(0);
+    expect(count(tenth, next)).to.equal(1);
+    expect(tenth.length).to.equal(1);
+
+    // The next turn it has forgotten 3,0, but still remembers 0,2.
+    const eleventh = await after(1);
+
+    expect(count(eleventh, best)).to.equal(1);
+    expect(count(eleventh, next)).to.equal(0);
+    expect(eleventh.length).to.equal(1);
+
+    // Ten turns after it found no path to 0,2, it has forgotten that too, but remembers 3,0 again.
+    const twentieth = await after(UNPATHABLE_TURNS - 1);
+
+    expect(count(twentieth, best)).to.equal(0);
+    expect(count(twentieth, next)).to.equal(1);
+    expect(twentieth.length).to.equal(1);
   });
 });
