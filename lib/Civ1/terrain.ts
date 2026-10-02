@@ -191,7 +191,8 @@ const workTurns: { [K in TerrainImprovement]: number } = {
   road: 1,
 };
 
-// How much a point of food, a shield and a point of trade are worth to a city, more of what it's short of.
+// How much a point of food, a shield and a point of trade are worth to a city, and `SHORT` times as much for food or
+//  shields when the city has at most 1 to spare.
 const FOOD = 2;
 const SHIELDS = 1.5;
 const TRADE = 1;

@@ -31,6 +31,7 @@ export declare const chooseTerrainJob: (
   policy: TerrainPolicy,
   unit: Unit
 ) => TerrainJob | null;
+export declare const dropTerrainJob: (memory: Memory, unit: Unit) => void;
 export declare const terrainWork: (
   dependencies: Dependencies,
   player: Player,

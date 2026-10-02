@@ -1,11 +1,12 @@
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
-import {
+import terrainWork, {
   TerrainJobValue,
   chooseTerrainJob,
   terrainJobs,
 } from '../lib/Unit/terrainWork';
+import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
 import unitGame, { UnitGame, at } from './lib/unitGame';
 import Tile from '@civ-clone/core-world/Tile';
 import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
@@ -209,5 +210,82 @@ describe('TerrainWork', (): void => {
       ).attempt(new ActiveUnit(setup.player, settlers))
     ).true;
     expect(terrainJobs(memory).has(settlers)).true;
+  });
+  it('should look past the best jobs the worker could not do for one it could', async (): Promise<void> => {
+    // No water anywhere, so no irrigation: each tile's irrigation is ranked above every road, and none can be done.
+    const setup = await unitGame('15G', 3, 5, Despotism),
+      city = setup.addCity(2, 1, 1),
+      settlers = setup.addUnit(Settlers, 0, 0, city),
+      job = chooseTerrainJob(
+        setup.dependencies,
+        setup.player,
+        memoryRegistryInstance.memoryFor(setup.player),
+        {
+          jobs: () => [
+            { improvement: 'irrigation', value: 10, turns: 1 },
+            { improvement: 'road', value: 1, turns: 1 },
+          ],
+          workersWanted: () => 0,
+        },
+        settlers
+      );
+
+    expect(job?.improvement).to.equal('road');
+  });
+
+  it('should forget the path to a job that is no longer worth doing', async (): Promise<void> => {
+    const setup = await unitGame(MAP, 3, 5, Despotism),
+      city = setup.addCity(1, 1, 1),
+      settlers = setup.addUnit(Settlers, 0, 0, city),
+      memory = memoryRegistryInstance.memoryFor(setup.player),
+      plains = setup.world.get(3, 0);
+
+    // On its way to irrigate the Plains at 3,0, then the Plains are irrigated by someone else and there's nothing
+    //  else worth doing.
+    await setup.takeTurns(1);
+
+    expect(terrainJobs(memory).get(settlers)?.tile).to.equal(plains);
+    expect(memory.unitPathData.get(settlers)?.end()).to.equal(plains);
+
+    setup.game.tileImprovements.register(new Irrigation(plains));
+
+    expect(
+      await terrainWork(
+        setup.dependencies,
+        setup.player,
+        memory,
+        civ1Knowledge,
+        { jobs: () => [], workersWanted: () => 0 },
+        settlers,
+        {}
+      )
+    ).false;
+    expect(terrainJobs(memory).has(settlers)).false;
+    expect(memory.unitPathData.has(settlers)).false;
+  });
+
+  it('should send a worker standing on its job tile, not yet at work, to settle a site that comes within reach', async (): Promise<void> => {
+    const setup = await unitGame(MAP, 3, 5, Despotism),
+      city = setup.addCity(1, 1, 1),
+      settlers = setup.addUnit(Settlers, 0, 0, city),
+      memory = memoryRegistryInstance.memoryFor(setup.player);
+
+    // It arrives at the Plains at 3,0 with no moves left, so starts work the turn after.
+    await setup.takeTurns(3);
+
+    expect(at(settlers)).to.equal('3,0');
+    expect(settlers.busy()).to.equal(null);
+
+    setup.game.rules.process(TurnStart, setup.player);
+    memory.targets.goodSitesForCities.push(setup.world.get(3, 2));
+
+    expect(
+      await new TerrainWork(
+        setup.dependencies,
+        civ1Knowledge,
+        civ1TerrainPolicy
+      ).attempt(new ActiveUnit(setup.player, settlers))
+    ).false;
+    expect(terrainJobs(memory).has(settlers)).false;
   });
 });
