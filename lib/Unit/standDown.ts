@@ -230,6 +230,15 @@ export const standDown = async (
     }
   }
 
+  // In one of the player's cities, it would wait there: it becomes that city's, if the city can support it, before its
+  //  upkeep is weighed, so that a unit its old home can't afford isn't disbanded when the city it's in can.
+  const city = dependencies.cityRegistry.getByTile(unit.tile()),
+    inOwnCity = city?.player() === player;
+
+  if (city && inOwnCity) {
+    takeUpStation(dependencies, knowledge, unit, city, actions.setHomeCity);
+  }
+
   if (actions.disband && policy.disband(dependencies, unit)) {
     unit.action(actions.disband);
 
@@ -238,11 +247,7 @@ export const standDown = async (
 
   // Not fortified: the city has the defenders it wants, so this one waits, ready for a mission when one comes up. A
   //  fortified unit stays fortified for good.
-  const city = dependencies.cityRegistry.getByTile(unit.tile());
-
-  if (city?.player() === player) {
-    // Waiting here, it's this city's: it becomes its home, if it can support it.
-    takeUpStation(dependencies, knowledge, unit, city, actions.setHomeCity);
+  if (inOwnCity) {
     noOrders(dependencies, unit);
 
     return;
