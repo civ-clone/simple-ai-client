@@ -34,7 +34,15 @@ import { createDependencies } from '../lib/Dependencies';
 import { createMemory } from '../lib/Memory';
 import { dependenciesFor } from '../registerStrategies';
 import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
-import { hasOpenTerrainJob, terrainJobs } from '../lib/Unit/terrainWork';
+import {
+  TerrainJob,
+  UNDOABLE_TURNS,
+  chooseTerrainJob,
+  hasOpenTerrainJob,
+  isKnownUndoable,
+  terrainJobs,
+} from '../lib/Unit/terrainWork';
+import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import Tile from '@civ-clone/core-world/Tile';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
 import { landReachableFrom } from '../lib/City/explorers';
@@ -365,6 +373,96 @@ describe('buildItemInCity', (): void => {
       setup.targets.goodSitesForCities.push(setup.world.get(3, 0));
 
       expect(setup.choose()).equal(Settlers);
+    });
+
+    // Plains everywhere, with roads: irrigation is the only job worth anything in Civ1, and with no water anywhere no
+    //  worker can do it.
+    const plainsWithRoads = async () => {
+      const setup = await setUp({ map: '50P', shields: 2, size: 2 });
+
+      setup.world
+        .entries()
+        .forEach((tile: Tile): void =>
+          setup.game.tileImprovements.register(new Road(tile))
+        );
+      unitsOut(setup, 2, Settlers);
+
+      return setup;
+    };
+
+    // Room for more Settlers than the city could have on order, so that choosing again isn't held back by the Settlers
+    //  it chose last time.
+    const roomy: ProductionPolicy = {
+      ...defaultProductionPolicy,
+      settlers: 10,
+    };
+
+    // A worker of the player's with its moves looks for a job, as `terrainWork` does, and finds none it could do.
+    const lookForJob = (setup: SetUp, moves: number = 1): TerrainJob | null => {
+      const worker = new Settlers(
+        null,
+        setup.player,
+        setup.world.get(2, 2),
+        setup.game.rules
+      );
+
+      worker.moves().set(moves);
+
+      const job = chooseTerrainJob(
+        setup.dependencies,
+        setup.player,
+        memoryRegistryInstance.memoryFor(setup.player),
+        civ1TerrainPolicy,
+        worker
+      );
+
+      worker.destroy();
+
+      return job;
+    };
+
+    it('should not build Settlers for terrain jobs its workers have found they can do none of', async (): Promise<void> => {
+      const setup = await plainsWithRoads();
+
+      // By the policy alone there's a job, so Settlers.
+      expect(setup.choose(roomy)).equal(Settlers);
+
+      // A worker with no moves left is offered no actions at all, which says nothing about the jobs.
+      expect(lookForJob(setup, 0)).null;
+      expect(setup.choose(roomy)).equal(Settlers);
+
+      expect(lookForJob(setup)).null;
+      expect(setup.choose(roomy)).not.equal(Settlers);
+    });
+
+    it('should forget the terrain jobs its workers could do none of after a while, or once something nearby changes', async (): Promise<void> => {
+      const setup = await plainsWithRoads(),
+        { dependencies, game, player, world } = setup,
+        memory = memoryRegistryInstance.memoryFor(player),
+        job = { improvement: 'irrigation' as const, tile: world.get(1, 1) };
+
+      expect(lookForJob(setup)).null;
+      expect(isKnownUndoable(dependencies, player, memory, job)).true;
+      expect(setup.choose(roomy)).not.equal(Settlers);
+
+      for (let turn = 1; turn < UNDOABLE_TURNS; turn++) {
+        game.turn.increment();
+      }
+
+      expect(isKnownUndoable(dependencies, player, memory, job)).true;
+
+      game.turn.increment();
+
+      expect(isKnownUndoable(dependencies, player, memory, job)).false;
+      expect(setup.choose(roomy)).equal(Settlers);
+
+      // Found again, then something changes beside the tile: it might be doable now.
+      expect(lookForJob(setup)).null;
+      expect(isKnownUndoable(dependencies, player, memory, job)).true;
+
+      game.tileImprovements.register(new Irrigation(world.get(2, 1)));
+
+      expect(isKnownUndoable(dependencies, player, memory, job)).false;
     });
 
     it('should build Settlers for a terrain job no worker has claimed, with no city site', async (): Promise<void> => {
