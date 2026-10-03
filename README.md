@@ -74,8 +74,8 @@ builds for founding cities (`isFoundingSettlers` in `lib/Civ1/buildItemInCity.ts
 one for want of a site, do.
 
 A worker with no city site it can reach, no terrain job and no step that scores above nothing joins one of the
-player's cities (civ-clone/web-renderer#243, #230), as v474.05's computer players have a spare Settlers do
-(OpenCivOne's `AIEngine.cs`, L1468-1483), rather than walk back and forth: `WorkerTurn` hands it to
+player's cities (civ-clone/web-renderer#243, #230), as v474.05's computer players do with Settlers they have no use
+for (OpenCivOne's `AIEngine.cs`, L1468-1483), rather than walk back and forth: `WorkerTurn` hands it to
 `lib/Unit/idleWorker.ts`, which joins the city it's standing in if the unit is offered `JoinCity` there, or else heads
 for the nearest of the player's cities it can reach that it could join, and joins on arriving. Which cities it could
 join is for the ruleset's `CanJoinCity` rules (`joinableCity` in `base-unit-action-join-city`; Civ1's limit is a city
