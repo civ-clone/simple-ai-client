@@ -10,6 +10,7 @@ import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
+import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import moveUnit from './moveUnit';
@@ -97,6 +98,107 @@ export const unpathableTiles = (
     .forEach(([tile]): boolean => tiles!.delete(tile));
 
   return tiles;
+};
+
+// How long the player remembers a job a worker found it had no action for, such as irrigation with no water beside
+//  the tile, unless what's around the tile changes sooner (`jobCircumstances`). Only `hasOpenTerrainJob` uses it: at
+//  worst, once a period, a city builds a worker for jobs none could do, which finds that out again.
+export const UNDOABLE_TURNS = 20;
+
+// A job a worker had no action for: the turn it found that, and the circumstances it found it in.
+interface UndoableJob {
+  circumstances: string;
+  turn: number;
+}
+
+// The jobs the player's workers found they had no action for, by tile and improvement.
+const undoableByMemory: WeakMap<
+  Memory,
+  Map<Tile, Map<TerrainImprovement, UndoableJob>>
+> = new WeakMap();
+
+const undoableJobsFor = (
+  memory: Memory
+): Map<Tile, Map<TerrainImprovement, UndoableJob>> => {
+  let undoable = undoableByMemory.get(memory);
+
+  if (!undoable) {
+    undoable = new Map();
+
+    undoableByMemory.set(memory, undoable);
+  }
+
+  return undoable;
+};
+
+// What a job's doability could depend on, whatever the ruleset, as a key that changes when any of it does: the
+//  improvements on the tile and the tiles around it (irrigation from an irrigated neighbour, say) and the advances the
+//  player has (roads on Rivers with Bridge Building, say). Anything else is caught by `UNDOABLE_TURNS`.
+const jobCircumstances = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): string => {
+  const improvements = [tile, ...tile.getNeighbours()].reduce(
+      (total: number, tile: Tile): number =>
+        total + dependencies.tileImprovementRegistry.getByTile(tile).length,
+      0
+    ),
+    advances = dependencies.playerResearchRegistry
+      .getBy('player', player)
+      .reduce(
+        (total: number, research: PlayerResearch): number =>
+          total + research.complete().length,
+        0
+      );
+
+  return `${improvements}:${advances}`;
+};
+
+// Notes that a worker of the player's has no action for `improvement` on `tile`.
+export const rememberUndoableJob = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  { improvement, tile }: TerrainJob
+): void => {
+  const undoable = undoableJobsFor(memory);
+
+  if (!undoable.has(tile)) {
+    undoable.set(tile, new Map());
+  }
+
+  undoable.get(tile)!.set(improvement, {
+    circumstances: jobCircumstances(dependencies, player, tile),
+    turn: dependencies.turn.value(),
+  });
+};
+
+// Whether a worker of the player's found it had no action for `improvement` on `tile`, in the last `UNDOABLE_TURNS`
+//  turns and with nothing around the tile changed since. Anything older or changed is forgotten.
+export const isKnownUndoable = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  { improvement, tile }: TerrainJob
+): boolean => {
+  const byImprovement = undoableJobsFor(memory).get(tile),
+    found = byImprovement?.get(improvement);
+
+  if (!found) {
+    return false;
+  }
+
+  if (
+    dependencies.turn.value() - found.turn < UNDOABLE_TURNS &&
+    found.circumstances === jobCircumstances(dependencies, player, tile)
+  ) {
+    return true;
+  }
+
+  byImprovement!.delete(improvement);
+
+  return false;
 };
 
 // The player's workers' jobs, less those of workers that have since been destroyed.
@@ -201,14 +303,20 @@ export const chooseTerrainJob = (
     if (actionsAt(job.tile)[actionFor[job.improvement]]) {
       return job;
     }
+
+    // With no moves left a unit is offered no actions at all, which says nothing about the job.
+    if (unit.moves().value() >= 0.1) {
+      rememberUndoableJob(dependencies, player, memory, job);
+    }
   }
 
   return null;
 };
 
 // Whether a worker on `reachable` tiles would find a terrain job no unit of the player's has claimed, by the policy:
-//  for production, whether a worker built now would have something to do (`lib/Civ1/buildItemInCity`). It doesn't ask
-//  whether the worker could do the job there, as `chooseTerrainJob` does, which takes a unit.
+//  for production, whether a worker built now would have something to do (`lib/Civ1/buildItemInCity`). It can't ask
+//  whether a worker could do the job there, as `chooseTerrainJob` does, which takes a unit with moves left, so it
+//  leaves out the jobs the player's workers have found they have no action for (`isKnownUndoable`).
 export const hasOpenTerrainJob = (
   dependencies: Dependencies,
   player: Player,
@@ -233,9 +341,14 @@ export const hasOpenTerrainJob = (
             reachable.has(tile) &&
             !claimed.has(tile) &&
             dependencies.cityRegistry.getByTile(tile) === null &&
-            policy
-              .jobs(dependencies, player, tile)
-              .some(({ value }: TerrainJobValue): boolean => value > 0)
+            policy.jobs(dependencies, player, tile).some(
+              ({ improvement, value }: TerrainJobValue): boolean =>
+                value > 0 &&
+                !isKnownUndoable(dependencies, player, memory, {
+                  improvement,
+                  tile,
+                })
+            )
         )
     );
 };

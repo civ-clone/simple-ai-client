@@ -30,6 +30,19 @@ export declare const unpathableTiles: (
   unit: Unit,
   turn: number
 ) => Map<Tile, number>;
+export declare const UNDOABLE_TURNS = 20;
+export declare const rememberUndoableJob: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  { improvement, tile }: TerrainJob
+) => void;
+export declare const isKnownUndoable: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  { improvement, tile }: TerrainJob
+) => boolean;
 export declare const terrainJobs: (memory: Memory) => Map<Unit, TerrainJob>;
 export declare const chooseTerrainJob: (
   dependencies: Dependencies,
