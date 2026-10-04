@@ -55,23 +55,23 @@ describe('TerrainWork', (): void => {
     expect(jobsAt(despotism, 0, 1)).to.deep.equal(['road:0.5/1']);
     // Under Monarchy it does, and food is worth twice as much as trade.
     expect(jobsAt(monarchy, 0, 1)).to.deep.equal([
-      'irrigation:1/2',
+      'irrigation:1/4',
       'road:0.5/1',
     ]);
     // The worked Plains tile, worth twice an unworked one.
     expect(jobsAt(despotism, 2, 0)).to.deep.equal([
-      'irrigation:3/2',
+      'irrigation:3/4',
       'road:1/1',
     ]);
-    // Hills: a mine adds two shields under Despotism, three under Monarchy, and takes three times as long as a road
-    //  would on flat land, twice over for the hills.
+    // Hills: a mine adds two shields under Despotism, three under Monarchy. Irrigating or mining Hills takes 10 turns
+    //  in Civ1, counting the turn of the order, so 9 more.
     expect(jobsAt(despotism, 3, 1)).to.deep.equal([
-      'irrigation:1.5/4',
-      'mine:2.25/6',
+      'irrigation:1.5/9',
+      'mine:2.25/9',
     ]);
     expect(jobsAt(monarchy, 3, 1)).to.deep.equal([
-      'irrigation:1/4',
-      'mine:3.375/6',
+      'irrigation:1/9',
+      'mine:3.375/9',
     ]);
 
     // An improvement already there isn't offered again, and a mine replaces irrigation, losing its food.
@@ -80,8 +80,8 @@ describe('TerrainWork', (): void => {
       new Road(despotism.world.get(3, 0))
     );
 
-    expect(jobsAt(despotism, 3, 1)).to.deep.equal(['mine:0.75/6']);
-    expect(jobsAt(despotism, 3, 0)).to.deep.equal(['irrigation:1.5/2']);
+    expect(jobsAt(despotism, 3, 1)).to.deep.equal(['mine:0.75/9']);
+    expect(jobsAt(despotism, 3, 0)).to.deep.equal(['irrigation:1.5/4']);
   });
 
   it('should choose the job worth most for the turns it takes, that the worker could do there', async (): Promise<void> => {
@@ -96,11 +96,11 @@ describe('TerrainWork', (): void => {
         settlers
       );
 
-    // Irrigating the worked Plains at 2,0 would be worth most, but there's no water beside it. Next is irrigating the
-    //  Plains at 3,0, beside the sea, 2 tiles away (the map wraps): 1.5 over 2 + 2 turns.
+    // Irrigating the worked Plains at 2,0 would be worth most, but there's no water beside it. Next is a road there, 2
+    //  tiles away: 1 over 1 + 2 turns, ahead of irrigating the Plains at 3,0 beside the sea (1.5 over 4 + 2).
     expect(
       job && `${job.improvement}@${job.tile.x()},${job.tile.y()}`
-    ).to.equal('irrigation@3,0');
+    ).to.equal('road@2,0');
   });
 
   it('should not have two workers claim the same tile', async (): Promise<void> => {
@@ -129,23 +129,23 @@ describe('TerrainWork', (): void => {
     const setup = await unitGame(MAP, 3, 5, Despotism),
       city = setup.addCity(1, 1, 1),
       settlers = setup.addUnit(Settlers, 0, 0, city),
-      plains = setup.world.get(3, 0),
+      plains = setup.world.get(2, 0),
       tiles: string[] = [];
 
-    await setup.takeTurns(3, () => tiles.push(at(settlers)));
+    await setup.takeTurns(2, () => tiles.push(at(settlers)));
 
-    // Through the city: the sea is in the way the other way round.
-    expect(tiles).to.deep.equal(['1,1', '2,1', '3,0']);
+    // Through the city, to build a road on the Plains it works.
+    expect(tiles).to.deep.equal(['1,1', '2,0']);
     expect(improvements(setup, plains)).to.deep.equal([]);
 
     // It starts the turn after it arrived with no moves left.
     await setup.takeTurns(1);
 
-    expect(settlers.busy()?.constructor.name).to.equal('BuildingIrrigation');
+    expect(settlers.busy()?.constructor.name).to.equal('BuildingRoad');
 
-    // The work done, as the engine would at the start of a turn two turns on. (A `Game` other than the default one
-    //  doesn't finish delayed actions.)
-    setup.game.tileImprovements.register(new Irrigation(plains));
+    // The work done, as the engine would at the start of the next turn. (A `Game` other than the default one doesn't
+    //  finish delayed actions.)
+    setup.game.tileImprovements.register(new Road(plains));
     settlers.setBusy();
 
     await setup.takeTurns(1);
@@ -238,16 +238,16 @@ describe('TerrainWork', (): void => {
       city = setup.addCity(1, 1, 1),
       settlers = setup.addUnit(Settlers, 0, 0, city),
       memory = memoryRegistryInstance.memoryFor(setup.player),
-      plains = setup.world.get(3, 0);
+      plains = setup.world.get(2, 0);
 
-    // On its way to irrigate the Plains at 3,0, then the Plains are irrigated by someone else and there's nothing
-    //  else worth doing.
+    // On its way to build a road on the Plains at 2,0, then someone else builds it and there's nothing else worth
+    //  doing.
     await setup.takeTurns(1);
 
     expect(terrainJobs(memory).get(settlers)?.tile).to.equal(plains);
     expect(memory.unitPathData.get(settlers)?.end()).to.equal(plains);
 
-    setup.game.tileImprovements.register(new Irrigation(plains));
+    setup.game.tileImprovements.register(new Road(plains));
 
     expect(
       await terrainWork(
@@ -270,10 +270,10 @@ describe('TerrainWork', (): void => {
       settlers = setup.addUnit(Settlers, 0, 0, city),
       memory = memoryRegistryInstance.memoryFor(setup.player);
 
-    // It arrives at the Plains at 3,0 with no moves left, so starts work the turn after.
-    await setup.takeTurns(3);
+    // It arrives at the Plains at 2,0 with no moves left, so starts work the turn after.
+    await setup.takeTurns(2);
 
-    expect(at(settlers)).to.equal('3,0');
+    expect(at(settlers)).to.equal('2,0');
     expect(settlers.busy()).to.equal(null);
 
     setup.game.rules.process(TurnStart, setup.player);
