@@ -34,7 +34,13 @@ import {
   Production as CityProduction,
 } from '@civ-clone/library-city/Yields';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
-import { terrainMovementCost } from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
+import {
+  BuildIrrigation,
+  BuildMine,
+  BuildRoad,
+} from '@civ-clone/civ1-unit/Actions';
+import UnitAction from '@civ-clone/core-unit/Action';
+import { terrainJobTurns } from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
 
 export const isACityTile = (
   dependencies: Dependencies,
@@ -184,11 +190,11 @@ const improvementTypes: {
   road: Road,
 };
 
-// A worker's turns of work for each improvement, times the terrain's movement cost (`civ1-unit`'s `MovementCost`).
-const workTurns: { [K in TerrainImprovement]: number } = {
-  irrigation: 2,
-  mine: 3,
-  road: 1,
+// The worker's action for each improvement, whose turns of work come from `civ1-unit`'s `terrainJobTurns`.
+const workActions: { [K in TerrainImprovement]: typeof UnitAction } = {
+  irrigation: BuildIrrigation,
+  mine: BuildMine,
+  road: BuildRoad,
 };
 
 // How much a point of food, a shield and a point of trade are worth to a city, and `SHORT` times as much for food or
@@ -287,8 +293,7 @@ export const civ1TerrainPolicy: TerrainPolicy = {
           (tileImprovement: TileImprovement): boolean =>
             tileImprovement instanceof improvementTypes[improvement]
         ),
-      weights = weightsFor(dependencies, city),
-      cost = terrainMovementCost(tile.terrain()) ?? 1;
+      weights = weightsFor(dependencies, city);
 
     return (['irrigation', 'mine', 'road'] as TerrainImprovement[])
       .filter((improvement: TerrainImprovement): boolean => !has(improvement))
@@ -309,7 +314,7 @@ export const civ1TerrainPolicy: TerrainPolicy = {
             ((gain.food ?? 0) * weights.food +
               (gain.shields ?? 0) * weights.shields +
               (gain.trade ?? 0) * weights.trade),
-          turns: workTurns[improvement] * cost,
+          turns: terrainJobTurns(workActions[improvement], tile.terrain()) ?? 1,
         };
       })
       .filter(({ value }: TerrainJobValue): boolean => value > 0);
