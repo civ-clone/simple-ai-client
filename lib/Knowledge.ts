@@ -35,8 +35,12 @@ export interface Knowledge {
   ): boolean;
   shouldMine(dependencies: Dependencies, player: Player, tile: Tile): boolean;
   shouldRoad(dependencies: Dependencies, player: Player, tile: Tile): boolean;
-  // The shields one more unit would cost `city` to support (civ-clone/web-renderer#229).
-  unitSupport(dependencies: Dependencies, city: City): number;
+  // The shields one more unit would cost `city` to support (civ-clone/web-renderer#229), of type `UnitType` if given.
+  unitSupport(
+    dependencies: Dependencies,
+    city: City,
+    UnitType?: typeof Unit | null
+  ): number;
 }
 
 export default Knowledge;

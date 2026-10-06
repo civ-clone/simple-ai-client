@@ -300,6 +300,14 @@ describe('buildItemInCity', (): void => {
       ).to.equal(3);
     });
 
+    it('should count no support for one more Diplomat or Caravan under Monarchy', async (): Promise<void> => {
+      const { city, dependencies } = await setUp();
+
+      expect(unitSupport(dependencies, city, Warrior)).to.equal(1);
+      expect(unitSupport(dependencies, city, Diplomat)).to.equal(0);
+      expect(unitSupport(dependencies, city, Caravan)).to.equal(0);
+    });
+
     it("should not count Diplomats or Caravans against a city's free units under Despotism", async (): Promise<void> => {
       const { city, dependencies, game } = await setUp({
         government: Despotism,

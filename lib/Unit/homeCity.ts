@@ -30,7 +30,13 @@ export const takeUpStation = (
     setHomeCity.from() !== unit.tile() ||
     city.tile() !== unit.tile() ||
     city.player() !== unit.player() ||
-    netShields(city) - knowledge.unitSupport(dependencies, city) <= 0
+    netShields(city) -
+      knowledge.unitSupport(
+        dependencies,
+        city,
+        unit.constructor as typeof Unit
+      ) <=
+      0
   ) {
     return false;
   }
