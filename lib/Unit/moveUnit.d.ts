@@ -1,8 +1,10 @@
+import Action from '@civ-clone/core-unit/Action';
 import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
 import Memory from '../Memory';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
+export declare const actionsToTake: (actions: Action[]) => Action[];
 export declare const hasStepWorthTaking: (
   dependencies: Dependencies,
   player: Player,
