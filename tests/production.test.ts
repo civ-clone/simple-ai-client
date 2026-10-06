@@ -280,8 +280,8 @@ describe('buildItemInCity', (): void => {
       expect(isUnit(pickAtRandom(setup))).false;
     });
 
-    // The engine's rules charge for Diplomats and Caravans too, where v474.05 doesn't.
-    it('should count a shield to support any unit under Monarchy, as the ruleset charges', async (): Promise<void> => {
+    // Diplomats and Caravans cost nothing, as in v474.05 (civ-clone/web-renderer#34).
+    it('should count a shield to support any unit but a Diplomat or Caravan under Monarchy, as the ruleset charges', async (): Promise<void> => {
       const { city, dependencies, game } = await setUp();
 
       [Warrior, Settlers, Diplomat, Caravan].forEach((UnitType) => {
@@ -289,7 +289,7 @@ describe('buildItemInCity', (): void => {
       });
 
       expect(unitSupport(dependencies, city)).to.equal(1);
-      // The ruleset's own yields, not the test's: the fortified Warrior and the four above, a shield each.
+      // The ruleset's own yields, not the test's: the fortified Warrior, the Warrior and the Settlers, a shield each.
       expect(
         City.prototype.yields
           .call(city)
@@ -297,7 +297,21 @@ describe('buildItemInCity', (): void => {
             (cityYield: Yield): boolean =>
               cityYield instanceof UnitSupportProduction
           ).length
-      ).to.equal(5);
+      ).to.equal(3);
+    });
+
+    it("should not count Diplomats or Caravans against a city's free units under Despotism", async (): Promise<void> => {
+      const { city, dependencies, game } = await setUp({
+        government: Despotism,
+        size: 2,
+      });
+
+      [Diplomat, Caravan].forEach((UnitType) => {
+        new UnitType(city, city.player(), city.tile(), game.rules);
+      });
+
+      // Only the fortified Warrior uses one of the two free units.
+      expect(unitSupport(dependencies, city)).to.equal(0);
     });
 
     it('should still build a defender in a city with none, whatever it costs to support', async (): Promise<void> => {
