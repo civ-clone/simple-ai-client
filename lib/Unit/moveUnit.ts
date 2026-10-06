@@ -2,8 +2,11 @@
 //  step, until the unit has no moves left, negotiating with any neighbours it meets on the way.
 import {
   BribeUnit,
+  EstablishEmbassy,
   IndustrialSabotage,
   InciteRevolt,
+  InvestigateCity,
+  MeetWithKing,
   Move,
   SneakAttack,
   SneakCaptureCity,
@@ -24,14 +27,17 @@ import shouldAttack from '../shouldAttack';
 // Whether any step from where `unit` stands scores above nothing: a hut, an enemy, unknown tiles it could go on to, a
 //  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
 // The actions on a tile the AI will take. A Diplomat only steals: v474.05's computer players never sabotage, incite
-//  or subvert a city (Rome on 640K a Day, p353), and buying units isn't something this AI plans for yet
-//  (civ-clone/web-renderer#58).
+//  or subvert a city (Rome on 640K a Day, p353), or establish embassies, investigate cities or meet kings, and buying
+//  units isn't something this AI plans for yet (civ-clone/web-renderer#58).
 export const actionsToTake = (actions: Action[]): Action[] =>
   actions.filter(
     (action: Action): boolean =>
       !(
+        action instanceof EstablishEmbassy ||
+        action instanceof InvestigateCity ||
         action instanceof IndustrialSabotage ||
         action instanceof InciteRevolt ||
+        action instanceof MeetWithKing ||
         action instanceof BribeUnit
       )
   );

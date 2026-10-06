@@ -1,6 +1,6 @@
 {
   "name": "@civ-clone/simple-ai-client",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "repository": "git@github.com:civ-clone/simple-ai-client.git",
   "keywords": [
     "typescript",
@@ -95,6 +95,6 @@
     "@civ-clone/core-yield": "^0.1.0",
     "@civ-clone/library-city": "^0.1.4",
     "@civ-clone/library-diplomacy": "^0.1.0",
-    "@civ-clone/library-unit": "^0.1.8"
+    "@civ-clone/library-unit": "^0.1.9"
   }
 }
