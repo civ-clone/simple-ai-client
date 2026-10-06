@@ -36,6 +36,33 @@ export const actionsToTake = (actions: Action[]): Action[] =>
       )
   );
 
+// The action the AI takes on a tile, of `actions`, or none: the first it will take, unless that would break a peace
+//  treaty with a player it isn't strong enough to fight (`shouldAttack`).
+export const actionToTake = (
+  dependencies: Dependencies,
+  player: Player,
+  actions: Action[]
+): Action | null => {
+  const [action] = actionsToTake(actions);
+
+  if (
+    !action ||
+    ((action instanceof SneakAttack ||
+      action instanceof SneakCaptureCity ||
+      action instanceof SneakStealTechnology) &&
+      !shouldAttack(
+        dependencies,
+        player,
+        (action as SneakAttack | SneakStealTechnology).enemy()
+      ))
+  ) {
+    return null;
+  }
+
+  // The `instanceof` checks narrow it to types that aren't assignable to `Action` (civ-clone/web-renderer#21).
+  return action as unknown as Action;
+};
+
 export const hasStepWorthTaking = (
   dependencies: Dependencies,
   player: Player,
@@ -168,22 +195,11 @@ export const moveUnit = async (
       return;
     }
 
-    const actions = actionsToTake(unit.actions(target)),
-      [action] = actions,
+    const action = actionToTake(dependencies, player, unit.actions(target)),
       lastMoves = memory.lastUnitMoves.get(unit) || [],
       currentTarget = memory.unitTargetData.get(unit);
 
-    if (
-      !action ||
-      ((action instanceof SneakAttack ||
-        action instanceof SneakCaptureCity ||
-        action instanceof SneakStealTechnology) &&
-        !shouldAttack(
-          dependencies,
-          player,
-          (action as SneakAttack | SneakStealTechnology).enemy()
-        ))
-    ) {
+    if (!action) {
       // TODO: could do something a bit more intelligent here
       noOrders(dependencies, unit);
 

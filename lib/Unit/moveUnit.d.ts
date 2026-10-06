@@ -5,6 +5,11 @@ import Memory from '../Memory';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
 export declare const actionsToTake: (actions: Action[]) => Action[];
+export declare const actionToTake: (
+  dependencies: Dependencies,
+  player: Player,
+  actions: Action[]
+) => Action | null;
 export declare const hasStepWorthTaking: (
   dependencies: Dependencies,
   player: Player,
