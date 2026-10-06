@@ -1,7 +1,10 @@
 import {
   BribeUnit,
+  EstablishEmbassy,
   IndustrialSabotage,
   InciteRevolt,
+  InvestigateCity,
+  MeetWithKing,
   SneakStealTechnology,
   StealTechnology,
   SubvertCity,
@@ -13,12 +16,15 @@ import Player from '@civ-clone/core-player/Player';
 import { expect } from 'chai';
 
 describe('Diplomats', (): void => {
-  it('should only steal: no sabotage, inciting, subverting or bribing', (): void => {
+  it('should only steal: no embassies, investigating, sabotage, inciting, subverting, meeting kings or bribing', (): void => {
     // Only the class matters to the filter, so the actions are made without running their constructors.
     const offered = [
+      EstablishEmbassy,
+      InvestigateCity,
       IndustrialSabotage,
       InciteRevolt,
       SubvertCity,
+      MeetWithKing,
       BribeUnit,
       StealTechnology,
       SneakStealTechnology,
