@@ -1,9 +1,13 @@
 // Generic: the move executor. Follows the unit's path while it has one, otherwise takes the best-scored neighbouring
 //  step, until the unit has no moves left, negotiating with any neighbours it meets on the way.
 import {
+  BribeUnit,
+  IndustrialSabotage,
+  InciteRevolt,
   Move,
   SneakAttack,
   SneakCaptureCity,
+  SneakStealTechnology,
 } from '@civ-clone/library-unit/Actions';
 import Action from '@civ-clone/core-unit/Action';
 import Dependencies from '../Dependencies';
@@ -19,6 +23,19 @@ import shouldAttack from '../shouldAttack';
 
 // Whether any step from where `unit` stands scores above nothing: a hut, an enemy, unknown tiles it could go on to, a
 //  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
+// The actions on a tile the AI will take. A Diplomat only steals: v474.05's computer players never sabotage, incite
+//  or subvert a city (Rome on 640K a Day, p353), and buying units isn't something this AI plans for yet
+//  (civ-clone/web-renderer#58).
+export const actionsToTake = (actions: Action[]): Action[] =>
+  actions.filter(
+    (action: Action): boolean =>
+      !(
+        action instanceof IndustrialSabotage ||
+        action instanceof InciteRevolt ||
+        action instanceof BribeUnit
+      )
+  );
+
 export const hasStepWorthTaking = (
   dependencies: Dependencies,
   player: Player,
@@ -151,15 +168,21 @@ export const moveUnit = async (
       return;
     }
 
-    const actions = unit.actions(target),
+    const actions = actionsToTake(unit.actions(target)),
       [action] = actions,
       lastMoves = memory.lastUnitMoves.get(unit) || [],
       currentTarget = memory.unitTargetData.get(unit);
 
     if (
       !action ||
-      ((action instanceof SneakAttack || action instanceof SneakCaptureCity) &&
-        !shouldAttack(dependencies, player, action.enemy()))
+      ((action instanceof SneakAttack ||
+        action instanceof SneakCaptureCity ||
+        action instanceof SneakStealTechnology) &&
+        !shouldAttack(
+          dependencies,
+          player,
+          (action as SneakAttack | SneakStealTechnology).enemy()
+        ))
     ) {
       // TODO: could do something a bit more intelligent here
       noOrders(dependencies, unit);
