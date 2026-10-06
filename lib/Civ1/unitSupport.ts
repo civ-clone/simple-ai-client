@@ -20,7 +20,19 @@ const supported = (unit: Unit): boolean =>
     (UnitType: typeof Unit): boolean => unit instanceof UnitType
   ) && !(unit instanceof Diplomatic);
 
-export const unitSupport = (dependencies: Dependencies, city: City): number => {
+// `UnitType`, when given, is the unit in question: a `Diplomatic` one costs nothing whatever the city already supports.
+export const unitSupport = (
+  dependencies: Dependencies,
+  city: City,
+  UnitType: typeof Unit | null = null
+): number => {
+  if (
+    UnitType !== null &&
+    Object.prototype.isPrototypeOf.call(Diplomatic, UnitType)
+  ) {
+    return 0;
+  }
+
   if (
     !dependencies.playerGovernmentRegistry
       .getByPlayer(city.player())

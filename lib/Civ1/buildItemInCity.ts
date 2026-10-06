@@ -305,10 +305,16 @@ export const buildItemInCity = (
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item()),
     // Whether the city would still have shields to spare once it had another unit to support (civ-clone/web-renderer#229).
     //  Under Monarchy every unit costs a shield, and a city whose units eat all it makes builds nothing else.
-    supportsAnotherUnit =
-      shields - knowledge.unitSupport(dependencies, city) > 0,
+    //  Diplomats and Caravans cost no support, so they're always affordable.
     affordable = (buildItem: BuildItem): boolean =>
-      supportsAnotherUnit || !isUnitItem(buildItem),
+      !isUnitItem(buildItem) ||
+      shields -
+        knowledge.unitSupport(
+          dependencies,
+          city,
+          buildItem.item() as unknown as typeof Unit
+        ) >
+        0,
     // The units the city can support another of, for anything but a defender it's missing.
     affordableUnits = availableUnits.filter(affordable),
     // The rest, that the city can finish within the policy's turns for a unit or an improvement, and can support if
