@@ -1,6 +1,7 @@
 // Generic: one player's working memory, the targets found each turn and what each of its units is doing.
 import City from '@civ-clone/core-city/City';
 import Path from '@civ-clone/core-world-path/Path';
+import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { UncalmedReason } from './City/disorder';
@@ -19,8 +20,17 @@ export interface TargetBoard {
   undefendedCities: Tile[];
 }
 
+// Each player's military power as `shouldAttack` weighs it, worked out at most once a turn: the sum of every unit's
+//  attack and defence, which goes through the rules for each unit (civ-clone/web-renderer#311).
+export interface PowerCache {
+  // The turn the totals are for, or `null` before the first.
+  turn: number | null;
+  byPlayer: Map<Player, number>;
+}
+
 export interface Memory {
   lastUnitMoves: Map<Unit, Tile[]>;
+  power: PowerCache;
   // The turn the survey last filled `targets` for, or `null` until it first does: a memory that has never surveyed is
   //  a new one, such as a computer player's in a game just loaded (`lib/Turn/surveyTargets`).
   surveyedTurn: number | null;
@@ -58,6 +68,10 @@ export const forgetDestroyedUnits = (memory: Memory): void =>
 
 export const createMemory = (): Memory => ({
   lastUnitMoves: new Map(),
+  power: {
+    turn: null,
+    byPlayer: new Map(),
+  },
   surveyedTurn: null,
   targets: {
     citiesToLiberate: [],

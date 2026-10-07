@@ -12,6 +12,7 @@ import {
 import Action from '@civ-clone/core-unit/Action';
 import { actionToTake, actionsToTake } from '../lib/Unit/moveUnit';
 import Dependencies from '../lib/Dependencies';
+import MemoryRegistry from '../lib/MemoryRegistry';
 import Player from '@civ-clone/core-player/Player';
 import { expect } from 'chai';
 
@@ -45,6 +46,9 @@ describe('Diplomats', (): void => {
         const player = new Player(),
           rival = new Player(),
           dependencies = {
+            // `shouldAttack` keeps each turn's totals in the player's memory.
+            memoryRegistry: new MemoryRegistry(),
+            turn: { value: () => 1 },
             unitRegistry: {
               getByPlayer: (owner: Player) => [
                 unitOf(owner === player ? ours : theirs),
