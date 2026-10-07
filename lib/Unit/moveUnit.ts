@@ -131,7 +131,13 @@ export const moveUnit = async (
 
     if (path) {
       const target = path.shift(),
-        moves = unit.actions(target).filter((action) => action instanceof Move),
+        // Only a neighbour can be moved to. Once a step is blocked, the rest of the path is further away each time
+        //  round, and asking for the actions on a distant tile runs a path search to see whether `GoTo` is on offer:
+        //  40% of a late-game turn (civ-clone/web-renderer#306).
+        moves =
+          target && target.isNeighbourOf(unit.tile())
+            ? unit.actions(target).filter((action) => action instanceof Move)
+            : [],
         // Passing through, fly over a `City` or `Carrier` rather than landing on it, which would end the turn.
         [move] =
           path.length > 0 && unit.moves().value() > 1
