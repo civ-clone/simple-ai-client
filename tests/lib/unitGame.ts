@@ -155,12 +155,16 @@ export const unitGame = async (
 
         let actions = 0;
 
-        while (player.hasMandatoryActions()) {
+        for (
+          let action = player.mandatoryAction();
+          action !== undefined;
+          action = player.mandatoryAction()
+        ) {
           if (actions++ > 100) {
             throw new Error('too many actions in one turn');
           }
 
-          if (!(await registry.attempt(player.mandatoryAction()))) {
+          if (!(await registry.attempt(action))) {
             break;
           }
         }
