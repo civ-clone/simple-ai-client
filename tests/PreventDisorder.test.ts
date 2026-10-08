@@ -39,7 +39,8 @@ import cityRules from '@civ-clone/civ1-city/registerRules';
 import civ1DisorderPolicy from '../lib/Civ1/disorder';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { dependenciesFor } from '../registerStrategies';
-import { expect } from 'chai';
+import * as spies from 'chai-spies';
+import { expect, spy, use } from 'chai';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
 import playerTurnStart from '@civ-clone/civ1-player/Rules/Player/turn-start';
@@ -48,6 +49,8 @@ import reviewCities from '../lib/Turn/reviewCities';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import treasuryRules from '@civ-clone/civ1-treasury/registerRules';
 import worldRules from '@civ-clone/civ1-world/registerRules';
+
+use(spies);
 
 type SetUp = {
   city: City;
@@ -176,21 +179,14 @@ describe('PreventDisorder', (): void => {
   //  and the next.
   it("should work out the city's yields once to start and once for each Entertainer made", async (): Promise<void> => {
     const setup = await setUp(),
-      { city } = setup,
-      yields = city.yields.bind(city);
+      { city } = setup;
 
-    let calls = 0;
-
-    city.yields = () => {
-      calls++;
-
-      return yields();
-    };
+    spy.on(city, ['yields']);
 
     await setup.afterTurn();
 
     expect(entertainers(setup)).to.equal(2);
-    expect(calls).to.equal(3);
+    expect(city.yields).to.have.been.called.exactly(3);
   });
 
   it('should take Entertainers from the worked tiles that give the least food first', async (): Promise<void> => {

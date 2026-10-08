@@ -39,7 +39,8 @@ import buildItemInCity, {
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { createMemory } from '../lib/Memory';
 import { dependenciesFor } from '../registerStrategies';
-import { expect } from 'chai';
+import * as spies from 'chai-spies';
+import { expect, spy, use } from 'chai';
 import garrison from '../lib/Unit/garrison';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import { inDisorder } from '../lib/City/disorder';
@@ -48,6 +49,8 @@ import treasuryRules from '@civ-clone/civ1-treasury/registerRules';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
 import wonderRules from '@civ-clone/civ1-wonder/registerRules';
 import worldRules from '@civ-clone/civ1-world/registerRules';
+
+use(spies);
 
 type SetUp = {
   city: City;
@@ -212,22 +215,15 @@ describe('martial law', (): void => {
   it("should work out the city's yields once to say whether it wants a unit, or needs one to keep order", async (): Promise<void> => {
     const setup = await setUp(),
       { city, dependencies } = setup,
-      [unit] = defendersIn(dependencies, city),
-      yields = city.yields.bind(city);
+      [unit] = defendersIn(dependencies, city);
 
-    let calls = 0;
-
-    city.yields = () => {
-      calls++;
-
-      return yields();
-    };
+    spy.on(city, ['yields']);
 
     expect(wantsMartialLawUnit(dependencies, civ1Knowledge, city)).true;
-    expect(calls).to.equal(1);
+    expect(city.yields).to.have.been.called.once;
 
     expect(keepsOrder(dependencies, civ1Knowledge, city, unit)).true;
-    expect(calls).to.equal(2);
+    expect(city.yields).to.have.been.called.twice;
   });
 
   it('should not keep a spare unit where the government has no martial law', async (): Promise<void> => {
