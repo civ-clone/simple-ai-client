@@ -54,7 +54,9 @@ export interface DisorderPolicy {
   wasInDisorder(dependencies: Dependencies, city: City): boolean;
 }
 
-const foodBalance = (city: City): number => reduceYield(city.yields(), Food);
+// The functions below take `city`'s yields, as it stands, from a caller that has them already: working them out isn't
+//  cheap (civ-clone/web-renderer#315).
+const foodBalance = (yields: Yield[]): number => reduceYield(yields, Food);
 
 // Whether the ruleset's rules find `city` in civil disorder as it stands, or, given `extraUnhappiness`, with that many
 //  more unhappy citizens. Those take the place of content (or failing that, happy) citizens rather than adding to them,
@@ -62,25 +64,29 @@ const foodBalance = (city: City): number => reduceYield(city.yields(), Food);
 export const inDisorder = (
   dependencies: Dependencies,
   city: City,
-  extraUnhappiness: number = 0
-): boolean => {
-  const yields = city.yields();
-
-  if (extraUnhappiness > 0) {
-    yields.push(new Unhappiness(extraUnhappiness));
-  }
-
-  return dependencies.ruleRegistry
-    .process(CivilDisorder, city, yields)
+  extraUnhappiness: number = 0,
+  yields: Yield[] = city.yields()
+): boolean =>
+  dependencies.ruleRegistry
+    .process(
+      CivilDisorder,
+      city,
+      extraUnhappiness > 0
+        ? [...yields, new Unhappiness(extraUnhappiness)]
+        : yields
+    )
     .some((result: boolean): boolean => result);
-};
 
 // Whether `city` will grow at the player's next turn start, with the food it has now.
-export const willGrow = (dependencies: Dependencies, city: City): boolean => {
+export const willGrow = (
+  dependencies: Dependencies,
+  city: City,
+  yields: Yield[] = city.yields()
+): boolean => {
   const cityGrowth = dependencies.cityGrowthRegistry.getByCity(city);
 
   return (
-    cityGrowth.progress().value() + foodBalance(city) >=
+    cityGrowth.progress().value() + foodBalance(yields) >=
     cityGrowth.cost().value()
   );
 };
@@ -89,19 +95,20 @@ export const willGrow = (dependencies: Dependencies, city: City): boolean => {
 const disorderRisk = (
   dependencies: Dependencies,
   policy: DisorderPolicy,
-  city: City
+  city: City,
+  yields: Yield[]
 ): 'now' | 'growth' | null => {
-  if (inDisorder(dependencies, city)) {
+  if (inDisorder(dependencies, city, 0, yields)) {
     return 'now';
   }
 
-  if (!willGrow(dependencies, city)) {
+  if (!willGrow(dependencies, city, yields)) {
     return null;
   }
 
   const unhappiness = policy.unhappinessOnGrowth(dependencies, city);
 
-  return unhappiness > 0 && inDisorder(dependencies, city, unhappiness)
+  return unhappiness > 0 && inDisorder(dependencies, city, unhappiness, yields)
     ? 'growth'
     : null;
 };
@@ -188,7 +195,9 @@ export const calmCity = (
 ): UncalmedReason | null => {
   releaseEntertainers(dependencies, knowledge, city);
 
-  let risk = disorderRisk(dependencies, policy, city);
+  // `city`'s yields as it stands, worked out again after each tile is toggled.
+  let yields = city.yields(),
+    risk = disorderRisk(dependencies, policy, city, yields);
 
   if (risk === null) {
     return null;
@@ -201,21 +210,27 @@ export const calmCity = (
     reason: UncalmedReason = 'tiles';
 
   for (const tile of leastValuableWorkedTiles(dependencies, city)) {
-    const before = foodBalance(city);
+    const before = foodBalance(yields);
 
     toggleTile(dependencies, city, tile);
 
-    const after = foodBalance(city),
+    yields = city.yields();
+
+    const after = foodBalance(yields),
       lessFood = after < before;
 
     if (lessFood && after < 0) {
       reason = 'food';
-    } else if (lessFood && risk === 'growth' && !willGrow(dependencies, city)) {
+    } else if (
+      lessFood &&
+      risk === 'growth' &&
+      !willGrow(dependencies, city, yields)
+    ) {
       reason = 'growth';
     } else {
       taken.push(tile);
 
-      risk = disorderRisk(dependencies, policy, city);
+      risk = disorderRisk(dependencies, policy, city, yields);
 
       if (risk === null) {
         return null;

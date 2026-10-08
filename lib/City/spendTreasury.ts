@@ -25,6 +25,7 @@ import PlayerTreasury from '@civ-clone/core-treasury/PlayerTreasury';
 import SpendCost from '@civ-clone/core-treasury/SpendCost';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
+import Yield from '@civ-clone/core-yield/Yield';
 import { netShields } from './buildTime';
 import { isDefenderType, wantsDefender, wantsMartialLawUnit } from './defence';
 
@@ -84,7 +85,8 @@ const kindOf = (
   policy: SpendingPolicy,
   city: City,
   building: BuildItem,
-  turnsLeft: number
+  turnsLeft: number,
+  yields: Yield[]
 ): PurchaseKind | null => {
   const item = building.item();
 
@@ -93,7 +95,7 @@ const kindOf = (
     if (
       (wantsDefender(dependencies, city) &&
         isDefenderType(dependencies, item)) ||
-      (wantsMartialLawUnit(dependencies, knowledge, city) &&
+      (wantsMartialLawUnit(dependencies, knowledge, city, yields) &&
         knowledge.martialLaw.wouldUse(dependencies, item))
     ) {
       return 'defender';
@@ -148,7 +150,8 @@ export const purchases = (
         return [];
       }
 
-      const shields = netShields(city),
+      const yields = city.yields(),
+        shields = netShields(city, yields),
         turnsLeft =
           shields > 0 ? Math.min(NEVER, Math.ceil(remaining / shields)) : NEVER,
         kind = kindOf(
@@ -157,7 +160,8 @@ export const purchases = (
           policy,
           city,
           building,
-          turnsLeft
+          turnsLeft,
+          yields
         );
 
       if (kind === null) {

@@ -37,14 +37,17 @@ export const unitsWanted = (
   dependencies: Dependencies,
   knowledge: Knowledge,
   city: City
-): number =>
-  Math.max(
+): number => {
+  const yields = city.yields();
+
+  return Math.max(
     0,
     defendersWanted(dependencies, city) -
       defendersIn(dependencies, city).length,
-    martialLawUnitsWanted(dependencies, knowledge, city) -
-      martialLawUnitsIn(city).length
+    martialLawUnitsWanted(dependencies, knowledge, city, yields) -
+      martialLawUnitsIn(city, yields).length
   );
+};
 
 // How many of the player's units that could defend a city are on their way to `tile`: a ship going into port, say,
 //  doesn't make up for a defender the city is short of.

@@ -5,10 +5,14 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
 import { Production } from '@civ-clone/library-city/Yields';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
+import Yield from '@civ-clone/core-yield/Yield';
 
-// The shields `city` makes each turn after unit support. Unit support yields are negative `Production`.
-export const netShields = (city: City): number =>
-  reduceYield(city.yields(), Production);
+// The shields `city` makes each turn after unit support. Unit support yields are negative `Production`. A caller that
+//  has `city`'s yields already passes them in.
+export const netShields = (
+  city: City,
+  yields: Yield[] = city.yields()
+): number => reduceYield(yields, Production);
 
 // How many turns `city` takes to finish a build item, counting the shields it has stored: 0 for one it has the shields
 //  for already, and `Infinity` for any other when it makes no shields to spare. Built once per decision, as working out

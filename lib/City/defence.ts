@@ -72,11 +72,13 @@ const calmedWithoutMartialLaw = (
 // How many units in `city` martial law would use: one for each citizen unhappy before anything calms them, less those
 //  its improvements, Wonders and the rest can calm, up to the policy's limit. Those counts are the ruleset's rules' own,
 //  so they're the same whether or not the city has made Entertainers yet, and whatever order the rules apply in. A
-//  citizen a unit keeps content leaves its tile worked, where an Entertainer gives it up.
+//  citizen a unit keeps content leaves its tile worked, where an Entertainer gives it up. A caller that has `city`'s
+//  yields already passes them in, as working them out isn't cheap (civ-clone/web-renderer#315).
 export const martialLawUnitsWanted = (
   dependencies: Dependencies,
   knowledge: Knowledge,
-  city: City
+  city: City,
+  yields?: Yield[]
 ): number => {
   const limit = knowledge.martialLaw.limit(dependencies, city);
 
@@ -88,7 +90,7 @@ export const martialLawUnitsWanted = (
     limit,
     Math.max(
       0,
-      unhappiness(city.yields()).positive -
+      unhappiness(yields ?? city.yields()).positive -
         calmedWithoutMartialLaw(dependencies, city)
     )
   );
@@ -103,9 +105,11 @@ export const defendersWanted = (
 
 // The units in `city` that martial law is using now, by the ruleset's own rules. A defender keeps order as well as any
 //  unit, and so might a unit that couldn't defend the city at all.
-export const martialLawUnitsIn = (city: City): Unit[] =>
-  city
-    .yields()
+export const martialLawUnitsIn = (
+  city: City,
+  yields: Yield[] = city.yields()
+): Unit[] =>
+  yields
     .filter((cityYield: Yield): boolean => cityYield instanceof MartialLaw)
     .map((cityYield: Yield): Unit => (cityYield as MartialLaw).unit());
 
@@ -120,10 +124,11 @@ export const wantsDefender = (
 export const wantsMartialLawUnit = (
   dependencies: Dependencies,
   knowledge: Knowledge,
-  city: City
+  city: City,
+  yields: Yield[] = city.yields()
 ): boolean =>
-  martialLawUnitsIn(city).length <
-  martialLawUnitsWanted(dependencies, knowledge, city);
+  martialLawUnitsIn(city, yields).length <
+  martialLawUnitsWanted(dependencies, knowledge, city, yields);
 
 // Whether `city` wants another unit in it: a defender, or a unit for martial law to use.
 export const wantsUnit = (
@@ -141,11 +146,12 @@ export const keepsOrder = (
   city: City,
   unit: Unit
 ): boolean => {
-  const inUse = martialLawUnitsIn(city);
+  const yields = city.yields(),
+    inUse = martialLawUnitsIn(city, yields);
 
   return (
     inUse.includes(unit) &&
-    inUse.length <= martialLawUnitsWanted(dependencies, knowledge, city)
+    inUse.length <= martialLawUnitsWanted(dependencies, knowledge, city, yields)
   );
 };
 
