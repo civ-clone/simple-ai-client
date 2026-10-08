@@ -8,8 +8,10 @@ import { Monarchy, Republic } from '@civ-clone/civ1-government/Governments';
 import { ShakespearesTheatre } from '@civ-clone/civ1-wonder/Wonders';
 import {
   defendersIn,
+  keepsOrder,
   martialLawUnitsIn,
   martialLawUnitsWanted,
+  wantsMartialLawUnit,
 } from '../lib/City/defence';
 import { Diplomat, Warrior } from '@civ-clone/civ1-unit/Units';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
@@ -203,6 +205,29 @@ describe('martial law', (): void => {
 
     expect(entertainers(setup)).to.equal(0);
     expect(disorder(setup)).false;
+  });
+
+  // civ-clone/web-renderer#315: the units martial law uses and the units it wants come from the same yields, which
+  //  aren't cheap to work out.
+  it("should work out the city's yields once to say whether it wants a unit, or needs one to keep order", async (): Promise<void> => {
+    const setup = await setUp(),
+      { city, dependencies } = setup,
+      [unit] = defendersIn(dependencies, city),
+      yields = city.yields.bind(city);
+
+    let calls = 0;
+
+    city.yields = () => {
+      calls++;
+
+      return yields();
+    };
+
+    expect(wantsMartialLawUnit(dependencies, civ1Knowledge, city)).true;
+    expect(calls).to.equal(1);
+
+    expect(keepsOrder(dependencies, civ1Knowledge, city, unit)).true;
+    expect(calls).to.equal(2);
   });
 
   it('should not keep a spare unit where the government has no martial law', async (): Promise<void> => {

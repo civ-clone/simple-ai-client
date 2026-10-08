@@ -172,6 +172,27 @@ describe('PreventDisorder', (): void => {
     expect(setup.memory.uncalmedCities.size).to.equal(0);
   });
 
+  // civ-clone/web-renderer#315: working out a city's yields isn't cheap, and nothing changes them between one Entertainer
+  //  and the next.
+  it("should work out the city's yields once to start and once for each Entertainer made", async (): Promise<void> => {
+    const setup = await setUp(),
+      { city } = setup,
+      yields = city.yields.bind(city);
+
+    let calls = 0;
+
+    city.yields = () => {
+      calls++;
+
+      return yields();
+    };
+
+    await setup.afterTurn();
+
+    expect(entertainers(setup)).to.equal(2);
+    expect(calls).to.equal(3);
+  });
+
   it('should take Entertainers from the worked tiles that give the least food first', async (): Promise<void> => {
     // Hills all round, but for the four Grassland next to the city, so a city of 7 works three Hills, which give less
     //  food than Grassland.

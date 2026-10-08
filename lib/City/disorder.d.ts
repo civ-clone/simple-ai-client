@@ -5,6 +5,7 @@ import Knowledge from '../Knowledge';
 import Memory from '../Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
+import Yield from '@civ-clone/core-yield/Yield';
 export type UncalmedReason = 'food' | 'growth' | 'tiles';
 export interface DisorderPolicy {
   calmingImprovements: IBuildable[];
@@ -15,11 +16,13 @@ export interface DisorderPolicy {
 export declare const inDisorder: (
   dependencies: Dependencies,
   city: City,
-  extraUnhappiness?: number
+  extraUnhappiness?: number,
+  yields?: Yield[]
 ) => boolean;
 export declare const willGrow: (
   dependencies: Dependencies,
-  city: City
+  city: City,
+  yields?: Yield[]
 ) => boolean;
 export declare const leastValuableWorkedTiles: (
   dependencies: Dependencies,

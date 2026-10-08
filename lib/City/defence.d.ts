@@ -2,6 +2,7 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '../Dependencies';
 import Knowledge from '../Knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
+import Yield from '@civ-clone/core-yield/Yield';
 export interface MartialLawPolicy {
   limit(dependencies: Dependencies, city: City): number;
   wouldUse(dependencies: Dependencies, UnitType: object): boolean;
@@ -9,13 +10,17 @@ export interface MartialLawPolicy {
 export declare const martialLawUnitsWanted: (
   dependencies: Dependencies,
   knowledge: Knowledge,
-  city: City
+  city: City,
+  yields?: Yield[]
 ) => number;
 export declare const defendersWanted: (
   dependencies: Dependencies,
   city: City
 ) => number;
-export declare const martialLawUnitsIn: (city: City) => Unit[];
+export declare const martialLawUnitsIn: (
+  city: City,
+  yields?: Yield[]
+) => Unit[];
 export declare const wantsDefender: (
   dependencies: Dependencies,
   city: City
@@ -23,7 +28,8 @@ export declare const wantsDefender: (
 export declare const wantsMartialLawUnit: (
   dependencies: Dependencies,
   knowledge: Knowledge,
-  city: City
+  city: City,
+  yields?: Yield[]
 ) => boolean;
 export declare const wantsUnit: (
   dependencies: Dependencies,
