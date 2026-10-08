@@ -20,7 +20,7 @@ import Leader from '@civ-clone/core-civilization/Leader';
 import Player from '@civ-clone/core-player/Player';
 import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import { TraitRegistry } from '@civ-clone/core-civilization/TraitRegistry';
-import { createDependencies } from '../lib/Dependencies';
+import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { expect } from 'chai';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 

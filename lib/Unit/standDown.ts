@@ -8,19 +8,20 @@
 //  5. or, with none it can reach, stays where it is, fortified if it can be.
 import { defendersIn, defendersWanted, isDefender } from '../City/defence';
 import { martialLawUnitsIn, martialLawUnitsWanted } from '../City/defence';
-import { ActionLookup } from '../actionLookup';
+import { ActionLookup } from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { Land } from '@civ-clone/library-unit/Types';
-import Memory from '../Memory';
+import { SetHomeCity } from '@civ-clone/library-unit/Actions';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import moveUnit from './moveUnit';
-import { noOrders } from './orders';
-import reachableTiles from './reachable';
+import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
+import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 import takeUpStation from './homeCity';
 
 // The ruleset's part: when a unit is worth keeping. `Civ1/standDown` has Civ1's.
@@ -253,7 +254,13 @@ export const standDown = async (
     inOwnCity = city?.player() === player;
 
   if (city && inOwnCity) {
-    takeUpStation(dependencies, knowledge, unit, city, actions.setHomeCity);
+    takeUpStation(
+      dependencies,
+      knowledge,
+      unit,
+      city,
+      actions.setHomeCity as SetHomeCity | undefined
+    );
   }
 
   if (actions.disband && policy.disband(dependencies, unit)) {

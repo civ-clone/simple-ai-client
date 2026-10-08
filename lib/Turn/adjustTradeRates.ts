@@ -7,11 +7,11 @@
 //  rates the engine shares each city's trade out by at that turn start.
 import { Rates, startingRates, tradeRates } from '../tradeRates';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { DisorderPolicy, UncalmedReason, calmCities } from '../City/disorder';
-import Knowledge from '../Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Luxuries from '@civ-clone/base-trade-rate-luxuries/Luxuries';
-import Memory from '../Memory';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import PlayerTradeRates from '@civ-clone/core-trade-rate/PlayerTradeRates';
 import PlayerTreasury from '@civ-clone/core-treasury/PlayerTreasury';

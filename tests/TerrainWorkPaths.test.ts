@@ -2,14 +2,15 @@ import terrainWork, {
   TerrainPolicy,
   UNPATHABLE_TURNS,
   terrainJobs,
-} from '../lib/Unit/terrainWork';
+} from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import { Despotism } from '@civ-clone/civ1-government/Governments';
 import Path from '@civ-clone/core-world-path/Path';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import Tile from '@civ-clone/core-world/Tile';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { expect } from 'chai';
-import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
+import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
+import { travelToPathEnd } from '../lib/Unit/moveUnit';
 import unitGame from './lib/unitGame';
 
 //   01234
@@ -68,10 +69,17 @@ describe('TerrainWork paths', (): void => {
           setup.dependencies,
           setup.player,
           memory,
-          civ1Knowledge,
           policy,
           settlers,
-          {}
+          {},
+          () =>
+            travelToPathEnd(
+              setup.dependencies,
+              setup.player,
+              memory,
+              civ1Knowledge,
+              settlers
+            )
         );
 
     return { ...setup, best, memory, next, offered, settlers, work };

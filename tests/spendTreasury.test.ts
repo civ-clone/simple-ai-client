@@ -19,7 +19,7 @@ import Spend from '@civ-clone/core-treasury/Rules/Spend';
 import SpendCost from '@civ-clone/core-treasury/SpendCost';
 import { buildCost } from '@civ-clone/core-city-build/Rules/BuildCost';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../lib/Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import { Game } from '@civ-clone/core-game/Game';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';

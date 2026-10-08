@@ -3,9 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UnloadTransport = void 0;
 // Generic: a transport at the coast unloads cargo that hasn't just come from there, then waits. Handles the action
 //  only when it unloads. The first unit strategy to read the unit's turn context, so the one that creates it.
-const AIStrategy_1 = require("../lib/AIStrategy");
-const isUnitAction_1 = require("../lib/isUnitAction");
-const unitTurnContextFor_1 = require("../lib/unitTurnContextFor");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
+const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
+const unitTurnContextFor_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor");
 const unloadTransport_1 = require("../../lib/Unit/unloadTransport");
 class UnloadTransport extends AIStrategy_1.default {
     handles(action) {

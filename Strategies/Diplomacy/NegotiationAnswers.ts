@@ -1,6 +1,6 @@
 // Generic: answers each step of a negotiation: declines when it's the stronger side, otherwise prefers knowledge, then
 //  peace. Every other `chooseFromList` falls through to the client's random pick.
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import ChooseFromList from '@civ-clone/core-strategy-ai-client/PlayerActions/ChooseFromList';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import chooseNegotiationStep from '../../lib/Diplomacy/chooseNegotiationStep';

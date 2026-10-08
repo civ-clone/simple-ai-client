@@ -6,7 +6,8 @@ import Player from '@civ-clone/core-player/Player';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import { Road } from '@civ-clone/civ1-world/TileImprovements';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
-import TerrainWork from '../Strategies/Unit/TerrainWork';
+import TerrainWork from '@civ-clone/base-strategy-terrain-work/Strategies/Unit/TerrainWork';
+import { travelToPathEnd } from '../lib/Unit/moveUnit';
 import Tile from '@civ-clone/core-world/Tile';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
 import WorkerTurn from '../Strategies/Unit/WorkerTurn';
@@ -14,8 +15,8 @@ import civ1Knowledge from '../lib/Civ1/knowledge';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
 import { couldJoin } from '../lib/Unit/idleWorker';
 import { expect } from 'chai';
-import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
-import { terrainJobs } from '../lib/Unit/terrainWork';
+import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
+import { terrainJobs } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 
 const sizeOf = ({ game }: UnitGame, city: City): number =>
   game.cityGrowth.getByCity(city).size();
@@ -106,7 +107,8 @@ describe('idle Settlers', (): void => {
       await new TerrainWork(
         setup.dependencies,
         civ1Knowledge,
-        civ1TerrainPolicy
+        civ1TerrainPolicy,
+        travelToPathEnd
       ).attempt(action)
     ).false;
     expect(

@@ -1,8 +1,8 @@
 // Generic: at the start of each turn, surveys everything the player can see and refills its target board.
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import BeforeTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
-import surveyTargets from '../../lib/Turn/surveyTargets';
+import surveyTargets from '@civ-clone/base-strategy-ai/lib/Turn/surveyTargets';
 
 export class SurveyTargets extends AIStrategy {
   handles(action: PlayerAction): boolean {

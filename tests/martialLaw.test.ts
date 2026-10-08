@@ -17,7 +17,9 @@ import { Diplomat, Warrior } from '@civ-clone/civ1-unit/Units';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
 import { CeremonialBurial } from '@civ-clone/civ1-science/Advances';
 import City from '@civ-clone/core-city/City';
-import Dependencies, { createDependencies } from '../lib/Dependencies';
+import Dependencies, {
+  createDependencies,
+} from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Fortify } from '@civ-clone/civ1-unit/Actions';
 import { Game } from '@civ-clone/core-game/Game';
 import Government from '@civ-clone/core-government/Government';
@@ -37,7 +39,7 @@ import buildItemInCity, {
   defaultProductionPolicy,
 } from '../lib/Civ1/buildItemInCity';
 import civ1Knowledge from '../lib/Civ1/knowledge';
-import { createMemory } from '../lib/Memory';
+import { createMemory } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { dependenciesFor } from '../registerStrategies';
 import * as spies from 'chai-spies';
 import { expect, spy, use } from 'chai';

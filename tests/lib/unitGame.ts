@@ -7,7 +7,7 @@ import BasePathFinder from '@civ-clone/simple-world-path/BasePathFinder';
 import BeforeTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn';
 import City from '@civ-clone/core-city/City';
 import { CeremonialBurial } from '@civ-clone/civ1-science/Advances';
-import Dependencies from '../../lib/Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Government from '@civ-clone/core-government/Government';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
 import Player from '@civ-clone/core-player/Player';

@@ -13,7 +13,7 @@ import buildItemInCity, {
   isFoundingSettlers,
 } from '../lib/Civ1/buildItemInCity';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../lib/Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import { Game } from '@civ-clone/core-game/Game';
 import Government from '@civ-clone/core-government/Government';
@@ -22,7 +22,7 @@ import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import { Production } from '@civ-clone/civ1-world/Yields';
-import { TargetBoard } from '../lib/Memory';
+import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Unit from '@civ-clone/core-unit/Unit';
 import { UnitSupportProduction } from '@civ-clone/library-city/Yields';
@@ -30,10 +30,10 @@ import World from '@civ-clone/core-world/World';
 import Yield from '@civ-clone/core-yield/Yield';
 import cityImprovementRules from '@civ-clone/civ1-city-improvement/registerRules';
 import cityRules from '@civ-clone/civ1-city/registerRules';
-import { createDependencies } from '../lib/Dependencies';
-import { createMemory } from '../lib/Memory';
+import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import { createMemory } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { dependenciesFor } from '../registerStrategies';
-import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
+import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import {
   TerrainJob,
   UNDOABLE_TURNS,
@@ -41,7 +41,7 @@ import {
   hasOpenTerrainJob,
   isKnownUndoable,
   terrainJobs,
-} from '../lib/Unit/terrainWork';
+} from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import Tile from '@civ-clone/core-world/Tile';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';

@@ -11,8 +11,8 @@ import {
 } from '@civ-clone/library-unit/Actions';
 import Action from '@civ-clone/core-unit/Action';
 import { actionToTake, actionsToTake } from '../lib/Unit/moveUnit';
-import Dependencies from '../lib/Dependencies';
-import MemoryRegistry from '../lib/MemoryRegistry';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import MemoryRegistry from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import Player from '@civ-clone/core-player/Player';
 import { expect } from 'chai';
 

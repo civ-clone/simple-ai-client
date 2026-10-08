@@ -1,5 +1,5 @@
 // Generic: whether `player` is strong enough to pick a fight with `enemy`.
-import Dependencies from './Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 
 // The sum of every unit's attack and defence, as `player` last worked it out this turn. Each is a pass through the

@@ -165,12 +165,12 @@ import StrategyRegistry from '@civ-clone/core-strategy/StrategyRegistry';
 import { createStrategies } from '../registerStrategies';
 import Path from '@civ-clone/core-world-path/Path';
 import assignMission, { attackEnemyUnits } from '../lib/Unit/assignMission';
-import reachableTiles from '../lib/Unit/reachable';
+import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 import settlerWork from '../lib/Unit/settlerWork';
 import MandatoryPlayerAction from '@civ-clone/core-player/MandatoryPlayerAction';
 import MissionAndMove from '../Strategies/Unit/MissionAndMove';
 import civ1Knowledge from '../lib/Civ1/knowledge';
-import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
+import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import TerrainFeatureRegistry from '@civ-clone/core-terrain-feature/TerrainFeatureRegistry';
 import TileImprovementRegistry from '@civ-clone/core-tile-improvement/TileImprovementRegistry';
 import TraitRegistry from '@civ-clone/core-civilization/TraitRegistry';
@@ -346,13 +346,15 @@ import {
   Move,
 } from '@civ-clone/civ1-unit/Actions';
 import garrison from '../lib/Unit/garrison';
-import Dependencies, { createDependencies } from '../lib/Dependencies';
+import Dependencies, {
+  createDependencies,
+} from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import buildItemInCity, {
   ProductionPolicy,
   defaultProductionPolicy,
 } from '../lib/Civ1/buildItemInCity';
 import ChooseProduction from '../Strategies/Civ1/ChooseProduction';
-import { createMemory } from '../lib/Memory';
+import { createMemory } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { Colossus, Lighthouse, Pyramids } from '@civ-clone/civ1-wonder/Wonders';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import { Production as ProductionYield } from '@civ-clone/civ1-world/Yields';

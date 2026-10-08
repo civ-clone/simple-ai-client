@@ -6,7 +6,7 @@ import {
   shouldRoad,
 } from './terrain';
 import { aircraftCanReturn, aircraftFuel } from './aircraft';
-import Knowledge from '../Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import assignWorkers from '@civ-clone/civ1-city/lib/assignWorkers';
 import civ1MartialLawPolicy from './martialLaw';
 import triremeCanReturn from './trireme';

@@ -6,15 +6,18 @@
 //  With no city it could join, it waits in the player's city it's in, or heads for the nearest of any, keeping its
 //  home: it takes a site or a terrain job on any later turn the survey offers one. It's never disbanded.
 import { citiesInReach, firstPath, goAlong } from './standDown';
-import { ActionLookup, lookupActions } from '../actionLookup';
+import {
+  ActionLookup,
+  lookupActions,
+} from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
-import Memory from '../Memory';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
 import joinableCity from '@civ-clone/base-unit-action-join-city/joinableCity';
-import { noOrders } from './orders';
+import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
 // Whether the ruleset would let `unit` join `city`, were it standing there.
 export const couldJoin = (

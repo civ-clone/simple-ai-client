@@ -2,13 +2,13 @@
 //  runs. Handles every unit but one with nothing to do: no mission, nothing to head for and no step worth taking,
 //  which it leaves to the next strategy (`StandDown`) rather than have it wander (civ-clone/web-renderer#230). An
 //  aircraft is always handled, as before.
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
 import assignMission from '../../lib/Unit/assignMission';
-import isUnitAction from '../lib/isUnitAction';
+import isUnitAction from '@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction';
 import moveUnit, { hasStepWorthTaking } from '../../lib/Unit/moveUnit';
-import unitTurnContextFor from '../lib/unitTurnContextFor';
+import unitTurnContextFor from '@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor';
 
 export class MissionAndMove extends AIStrategy {
   handles(action: PlayerAction): boolean {

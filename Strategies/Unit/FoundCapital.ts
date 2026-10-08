@@ -1,13 +1,13 @@
 // Generic: a worker founds its player's first city where it stands once the player has waited long enough for a good
 //  site. Handles the action only when it founds the city; otherwise `WorkerTurn` carries on as usual.
-import AIStrategy from '../lib/AIStrategy';
-import Dependencies from '../../lib/Dependencies';
-import Knowledge from '../../lib/Knowledge';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
 import { Worker } from '@civ-clone/library-unit/Types';
 import shouldFoundCapital from '../../lib/Unit/foundCapital';
-import unitTurnContextFor from '../lib/unitTurnContextFor';
+import unitTurnContextFor from '@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor';
 
 export class FoundCapital extends AIStrategy {
   private _foundByTurn: number;

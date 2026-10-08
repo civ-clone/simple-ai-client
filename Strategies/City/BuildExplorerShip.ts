@@ -1,7 +1,7 @@
 // Generic: a coastal city builds a ship to explore the sea with, when the player has more than one city and no ship
 //  (`lib/City/explorerShip`). Handles the choice only then; otherwise the ruleset's production choice
 //  (`ChooseProduction`) makes it.
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import explorerShipFor from '../../lib/City/explorerShip';

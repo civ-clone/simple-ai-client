@@ -17,9 +17,9 @@
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import City from '@civ-clone/core-city/City';
 import CityImprovement from '@civ-clone/core-city-improvement/CityImprovement';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Worker } from '@civ-clone/library-unit/Types';
-import Knowledge from '../Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Player from '@civ-clone/core-player/Player';
 import PlayerTreasury from '@civ-clone/core-treasury/PlayerTreasury';
 import SpendCost from '@civ-clone/core-treasury/SpendCost';

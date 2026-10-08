@@ -1,4 +1,4 @@
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import ChooseFromList from '@civ-clone/core-strategy-ai-client/PlayerActions/ChooseFromList';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 export declare class NegotiationAnswers extends AIStrategy {

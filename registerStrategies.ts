@@ -1,14 +1,17 @@
 // Civ1: the strategy pack `SimpleAIClient` plays with, generic strategies given Civ1's `Knowledge` plus the Civ1 ones,
 //  registered into a game's `StrategyRegistry`.
 import { Game, defaultGame } from '@civ-clone/core-game';
-import Dependencies, { createDependencies } from './lib/Dependencies';
+import Dependencies, {
+  dependenciesFor as gameDependencies,
+} from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Explore from '@civ-clone/base-strategy-explore/Strategies/Unit/Explore';
 import BuildExplorerShip from './Strategies/City/BuildExplorerShip';
 import ChooseGovernment from './Strategies/Civ1/ChooseGovernment';
 import ChooseProduction from './Strategies/Civ1/ChooseProduction';
 import ChooseResearch from './Strategies/Science/ChooseResearch';
 import FoundCapital from './Strategies/Unit/FoundCapital';
 import Garrison from './Strategies/Unit/Garrison';
-import Knowledge from './lib/Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import MissionAndMove from './Strategies/Unit/MissionAndMove';
 import NegotiationAnswers from './Strategies/Diplomacy/NegotiationAnswers';
 import PreventDisorder from './Strategies/City/PreventDisorder';
@@ -18,12 +21,13 @@ import StandDown from './Strategies/Unit/StandDown';
 import StartRevolution from './Strategies/Civ1/StartRevolution';
 import Strategy from '@civ-clone/core-strategy/Strategy';
 import SurveyTargets from './Strategies/Turn/SurveyTargets';
-import TerrainWork from './Strategies/Unit/TerrainWork';
+import TerrainWork from '@civ-clone/base-strategy-terrain-work/Strategies/Unit/TerrainWork';
 import TradeRates from './Strategies/Turn/TradeRates';
 import UnloadTransport from './Strategies/Unit/UnloadTransport';
 import WaitForCarrier from './Strategies/Unit/WaitForCarrier';
 import WakeCarrierAircraft from './Strategies/Turn/WakeCarrierAircraft';
 import WorkerTurn from './Strategies/Unit/WorkerTurn';
+import { travelToPathEnd } from './lib/Unit/moveUnit';
 import civ1DisorderPolicy from './lib/Civ1/disorder';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import civ1SpendingPolicy from './lib/Civ1/spending';
@@ -31,38 +35,6 @@ import civ1StandDownPolicy from './lib/Civ1/standDown';
 import { civ1TerrainPolicy } from './lib/Civ1/terrain';
 import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
 import civ1WantedAdvances from './lib/Civ1/wantedAdvances';
-
-// The game's registries, as the strategies take them.
-export const dependenciesFor = (game: Game): Dependencies =>
-  createDependencies({
-    availableSpecialistRegistry: game.availableSpecialists,
-    cityBuildRegistry: game.cityBuilds,
-    cityGrowthRegistry: game.cityGrowth,
-    cityImprovementRegistry: game.cityImprovements,
-    cityRegistry: game.cities,
-    clientRegistry: game.clients,
-    engine: game.engine,
-    goodyHutRegistry: game.goodyHuts,
-    interactionRegistry: game.interactions,
-    pathFinderRegistry: game.pathFinders,
-    pendingEffectRegistry: game.pendingEffects,
-    playerGovernmentRegistry: game.playerGovernments,
-    playerResearchRegistry: game.playerResearch,
-    playerTradeRatesRegistry: game.playerTradeRates,
-    playerTreasuryRegistry: game.playerTreasuries,
-    playerWorldRegistry: game.playerWorlds,
-    randomNumberGenerator: game.rng,
-    ruleRegistry: game.rules,
-    specialistRegistry: game.specialists,
-    strategyNoteRegistry: game.strategyNotes,
-    terrainFeatureRegistry: game.terrainFeatures,
-    tileImprovementRegistry: game.tileImprovements,
-    traitRegistry: game.traits,
-    turn: game.turn,
-    unitImprovementRegistry: game.unitImprovements,
-    unitRegistry: game.units,
-    workedTileRegistry: game.workedTiles,
-  });
 
 // In the order `SimpleAIClient` has always made its decisions. With no `Priority` rules, the registry keeps this
 //  order, so a strategy registered later (another plugin's) comes after all of these unless a `Priority` puts it
@@ -80,7 +52,7 @@ export const createStrategies = (
   new WaitForCarrier(dependencies, knowledge),
   new UnloadTransport(dependencies, knowledge),
   new FoundCapital(dependencies, knowledge),
-  new TerrainWork(dependencies, knowledge, civ1TerrainPolicy),
+  new TerrainWork(dependencies, knowledge, civ1TerrainPolicy, travelToPathEnd),
   new WorkerTurn(dependencies, knowledge),
   new Garrison(dependencies, knowledge),
   new MissionAndMove(dependencies, knowledge),
@@ -104,7 +76,14 @@ export const createStrategies = (
   // Last: what's left of the treasury once disorder has had its share, and with the rates for the turn ahead set from
   //  the treasury the player earned.
   new SpendTreasury(dependencies, knowledge, civ1SpendingPolicy),
+  // Standing orders for a player's units (`UnitOrder`): it handles none of the computer players' actions, so it
+  //  changes nothing they do.
+  new Explore(dependencies, knowledge),
 ];
+
+// The game's registries, as the strategies take them: `base-strategy-ai`'s, exported from here as it always was, for
+//  the callers that import it from here (the arena among them).
+export const dependenciesFor = gameDependencies;
 
 export const register = (game: Game): void =>
   game.strategies.register(...createStrategies(dependenciesFor(game)));

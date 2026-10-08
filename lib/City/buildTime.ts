@@ -2,7 +2,7 @@
 //  units cost to support (civ-clone/web-renderer#212).
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Production } from '@civ-clone/library-city/Yields';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 import Yield from '@civ-clone/core-yield/Yield';

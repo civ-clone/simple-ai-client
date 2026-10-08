@@ -6,7 +6,7 @@ import {
 } from '@civ-clone/core-client/ChoiceMeta';
 import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
 import Decline from '@civ-clone/core-diplomacy/Proposal/Decline';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import ExchangeKnowledge from '@civ-clone/library-diplomacy/Proposals/ExchangeKnowledge';
 import { Interaction } from '@civ-clone/core-diplomacy/Interaction';
 import OfferPeace from '@civ-clone/library-diplomacy/Proposals/OfferPeace';

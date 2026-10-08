@@ -22,7 +22,7 @@ import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import { TraitRegistry } from '@civ-clone/core-civilization/TraitRegistry';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import civ1WantedAdvances from '../lib/Civ1/wantedAdvances';
-import { createDependencies } from '../lib/Dependencies';
+import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { expect } from 'chai';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import requirements from '@civ-clone/civ1-science/Rules/Research/requirements';

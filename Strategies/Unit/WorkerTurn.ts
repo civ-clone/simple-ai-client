@@ -3,13 +3,13 @@
 //  waits in one (`lib/Unit/idleWorker`), rather than step back and forth at random (civ-clone/web-renderer#230,
 //  #243). Always handles a worker.
 import moveUnit, { hasStepWorthTaking } from '../../lib/Unit/moveUnit';
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
 import { Worker } from '@civ-clone/library-unit/Types';
 import idleWorker from '../../lib/Unit/idleWorker';
 import settlerWork from '../../lib/Unit/settlerWork';
-import unitTurnContextFor from '../lib/unitTurnContextFor';
+import unitTurnContextFor from '@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor';
 
 export class WorkerTurn extends AIStrategy {
   handles(action: PlayerAction): boolean {

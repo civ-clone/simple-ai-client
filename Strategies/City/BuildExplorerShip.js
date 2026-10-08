@@ -4,7 +4,7 @@ exports.BuildExplorerShip = void 0;
 // Generic: a coastal city builds a ship to explore the sea with, when the player has more than one city and no ship
 //  (`lib/City/explorerShip`). Handles the choice only then; otherwise the ruleset's production choice
 //  (`ChooseProduction`) makes it.
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
 const explorerShip_1 = require("../../lib/City/explorerShip");
 class BuildExplorerShip extends AIStrategy_1.default {

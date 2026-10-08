@@ -1,10 +1,10 @@
 // Generic: a unit in one of the player's cities fortifies there if the city needs more defenders, if martial law needs
 //  it there to keep order, or if it can relieve a weaker one, and makes the city its home (`homeCity`).
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { defendersWanted, isDefender, keepsOrder } from '../City/defence';
 import { Fortified } from '@civ-clone/library-unit/UnitImprovements';
 import { Fortify } from '@civ-clone/library-unit/Actions';
-import Knowledge from '../Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { SetHomeCity } from '@civ-clone/library-unit/Actions';
 import takeUpStation from './homeCity';
 import Tile from '@civ-clone/core-world/Tile';

@@ -6,7 +6,7 @@ import {
 import Action from '@civ-clone/core-unit/Action';
 import { Bomber } from '@civ-clone/civ1-unit/Units';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Move } from '@civ-clone/civ1-unit/Actions';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';

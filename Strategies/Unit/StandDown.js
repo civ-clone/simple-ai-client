@@ -5,9 +5,9 @@ exports.StandDown = void 0;
 //  if the ruleset's policy finds it isn't worth keeping, or stays in or heads for one of the player's cities
 //  (`lib/Unit/standDown`). Always handles a unit.
 const standDown_1 = require("../../lib/Unit/standDown");
-const AIStrategy_1 = require("../lib/AIStrategy");
-const isUnitAction_1 = require("../lib/isUnitAction");
-const unitTurnContextFor_1 = require("../lib/unitTurnContextFor");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
+const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
+const unitTurnContextFor_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor");
 class StandDown extends AIStrategy_1.default {
     constructor(dependencies, knowledge, policy) {
         super(dependencies, knowledge);

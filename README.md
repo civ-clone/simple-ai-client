@@ -30,7 +30,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/WaitForCarrier`          | a unit's action                              | makes an aircraft wait until carriers have moved (handles it only then)        | generic |
 | `Strategies/Unit/UnloadTransport`         | a unit's action                              | unloads a transport at the coast (handles it only then)                        | generic |
 | `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
-| `Strategies/Unit/TerrainWork`             | a `Worker`'s action                          | goes to and does its terrain job, or takes one if it has no city site to settle (handles it only then) | generic |
+| `TerrainWork` (`base-strategy-terrain-work`) | a `Worker`'s action                          | goes to and does its terrain job, or takes one if it has no city site to settle (handles it only then) | generic |
 | `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves; with none of that, joins a city | generic |
 | `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city, which becomes its home (handles it only then) | generic |
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; handles it unless the unit has nothing to do | generic |
@@ -43,6 +43,7 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/City/PreventDisorder`         | `AfterTurn`                                  | keeps cities out of civil disorder, by the ruleset's `DisorderPolicy`          | generic |
 | `Strategies/Turn/TradeRates`              | `AfterTurn`                                  | sets the tax, luxury and science rates, by the ruleset's `TradeRatePolicy`     | generic |
 | `Strategies/City/SpendTreasury`           | `AfterTurn`                                  | spends the treasury over a reserve finishing builds, by the ruleset's `SpendingPolicy` | generic |
+| `Explore` (`base-strategy-explore`)       | nothing                                      | explores with one unit as a standing order (`UnitOrder`): see below            | generic |
 
 A unit with nothing to do (civ-clone/web-renderer#230), no mission, no path and no step that scores above nothing, is
 passed over by `MissionAndMove` rather than left to wander, and `StandDown` (`lib/Unit/standDown.ts`) takes it: a unit
@@ -59,7 +60,7 @@ A unit that takes up station in one of the player's cities, fortified there by `
 own units: unless the city couldn't support another unit without going to zero net shields (`Knowledge#unitSupport`),
 when it stays homed where it is. Units passing through, or on their way somewhere, keep their home.
 
-Workers improve the terrain on purpose (civ-clone/web-renderer#234). `TerrainWork` (`lib/Unit/terrainWork.ts`) gives
+Workers improve the terrain on purpose (civ-clone/web-renderer#234). `TerrainWork` (`base-strategy-terrain-work`) gives
 a worker a terrain job when it has no city site to settle and none it can reach, or when the player has fewer workers on
 terrain jobs than the ruleset's `TerrainPolicy` wants; until it starts work, a worker on a job goes back to settling if a
 site comes within reach and the player has the terrain workers it wants without it. A job is the tile, on the player's
@@ -83,7 +84,7 @@ under size 10), and which units may join for the rule that offers the action, so
 city it could join, it waits in the city it's in, or heads for the nearest, and takes a site or a job on any later
 turn. Civ1's production builds Settlers only when they'd have something to do: a city site on the board that they
 could walk to from the city, or a terrain job there that no unit of the player's has claimed (`hasOpenTerrainJob` in
-`lib/Unit/terrainWork.ts`). With neither, they'd only join a city again, and the shields would be lost. The policy
+`base-strategy-terrain-work`). With neither, they'd only join a city again, and the shields would be lost. The policy
 values jobs that no worker could do, such as irrigation with no water beside the tile, so a job counts only if none of
 the player's workers has found it had no action for it: `chooseTerrainJob` remembers each job it passes over for that
 reason, as long as the worker had moves left (with none, a unit is offered no actions at all), for `UNDOABLE_TURNS`
@@ -140,14 +141,21 @@ as it knows another government and never goes back to it by choice (the original
 and waits 40 turns after a revolution before the next.
 
 Strategies are game-wide and stateless. Each is a thin adapter over a module in `lib/`. It's given the shared
-registries (`lib/Dependencies.ts`) and the ruleset's judgements (`lib/Knowledge.ts`; Civ1's are in
-`lib/Civ1/knowledge.ts`).
+registries (`Dependencies`) and the ruleset's judgements (`Knowledge`; Civ1's are in `lib/Civ1/knowledge.ts`).
 
-Each player's working memory is looked up by player in `lib/MemoryRegistry.ts`. It holds the player's targets, unit
-paths and recent moves, and the cities its last turn left in disorder.
+The generic toolkit the strategies are built on is in
+[`base-strategy-ai`](https://github.com/civ-clone/base-strategy-ai): `Dependencies`, `Knowledge`, the players' memory
+(`Memory`, `MemoryRegistry`), the survey (`surveyTargets`), missions (`Mission`, `pursue`), `AIStrategy` and the unit
+turn context. Exploring is in [`base-strategy-explore`](https://github.com/civ-clone/base-strategy-explore), including the
+exploring terms of the move score (`scoreUnitMove` adds its own around them), and terrain jobs are in
+[`base-strategy-terrain-work`](https://github.com/civ-clone/base-strategy-terrain-work), which walks a worker to its job
+with this package's move executor (`travelToPathEnd`).
 
-The unit strategies share one context per action (`Strategies/lib/unitTurnContextFor.ts`), so a unit's actions are
-read once per turn, however many strategies look at it.
+Each player's working memory is looked up by player in `MemoryRegistry`. It holds the player's targets, unit paths and
+recent moves, and the cities its last turn left in disorder.
+
+The unit strategies share one context per action (`unitTurnContextFor`), so a unit's actions are read once per turn,
+however many strategies look at it.
 
 Generic files import only `core-*`, `base-*` and `library-*` packages and other generic files. Everything Civ1 is in a
 `Civ1/` folder.
@@ -176,3 +184,13 @@ client given its own registries needs a strategy registry built over those same 
 A strategy can be run for one unit or city, for example to automate a human player's unit:
 `await new MissionAndMove(dependenciesFor(game), civ1Knowledge).attempt(action)`. Here `action` is the unit's
 mandatory action, which is also where the player comes from.
+
+## Standing orders
+
+`Explore` and `TerrainWork` also carry out a standing order for one of a player's units (`UnitOrder` and
+`OrderStrategy` in `base-strategy-ai`), such as a human player's automated explorer or Settlers (civ-clone/web-renderer#198,
+#200). Find the pack's instance in the game's registry and run it once per turn for the unit:
+`findStrategy(game.strategies, Explore)?.order(new UnitOrder(player, unit))`. An order is synchronous, never attacks or
+negotiates, and returns `false` when the unit should be handed back to its player: nothing left to do, or another
+player's unit is near. `Explore` handles none of the computer players' actions, so registering it changes nothing they
+do.

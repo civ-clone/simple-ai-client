@@ -4,9 +4,9 @@ import { Game } from '@civ-clone/core-game/Game';
 import StrategyNote from '@civ-clone/core-strategy/StrategyNote';
 import Tile from '@civ-clone/core-world/Tile';
 import civ1Knowledge from '../lib/Civ1/knowledge';
-import { createMemory } from '../lib/Memory';
+import { createMemory } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { expect } from 'chai';
-import surveyTargets from '../lib/Turn/surveyTargets';
+import surveyTargets from '@civ-clone/base-strategy-ai/lib/Turn/surveyTargets';
 import unitGame from './lib/unitGame';
 
 const at = (tiles: Tile[]): string[] =>

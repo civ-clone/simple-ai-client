@@ -2,10 +2,10 @@
 //  board. Runs during other players' turns, against the same board the player's own turn uses.
 import City from '@civ-clone/core-city/City';
 import { CityRegistry } from '@civ-clone/core-city/CityRegistry';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import PlayerTile from '@civ-clone/core-player-world/PlayerTile';
-import { TargetBoard } from '../Memory';
+import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
 
 const hasPlayerCity = (

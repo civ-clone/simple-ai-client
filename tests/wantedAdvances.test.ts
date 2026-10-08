@@ -24,7 +24,7 @@ import { scienceStopped, wantedAdvances } from '../lib/Science/wantedAdvances';
 import Advance from '@civ-clone/core-science/Advance';
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
 import Civilization from '@civ-clone/core-civilization/Civilization';
-import Dependencies from '../lib/Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Friendly from '@civ-clone/base-leader-trait-aggression/Aggression/Friendly';
 import Leader from '@civ-clone/core-civilization/Leader';
 import Militaristic from '@civ-clone/base-leader-trait-militarism/Militarism/Militaristic';
@@ -34,7 +34,7 @@ import { PlayerResearchRegistry } from '@civ-clone/core-science/PlayerResearchRe
 import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import { TraitRegistry } from '@civ-clone/core-civilization/TraitRegistry';
 import civ1WantedAdvances from '../lib/Civ1/wantedAdvances';
-import { createDependencies } from '../lib/Dependencies';
+import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { expect } from 'chai';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 
