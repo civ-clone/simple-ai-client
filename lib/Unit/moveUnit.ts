@@ -13,14 +13,14 @@ import {
   SneakStealTechnology,
 } from '@civ-clone/library-unit/Actions';
 import Action from '@civ-clone/core-unit/Action';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
-import Memory from '../Memory';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import canNegotiate from '../Diplomacy/negotiate';
-import { noOrders } from './orders';
+import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import scoreUnitMove from './scoreUnitMove';
 import shouldAttack from '../shouldAttack';
 
@@ -237,5 +237,19 @@ export const moveUnit = async (
     noOrders(dependencies, unit);
   }
 };
+
+// Walks `unit` along its path and stops where the path ends, with any moves to spare left to the caller: how a worker
+//  gets to its terrain job (`TerrainWork`).
+export const travelToPathEnd = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  knowledge: Knowledge,
+  unit: Unit
+): Promise<void> =>
+  moveUnit(dependencies, player, memory, knowledge, unit, {
+    stopAtPathEnd: true,
+    wander: false,
+  });
 
 export default moveUnit;

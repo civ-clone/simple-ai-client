@@ -1,7 +1,7 @@
 // Civ1: a Trireme is lost at sea half the time when a move leaves it with no moves off the coast (`civ1-unit`'s
 //  `trireme-lost-at-sea` rule), and whether a Trireme is still safe after an action.
 import Action from '@civ-clone/core-unit/Action';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Move } from '@civ-clone/civ1-unit/Actions';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';

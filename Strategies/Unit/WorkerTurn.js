@@ -6,11 +6,11 @@ exports.WorkerTurn = void 0;
 //  waits in one (`lib/Unit/idleWorker`), rather than step back and forth at random (civ-clone/web-renderer#230,
 //  #243). Always handles a worker.
 const moveUnit_1 = require("../../lib/Unit/moveUnit");
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const Types_1 = require("@civ-clone/library-unit/Types");
 const idleWorker_1 = require("../../lib/Unit/idleWorker");
 const settlerWork_1 = require("../../lib/Unit/settlerWork");
-const unitTurnContextFor_1 = require("../lib/unitTurnContextFor");
+const unitTurnContextFor_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor");
 class WorkerTurn extends AIStrategy_1.default {
     handles(action) {
         return action.value() instanceof Types_1.Worker;

@@ -5,7 +5,7 @@ exports.TradeRates = void 0;
 //  science rates (`lib/Turn/adjustTradeRates`), with the ruleset's `DisorderPolicy` and `TradeRatePolicy`.
 const adjustTradeRates_1 = require("../../lib/Turn/adjustTradeRates");
 const AfterTurn_1 = require("@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn");
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 class TradeRates extends AIStrategy_1.default {
     constructor(dependencies, knowledge, disorderPolicy, policy) {
         super(dependencies, knowledge);

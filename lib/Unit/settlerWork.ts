@@ -1,14 +1,14 @@
 // Generic: a worker founds a city, irrigates, mines or builds a road where it stands, or else claims the nearest good
 //  city site it can reach and sets off along a path to it. Either way the move executor runs next.
-import { ActionLookup } from '../actionLookup';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
-import Memory from '../Memory';
+import { ActionLookup } from '@civ-clone/base-strategy-ai/lib/actionLookup';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-import reachableTiles from './reachable';
+import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 
 // The site the worker should still be heading for, if any. A site is given up when the worker has reached it, when
 //  it's no longer a good place for a city (say another city was founded nearby), or when the worker has lost its path

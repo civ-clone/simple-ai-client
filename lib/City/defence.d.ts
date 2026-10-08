@@ -1,12 +1,9 @@
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
-export interface MartialLawPolicy {
-  limit(dependencies: Dependencies, city: City): number;
-  wouldUse(dependencies: Dependencies, UnitType: object): boolean;
-}
+export type { MartialLawPolicy } from '@civ-clone/base-strategy-ai/lib/Knowledge';
 export declare const martialLawUnitsWanted: (
   dependencies: Dependencies,
   knowledge: Knowledge,

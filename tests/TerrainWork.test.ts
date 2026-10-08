@@ -5,7 +5,7 @@ import terrainWork, {
   TerrainJobValue,
   chooseTerrainJob,
   terrainJobs,
-} from '../lib/Unit/terrainWork';
+} from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
 import unitGame, { UnitGame, at } from './lib/unitGame';
 import Tile from '@civ-clone/core-world/Tile';
@@ -13,9 +13,10 @@ import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { ActiveUnit } from '@civ-clone/civ1-unit/PlayerActions';
-import TerrainWork from '../Strategies/Unit/TerrainWork';
+import TerrainWork from '@civ-clone/base-strategy-terrain-work/Strategies/Unit/TerrainWork';
+import { travelToPathEnd } from '../lib/Unit/moveUnit';
 import { expect } from 'chai';
-import { instance as memoryRegistryInstance } from '../lib/MemoryRegistry';
+import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 
 // What the Civ1 policy makes of each improvement of the tile at `x`, `y`, as `improvement:value/turns`.
 const jobsAt = (
@@ -165,10 +166,15 @@ describe('TerrainWork', (): void => {
       settlers = setup.addUnit(Settlers, 0, 0, city),
       memory = memoryRegistryInstance.memoryFor(setup.player),
       attempt = (workersWanted: number): Promise<boolean> =>
-        new TerrainWork(setup.dependencies, civ1Knowledge, {
-          ...civ1TerrainPolicy,
-          workersWanted: () => workersWanted,
-        }).attempt(new ActiveUnit(setup.player, settlers));
+        new TerrainWork(
+          setup.dependencies,
+          civ1Knowledge,
+          {
+            ...civ1TerrainPolicy,
+            workersWanted: () => workersWanted,
+          },
+          travelToPathEnd
+        ).attempt(new ActiveUnit(setup.player, settlers));
 
     memory.targets.goodSitesForCities.push(setup.world.get(3, 2));
 
@@ -206,7 +212,8 @@ describe('TerrainWork', (): void => {
       await new TerrainWork(
         setup.dependencies,
         civ1Knowledge,
-        civ1TerrainPolicy
+        civ1TerrainPolicy,
+        travelToPathEnd
       ).attempt(new ActiveUnit(setup.player, settlers))
     ).true;
     expect(terrainJobs(memory).has(settlers)).true;
@@ -254,10 +261,17 @@ describe('TerrainWork', (): void => {
         setup.dependencies,
         setup.player,
         memory,
-        civ1Knowledge,
         { jobs: () => [], workersWanted: () => 0 },
         settlers,
-        {}
+        {},
+        () =>
+          travelToPathEnd(
+            setup.dependencies,
+            setup.player,
+            memory,
+            civ1Knowledge,
+            settlers
+          )
       )
     ).false;
     expect(terrainJobs(memory).has(settlers)).false;
@@ -283,7 +297,8 @@ describe('TerrainWork', (): void => {
       await new TerrainWork(
         setup.dependencies,
         civ1Knowledge,
-        civ1TerrainPolicy
+        civ1TerrainPolicy,
+        travelToPathEnd
       ).attempt(new ActiveUnit(setup.player, settlers))
     ).false;
     expect(terrainJobs(memory).has(settlers)).false;

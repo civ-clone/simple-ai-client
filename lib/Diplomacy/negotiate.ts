@@ -2,7 +2,7 @@
 import { IInteraction } from '@civ-clone/core-diplomacy/Interaction';
 import AIClient from '@civ-clone/core-ai-client/AIClient';
 import { ChoiceMeta } from '@civ-clone/core-client/ChoiceMeta';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
 import Initiate from '@civ-clone/core-diplomacy/Negotiation/Initiate';
 import Negotiation from '@civ-clone/core-diplomacy/Negotiation';

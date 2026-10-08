@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReviewCities = void 0;
 // Generic: at the start of each turn, assigns each of the player's cities' workers and notes any city left undefended.
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const BeforeTurn_1 = require("@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn");
 const reviewCities_1 = require("../../lib/Turn/reviewCities");
 class ReviewCities extends AIStrategy_1.default {

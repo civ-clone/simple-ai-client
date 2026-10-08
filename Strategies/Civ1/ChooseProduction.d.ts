@@ -1,9 +1,9 @@
 import { ProductionPolicy } from '../../lib/Civ1/buildItemInCity';
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
-import Dependencies from '../../lib/Dependencies';
-import Knowledge from '../../lib/Knowledge';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Player from '@civ-clone/core-player/Player';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 export declare class ChooseProduction extends AIStrategy {

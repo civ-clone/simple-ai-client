@@ -7,7 +7,7 @@ import Unit from '@civ-clone/core-unit/Unit';
 import UnitImprovement from '@civ-clone/core-unit-improvement/UnitImprovement';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import civ1StandDownPolicy from '../lib/Civ1/standDown';
-import { createMemory } from '../lib/Memory';
+import { createMemory } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { expect } from 'chai';
 import { hasStepWorthTaking } from '../lib/Unit/moveUnit';
 import { netShields } from '../lib/City/buildTime';

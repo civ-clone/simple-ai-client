@@ -5,12 +5,12 @@ import { wantsUnit } from './defence';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import buildTime, { finishesWithin, netShields } from './buildTime';
-import Knowledge from '../Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { Naval } from '@civ-clone/library-unit/Types';
 import Player from '@civ-clone/core-player/Player';
-import { TargetBoard } from '../Memory';
+import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 

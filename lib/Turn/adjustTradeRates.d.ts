@@ -1,9 +1,9 @@
 import { Rates } from '../tradeRates';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { DisorderPolicy, UncalmedReason } from '../City/disorder';
-import Knowledge from '../Knowledge';
-import Memory from '../Memory';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 export interface TradeRatePolicy {
   inDisorder(dependencies: Dependencies, city: City): boolean;

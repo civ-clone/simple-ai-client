@@ -106,11 +106,14 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { instance as rngInstance } from '@civ-clone/core-random';
-import Dependencies from './lib/Dependencies';
-import Knowledge from './lib/Knowledge';
-import Memory from './lib/Memory';
-import { instance as memoryRegistryInstance } from './lib/MemoryRegistry';
-import { noOrders, skipUnit } from './lib/Unit/orders';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
+import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
+import {
+  noOrders,
+  skipUnit,
+} from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import buildItemInCity, {
   defaultProductionPolicy,
 } from './lib/Civ1/buildItemInCity';
@@ -120,7 +123,7 @@ import civ1Knowledge from './lib/Civ1/knowledge';
 import moveUnit from './lib/Unit/moveUnit';
 import reviewCities from './lib/Turn/reviewCities';
 import scoreUnitMove from './lib/Unit/scoreUnitMove';
-import surveyTargets from './lib/Turn/surveyTargets';
+import surveyTargets from '@civ-clone/base-strategy-ai/lib/Turn/surveyTargets';
 import unitDestroyed from './lib/Events/unitDestroyed';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
 // For its `ChoiceMetaDataMap` entry, which `chooseFromList` and its callers rely on.

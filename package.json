@@ -1,6 +1,6 @@
 {
   "name": "@civ-clone/simple-ai-client",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "repository": "git@github.com:civ-clone/simple-ai-client.git",
   "keywords": [
     "typescript",
@@ -49,6 +49,9 @@
     "@civ-clone/base-leader-trait-development": "^0.1.0",
     "@civ-clone/base-leader-trait-militarism": "^0.1.0",
     "@civ-clone/base-player-action-end-turn": "^0.1.0",
+    "@civ-clone/base-strategy-ai": "^0.1.0",
+    "@civ-clone/base-strategy-explore": "^0.1.0",
+    "@civ-clone/base-strategy-terrain-work": "^0.1.0",
     "@civ-clone/base-trade-rate-luxuries": "^0.1.0",
     "@civ-clone/base-trade-rate-research": "^0.1.0",
     "@civ-clone/base-trade-rate-tax": "^0.1.0",

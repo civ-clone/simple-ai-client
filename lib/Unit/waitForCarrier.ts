@@ -1,6 +1,6 @@
 // Generic: holds an aircraft back until the player's carriers have moved.
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { NavalTransport } from '@civ-clone/library-unit/Types';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';

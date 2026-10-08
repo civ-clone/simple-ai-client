@@ -1,12 +1,12 @@
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
-import Memory from '../Memory';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory, { UncalmedReason } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Yield from '@civ-clone/core-yield/Yield';
-export type UncalmedReason = 'food' | 'growth' | 'tiles';
+export type { UncalmedReason };
 export interface DisorderPolicy {
   calmingImprovements: IBuildable[];
   purchaseShare: number;

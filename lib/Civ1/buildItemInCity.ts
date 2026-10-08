@@ -12,10 +12,10 @@ import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { wantsUnit } from '../City/defence';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
-import Knowledge from '../Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { Land, Naval, Worker } from '@civ-clone/library-unit/Types';
 import {
   Barracks,
@@ -24,13 +24,16 @@ import {
 } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Player from '@civ-clone/core-player/Player';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
-import { TargetBoard } from '../Memory';
+import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
 import civ1Knowledge from './knowledge';
 import reachableLandToExplore from '../City/explorers';
 import { landReachableFrom } from '../City/explorers';
 import { civ1TerrainPolicy } from './terrain';
-import { hasOpenTerrainJob, terrainJobs } from '../Unit/terrainWork';
+import {
+  hasOpenTerrainJob,
+  terrainJobs,
+} from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';

@@ -5,11 +5,11 @@ exports.MissionAndMove = void 0;
 //  runs. Handles every unit but one with nothing to do: no mission, nothing to head for and no step worth taking,
 //  which it leaves to the next strategy (`StandDown`) rather than have it wander (civ-clone/web-renderer#230). An
 //  aircraft is always handled, as before.
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const assignMission_1 = require("../../lib/Unit/assignMission");
-const isUnitAction_1 = require("../lib/isUnitAction");
+const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
 const moveUnit_1 = require("../../lib/Unit/moveUnit");
-const unitTurnContextFor_1 = require("../lib/unitTurnContextFor");
+const unitTurnContextFor_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor");
 class MissionAndMove extends AIStrategy_1.default {
     handles(action) {
         return (0, isUnitAction_1.default)(action);

@@ -1,5 +1,5 @@
-import Dependencies from '../lib/Dependencies';
-import MemoryRegistry from '../lib/MemoryRegistry';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import MemoryRegistry from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import Player from '@civ-clone/core-player/Player';
 import { expect } from 'chai';
 import { militaryPower, shouldAttack } from '../lib/shouldAttack';

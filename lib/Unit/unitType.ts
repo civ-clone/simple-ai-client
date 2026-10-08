@@ -1,6 +1,6 @@
 // Generic: what a type of unit is like before anything modifies it, for judging a unit a city might build.
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
 

@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WaitForCarrier = void 0;
 // Generic: holds an aircraft back until the player's carriers have moved. Handles the action only when it does.
-const AIStrategy_1 = require("../lib/AIStrategy");
-const isUnitAction_1 = require("../lib/isUnitAction");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
+const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
 const waitForCarrier_1 = require("../../lib/Unit/waitForCarrier");
 class WaitForCarrier extends AIStrategy_1.default {
     handles(action) {

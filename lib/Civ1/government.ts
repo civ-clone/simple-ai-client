@@ -32,7 +32,7 @@ import {
 } from '@civ-clone/civ1-government/lib/revolution';
 import { Air } from '@civ-clone/library-unit/Types';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Government from '@civ-clone/core-government/Government';
 import { Marketplace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Player from '@civ-clone/core-player/Player';

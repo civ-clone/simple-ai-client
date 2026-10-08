@@ -6,8 +6,8 @@
 //  `Knowledge#unitSupport`), the unit stays homed where it is. Martial law is unaffected either way: it counts the units
 //  in a city, wherever they're from.
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { SetHomeCity } from '@civ-clone/library-unit/Actions';
 import Unit from '@civ-clone/core-unit/Unit';
 import { netShields } from '../City/buildTime';

@@ -5,7 +5,7 @@ import {
   Lighthouse,
   MagellansExpedition,
 } from '@civ-clone/civ1-wonder/Wonders';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Naval } from '@civ-clone/library-unit/Types';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';

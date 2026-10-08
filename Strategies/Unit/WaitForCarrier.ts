@@ -1,8 +1,8 @@
 // Generic: holds an aircraft back until the player's carriers have moved. Handles the action only when it does.
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
-import isUnitAction from '../lib/isUnitAction';
+import isUnitAction from '@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction';
 import waitForCarrier from '../../lib/Unit/waitForCarrier';
 
 export class WaitForCarrier extends AIStrategy {

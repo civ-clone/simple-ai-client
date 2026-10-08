@@ -1,5 +1,5 @@
-import { TerrainPolicy } from '../Unit/terrainWork';
-import Dependencies from '../Dependencies';
+import { TerrainPolicy } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 export declare const isACityTile: (

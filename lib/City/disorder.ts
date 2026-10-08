@@ -23,9 +23,9 @@ import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import CivilDisorder from '@civ-clone/core-city-happiness/Rules/CivilDisorder';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
-import Memory from '../Memory';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory, { UncalmedReason } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Specialist from '@civ-clone/core-city/Specialist';
 import SpendCost from '@civ-clone/core-treasury/SpendCost';
@@ -34,13 +34,8 @@ import WorkedTile from '@civ-clone/core-city/WorkedTile';
 import Yield from '@civ-clone/core-yield/Yield';
 import { changeWorkedTile } from '@civ-clone/library-city/lib/assignWorkers';
 
-// Why a city was left to fall into disorder at the player's next turn start:
-//  - `food`: the next Entertainer would have left it short of food;
-//  - `growth`: it will grow, and the next Entertainer, which it needs only at its new size, would stop it growing.
-//    Better a turn of disorder than a city that never grows past it: it's calmed at its new size at the end of that
-//    turn;
-//  - `tiles`: it had no worked tile left to take an Entertainer from.
-export type UncalmedReason = 'food' | 'growth' | 'tiles';
+// Why a city was left to fall into disorder: `Memory` in `base-strategy-ai` explains each reason.
+export type { UncalmedReason };
 
 // The ruleset's part. `Civ1/disorder` has Civ1's.
 export interface DisorderPolicy {

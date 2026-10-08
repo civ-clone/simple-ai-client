@@ -5,7 +5,7 @@
 //    `Militarism` 0.
 // Each trait's value is 0, 0.5 or 1, and becomes −1, 0 or 1.
 import Aggression from '@civ-clone/base-leader-trait-aggression/Aggression';
-import Dependencies from './Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Development from '@civ-clone/base-leader-trait-development/Development';
 import Leader from '@civ-clone/core-civilization/Leader';
 import Militarism from '@civ-clone/base-leader-trait-militarism/Militarism';

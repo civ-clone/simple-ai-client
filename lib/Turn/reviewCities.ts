@@ -1,9 +1,9 @@
 // Generic: the start-of-turn pass over the player's cities, assigning their workers and noting any left undefended.
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Player from '@civ-clone/core-player/Player';
-import Memory, { claimedTiles } from '../Memory';
+import Memory, { claimedTiles } from '@civ-clone/base-strategy-ai/lib/Memory';
 
 export const reviewCities = (
   dependencies: Dependencies,

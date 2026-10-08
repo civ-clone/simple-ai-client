@@ -19,11 +19,11 @@ import {
   TerrainImprovement,
   TerrainJobValue,
   TerrainPolicy,
-} from '../Unit/terrainWork';
+} from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import { Game, Oasis } from '@civ-clone/civ1-world/TerrainFeatures';
 import { Irrigation, Mine, Road } from '@civ-clone/civ1-world/TileImprovements';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import Terrain from '@civ-clone/core-terrain/Terrain';
 import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';

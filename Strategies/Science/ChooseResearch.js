@@ -4,7 +4,7 @@ exports.ChooseResearch = void 0;
 // Generic: picks what to research next, at random from what's available, preferring the advances the player's leader
 //  wants by the ruleset's `WantedAdvancesPolicy`, if it's given one. Always handles the choice.
 const wantedAdvances_1 = require("../../lib/Science/wantedAdvances");
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const PlayerResearch_1 = require("@civ-clone/core-science/PlayerResearch");
 const chooseResearch_1 = require("../../lib/Science/chooseResearch");
 class ChooseResearch extends AIStrategy_1.default {

@@ -5,7 +5,7 @@
 //  the advances its traits say it cares about: the ruleset's `WantedAdvancesPolicy` (Civ1's is `Civ1/wantedAdvances`).
 //  Until then, research picks a wanted advance whenever one is available (`chooseResearch`).
 import Advance from '@civ-clone/core-science/Advance';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import Trait from '@civ-clone/core-civilization/Trait';

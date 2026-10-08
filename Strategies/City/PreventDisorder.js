@@ -5,7 +5,7 @@ exports.PreventDisorder = void 0;
 //  (`lib/City/disorder`), with the ruleset's `DisorderPolicy`.
 const disorder_1 = require("../../lib/City/disorder");
 const AfterTurn_1 = require("@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn");
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 class PreventDisorder extends AIStrategy_1.default {
     constructor(dependencies, knowledge, policy) {
         super(dependencies, knowledge);

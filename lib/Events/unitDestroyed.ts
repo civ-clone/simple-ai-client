@@ -2,9 +2,9 @@
 //  nearby become targets, and a city it was defending that's left with fewer than two units switches production and
 //  buys it. Runs during combat, so perhaps during another player's turn.
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Gold from '@civ-clone/base-city-yield-gold/Gold';
-import Memory, { forgetUnit } from '../Memory';
+import Memory, { forgetUnit } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';

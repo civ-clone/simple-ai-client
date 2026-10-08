@@ -1,7 +1,7 @@
 // Generic: picks what to research next, at random from what's available, or from the advances the player's leader
 //  wants (`wantedAdvances`) when any of those is available.
 import Advance from '@civ-clone/core-science/Advance';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 
 // Draws from the random number generator once, and only when there's something to choose from: among the `wanted`

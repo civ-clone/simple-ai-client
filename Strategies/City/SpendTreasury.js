@@ -5,7 +5,7 @@ exports.SpendTreasury = void 0;
 //  reserve on finishing what its cities are building (`lib/City/spendTreasury`), with the ruleset's `SpendingPolicy`.
 const spendTreasury_1 = require("../../lib/City/spendTreasury");
 const AfterTurn_1 = require("@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn");
-const AIStrategy_1 = require("../lib/AIStrategy");
+const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 class SpendTreasury extends AIStrategy_1.default {
     constructor(dependencies, knowledge, policy) {
         super(dependencies, knowledge);

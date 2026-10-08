@@ -2,13 +2,13 @@
 //  if the ruleset's policy finds it isn't worth keeping, or stays in or heads for one of the player's cities
 //  (`lib/Unit/standDown`). Always handles a unit.
 import standDown, { StandDownPolicy } from '../../lib/Unit/standDown';
-import AIStrategy from '../lib/AIStrategy';
-import Dependencies from '../../lib/Dependencies';
-import Knowledge from '../../lib/Knowledge';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
-import isUnitAction from '../lib/isUnitAction';
-import unitTurnContextFor from '../lib/unitTurnContextFor';
+import isUnitAction from '@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction';
+import unitTurnContextFor from '@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor';
 
 export class StandDown extends AIStrategy {
   private _policy: StandDownPolicy;

@@ -3,22 +3,16 @@
 import { MartialLaw, Unhappiness } from '@civ-clone/library-city/Yields';
 import City from '@civ-clone/core-city/City';
 import Cost from '@civ-clone/core-city/Rules/Cost';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Defence } from '@civ-clone/core-unit/Yields';
 import { Fortifiable } from '@civ-clone/library-unit/Types';
-import Knowledge from '../Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
 import baseYieldOf from '../Unit/unitType';
 
-// The ruleset's part of martial law, units in a city keeping its unhappy citizens content (civ-clone/web-renderer#216).
-//  `Civ1/martialLaw` has Civ1's.
-export interface MartialLawPolicy {
-  // How many units in `city` martial law can use at most under its player's government: 0 where there's none.
-  limit(dependencies: Dependencies, city: City): number;
-  // Whether martial law would use a unit of `UnitType`.
-  wouldUse(dependencies: Dependencies, UnitType: object): boolean;
-}
+// The ruleset's part of martial law: `Knowledge` in `base-strategy-ai` describes it.
+export type { MartialLawPolicy } from '@civ-clone/base-strategy-ai/lib/Knowledge';
 
 // More unhappy citizens than any city has, for `calmedWithoutMartialLaw`.
 const CROWD = 100;

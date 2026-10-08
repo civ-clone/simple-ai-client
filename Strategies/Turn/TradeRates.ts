@@ -4,10 +4,10 @@ import adjustTradeRates, {
   TradeRatePolicy,
 } from '../../lib/Turn/adjustTradeRates';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
-import AIStrategy from '../lib/AIStrategy';
-import Dependencies from '../../lib/Dependencies';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { DisorderPolicy } from '../../lib/City/disorder';
-import Knowledge from '../../lib/Knowledge';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 
 export class TradeRates extends AIStrategy {

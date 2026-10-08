@@ -1,14 +1,23 @@
-// Generic: how good a move to `tile` looks for `unit`, for the move executor's greedy step. Below 0 rules it out.
-import { Fortifiable, NavalTransport } from '@civ-clone/library-unit/Types';
-import Dependencies from '../Dependencies';
-import Knowledge from '../Knowledge';
-import Memory from '../Memory';
+// Generic: how good a move to `tile` looks for `unit`, for the move executor's greedy step. Below 0 rules it out. The
+//  exploring terms are `base-strategy-explore`'s, added in the order they always were around the others.
+import {
+  discoverableTilesTerm,
+  goodyHutTerm,
+  headingForTargetTerm,
+  moveContext,
+  moveGate,
+  revisitTerm,
+} from '@civ-clone/base-strategy-explore/lib/Unit/scoreExploration';
+import { NavalTransport } from '@civ-clone/library-unit/Types';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
+import { SneakAttack } from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-import lookupActions from '../actionLookup';
+import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import shouldAttack from '../shouldAttack';
-import { terrainFor } from './reachable';
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -19,6 +28,7 @@ export const scoreUnitMove = (
   tile: Tile
 ): number => {
   const actions = unit.actions(tile),
+    lookup = lookupActions(actions),
     {
       attack,
       buildIrrigation,
@@ -27,40 +37,33 @@ export const scoreUnitMove = (
       captureCity,
       disembark,
       embark,
-      fortify,
       foundCity,
-      noOrders,
-      sneakAttack,
-    } = lookupActions(actions);
+    } = lookup,
+    sneakAttack = lookup.sneakAttack as SneakAttack | undefined;
 
   if (sneakAttack && !shouldAttack(dependencies, player, sneakAttack.enemy())) {
     return -10;
   }
 
-  const [firstAction] = actions;
+  const context = moveContext(
+      dependencies,
+      player,
+      memory,
+      knowledge,
+      unit,
+      tile,
+      actions,
+      lookup
+    ),
+    gate = moveGate(context);
 
-  if (
-    firstAction &&
-    !knowledge.canReturnAfter(dependencies, player, unit, firstAction)
-  ) {
-    return -1;
-  }
-
-  if (
-    !actions.length ||
-    (actions.length === 1 && noOrders) ||
-    (unit instanceof Fortifiable && actions.length === 2 && fortify && noOrders)
-  ) {
-    return -1;
+  if (gate !== null) {
+    return gate;
   }
 
   let score = 0;
 
-  const goodyHut = dependencies.goodyHutRegistry.getByTile(tile);
-
-  if (goodyHut !== null) {
-    score += 60;
-  }
+  score += goodyHutTerm(context);
 
   if (
     (foundCity && knowledge.shouldBuildCity(dependencies, player, tile)) ||
@@ -124,39 +127,10 @@ export const scoreUnitMove = (
     score += 8;
   }
 
-  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
-    canEnter = terrainFor(unit);
+  score += discoverableTilesTerm(context);
+  score += headingForTargetTerm(context);
 
-  // Only the unknown tiles the unit could go on to: the sea a land unit can see across would count for ever, as a
-  //  coast it could never reach (civ-clone/web-renderer#230).
-  const discoverableTiles = tile
-    .getNeighbours()
-    .filter(
-      (neighbouringTile: Tile): boolean =>
-        !playerWorld.includes(neighbouringTile) &&
-        (canEnter === null || canEnter(neighbouringTile))
-    ).length;
-
-  if (discoverableTiles > 0) {
-    score += discoverableTiles * 3;
-  }
-
-  const target = memory.unitTargetData.get(unit);
-
-  if (
-    target instanceof Tile &&
-    tile.distanceFrom(target) < unit.tile().distanceFrom(target)
-  ) {
-    score += 14;
-  }
-
-  const lastMoves = memory.lastUnitMoves.get(unit) || [];
-
-  if (!lastMoves.includes(tile)) {
-    score *= 4;
-  }
-
-  return score;
+  return revisitTerm(context, score);
 };
 
 export default scoreUnitMove;

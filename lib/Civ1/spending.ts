@@ -6,7 +6,7 @@
 //  plan for the continent, and a 512th more in every city once it holds over 2,000. Otherwise it hoards: the turn-204
 //  save that raised the issue had a computer player on 1,477 gold with cities making 0 or 1 shields. Here the player
 //  keeps a reserve and spends the rest at the ruleset's own price, a whole build at a time.
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import { SpendingPolicy } from '../City/spendTreasury';
 

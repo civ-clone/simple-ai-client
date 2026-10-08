@@ -1,5 +1,5 @@
 // Generic: at the start of each turn, assigns each of the player's cities' workers and notes any city left undefended.
-import AIStrategy from '../lib/AIStrategy';
+import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import BeforeTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import reviewCities from '../../lib/Turn/reviewCities';

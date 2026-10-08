@@ -31,7 +31,7 @@ import {
 import Advance from '@civ-clone/core-science/Advance';
 import City from '@civ-clone/core-city/City';
 import Civilization from '@civ-clone/core-civilization/Civilization';
-import Dependencies from '../lib/Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Game } from '@civ-clone/core-game/Game';
 import Government from '@civ-clone/core-government/Government';
 import Leader from '@civ-clone/core-civilization/Leader';

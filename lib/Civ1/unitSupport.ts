@@ -12,7 +12,7 @@ import {
 } from '@civ-clone/library-unit/Types';
 import { Anarchy, Despotism } from '@civ-clone/civ1-government/Governments';
 import City from '@civ-clone/core-city/City';
-import Dependencies from '../Dependencies';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Unit from '@civ-clone/core-unit/Unit';
 
 const supported = (unit: Unit): boolean =>
