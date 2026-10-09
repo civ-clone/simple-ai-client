@@ -1,5 +1,9 @@
-import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
-import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
+import {
+  Despotism,
+  Monarchy,
+  Republic,
+} from '@civ-clone/civ1-government/Governments';
+import { Irrigation, Mine, Road } from '@civ-clone/civ1-world/TileImprovements';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import terrainWork, {
@@ -38,6 +42,18 @@ const improvements = ({ game }: UnitGame, tile: Tile): string[] =>
     .map(
       (improvement: TileImprovement): string => improvement.constructor.name
     );
+
+// Registers `tileImprovements` as built, and forgets the yields their tiles had before, as `civ1-world`'s `Built` rule
+//  does when a unit finishes one.
+const build = (
+  { game, player }: UnitGame,
+  ...tileImprovements: TileImprovement[]
+): void => {
+  game.tileImprovements.register(...tileImprovements);
+  tileImprovements.forEach((improvement: TileImprovement): void =>
+    improvement.tile().clearYieldCache(player)
+  );
+};
 
 //   01234
 // 0 GGPPO
@@ -90,7 +106,8 @@ describe('TerrainWork', (): void => {
     const setup = await unitGame(MAP, 3, 5, Despotism);
 
     setup.addCity(1, 1, 1);
-    setup.game.tileImprovements.register(
+    build(
+      setup,
       new Road(setup.world.get(0, 1)),
       new Road(setup.world.get(2, 0))
     );
@@ -109,6 +126,32 @@ describe('TerrainWork', (): void => {
     expect(jobsAt(setup, 2, 0)).to.deep.equal(['irrigation:3/4']);
     // No road, no railroad.
     expect(jobsAt(setup, 1, 0)).to.deep.equal(['road:0.5/1']);
+
+    // Hills with a mine and a road: 1 food, 2 shields, so a railroad adds 1 shield, to a city with at most 1 to
+    //  spare. A railroad takes 8 turns on Hills in Civ1, so 7 more.
+    build(
+      setup,
+      new Mine(setup.world.get(3, 1)),
+      new Road(setup.world.get(3, 1))
+    );
+
+    expect(jobsAt(setup, 3, 1)).to.deep.equal(['railroad:1.125/7']);
+  });
+
+  it('should value the trade a railroad adds', async (): Promise<void> => {
+    const setup = await unitGame(MAP, 3, 5, Republic);
+
+    setup.addCity(1, 1, 1);
+    build(setup, new Road(setup.world.get(0, 1)));
+    setup.game.playerResearch
+      .getByPlayer(setup.player)
+      .addAdvance(RailroadAdvance);
+
+    // Grassland with a road under the Republic: 2 food, 2 trade, so a railroad adds 1 food and 1 trade.
+    expect(jobsAt(setup, 0, 1)).to.deep.equal([
+      'irrigation:1/4',
+      'railroad:1.5/3',
+    ]);
   });
 
   it('should have Settlers build a railroad on a road once the player has the Railroad advance', async (): Promise<void> => {
