@@ -1,5 +1,6 @@
 // Civ1: which tiles are worth a city, irrigation, a mine or a road, judged by Civ1's terrain and yields, and what
-//  each terrain job is worth (`civ1TerrainPolicy`, civ-clone/web-renderer#234).
+//  each terrain job is worth (`civ1TerrainPolicy`, civ-clone/web-renderer#234), railroads included
+//  (civ-clone/web-renderer#349).
 import {
   Desert,
   Grassland,
@@ -21,7 +22,12 @@ import {
   TerrainPolicy,
 } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import { Game, Oasis } from '@civ-clone/civ1-world/TerrainFeatures';
-import { Irrigation, Mine, Road } from '@civ-clone/civ1-world/TileImprovements';
+import {
+  Irrigation,
+  Mine,
+  Railroad,
+  Road,
+} from '@civ-clone/civ1-world/TileImprovements';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
@@ -33,12 +39,18 @@ import {
   Food as CityFood,
   Production as CityProduction,
 } from '@civ-clone/library-city/Yields';
-import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
+import {
+  reduceYield,
+  reduceYields,
+} from '@civ-clone/core-yield/lib/reduceYields';
 import {
   BuildIrrigation,
   BuildMine,
+  BuildRailroad,
   BuildRoad,
 } from '@civ-clone/civ1-unit/Actions';
+import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
+import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import UnitAction from '@civ-clone/core-unit/Action';
 import { terrainJobTurns } from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
 
@@ -187,6 +199,7 @@ const improvementTypes: {
 } = {
   irrigation: Irrigation,
   mine: Mine,
+  railroad: Railroad,
   road: Road,
 };
 
@@ -194,6 +207,7 @@ const improvementTypes: {
 const workActions: { [K in TerrainImprovement]: typeof UnitAction } = {
   irrigation: BuildIrrigation,
   mine: BuildMine,
+  railroad: BuildRailroad,
   road: BuildRoad,
 };
 
@@ -237,6 +251,23 @@ const add = (total: Gain, gain: Gain, sign: number = 1): Gain => ({
   trade: (total.trade ?? 0) + sign * (gain.trade ?? 0),
 });
 
+// What a railroad adds to `tile` for `player`: half of each of its yields, rounded down, as `civ1-world`'s
+//  `YieldModifier` rules and v474.05 have it.
+const railroadGain = (player: Player, tile: Tile): Gain => {
+  const [food, shields, trade] = reduceYields(
+    tile.yields(player),
+    Food,
+    Production,
+    Trade
+  );
+
+  return {
+    food: Math.floor(food / 2),
+    shields: Math.floor(shields / 2),
+    trade: Math.floor(trade / 2),
+  };
+};
+
 // What `improvement` adds to `tile` under `player`'s government, if anything.
 const gainOf = (
   dependencies: Dependencies,
@@ -244,6 +275,10 @@ const gainOf = (
   tile: Tile,
   improvement: TerrainImprovement
 ): Gain => {
+  if (improvement === 'railroad') {
+    return railroadGain(player, tile);
+  }
+
   const government = dependencies.playerGovernmentRegistry.getByPlayer(player),
     advanced = government.is(Monarchy, Communism, Republic, Democracy),
     republic = government.is(Republic, Democracy),
@@ -264,8 +299,17 @@ const gainOf = (
   );
 };
 
-// Civ1's terrain jobs for `TerrainWork`: irrigation, mines and roads where they add food, shields or trade, weighed by
-//  what the city that works (or could work) the tile is short of, for a worker's turns of work.
+// Whether the player has the Railroad advance.
+const knowsRailroad = (dependencies: Dependencies, player: Player): boolean =>
+  dependencies.playerResearchRegistry
+    .getBy('player', player)
+    .some((research: PlayerResearch): boolean =>
+      research.completed(RailroadAdvance)
+    );
+
+// Civ1's terrain jobs for `TerrainWork`: irrigation, mines, roads, and railroads on roads once the player has the
+//  Railroad advance, where they add food, shields or trade, weighed by what the city that works (or could work) the
+//  tile is short of, for a worker's turns of work.
 export const civ1TerrainPolicy: TerrainPolicy = {
   jobs: (dependencies, player, tile) => {
     const workedTile = dependencies.workedTileRegistry.getByTile(tile),
@@ -295,8 +339,13 @@ export const civ1TerrainPolicy: TerrainPolicy = {
         ),
       weights = weightsFor(dependencies, city);
 
-    return (['irrigation', 'mine', 'road'] as TerrainImprovement[])
-      .filter((improvement: TerrainImprovement): boolean => !has(improvement))
+    return (['irrigation', 'mine', 'railroad', 'road'] as TerrainImprovement[])
+      .filter(
+        (improvement: TerrainImprovement): boolean =>
+          !has(improvement) &&
+          (improvement !== 'railroad' ||
+            (has('road') && knowsRailroad(dependencies, player)))
+      )
       .map((improvement: TerrainImprovement): TerrainJobValue => {
         const replaced = replaces[improvement],
           gain = add(
