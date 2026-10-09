@@ -1,5 +1,6 @@
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
+import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import terrainWork, {
   TerrainJobValue,
@@ -83,6 +84,53 @@ describe('TerrainWork', (): void => {
 
     expect(jobsAt(despotism, 3, 1)).to.deep.equal(['mine:0.75/9']);
     expect(jobsAt(despotism, 3, 0)).to.deep.equal(['irrigation:1.5/4']);
+  });
+
+  it('should value a railroad on a road once the player has the Railroad advance, by half of each yield', async (): Promise<void> => {
+    const setup = await unitGame(MAP, 3, 5, Despotism);
+
+    setup.addCity(1, 1, 1);
+    setup.game.tileImprovements.register(
+      new Road(setup.world.get(0, 1)),
+      new Road(setup.world.get(2, 0))
+    );
+
+    // No railroad without the advance.
+    expect(jobsAt(setup, 0, 1)).to.deep.equal([]);
+
+    setup.game.playerResearch
+      .getByPlayer(setup.player)
+      .addAdvance(RailroadAdvance);
+
+    // Grassland with a road: 2 food, 1 trade, so a railroad adds 1 food, to a city with at most 1 to spare. Unworked:
+    //  worth half. A railroad takes 4 turns on Grassland in Civ1, counting the turn of the order, so 3 more.
+    expect(jobsAt(setup, 0, 1)).to.deep.equal(['railroad:1.5/3']);
+    // The worked Plains with a road: 1 food, 1 shield, 1 trade, so a railroad adds nothing.
+    expect(jobsAt(setup, 2, 0)).to.deep.equal(['irrigation:3/4']);
+    // No road, no railroad.
+    expect(jobsAt(setup, 1, 0)).to.deep.equal(['road:0.5/1']);
+  });
+
+  it('should have Settlers build a railroad on a road once the player has the Railroad advance', async (): Promise<void> => {
+    // Grassland everywhere, roads already built, and no water for irrigation: a railroad is the only job left.
+    const setup = await unitGame('15G', 3, 5, Despotism),
+      city = setup.addCity(2, 1, 1),
+      settlers = setup.addUnit(Settlers, 0, 0, city);
+
+    setup.world
+      .entries()
+      .filter((tile: Tile): boolean => tile !== city.tile())
+      .forEach((tile: Tile): void =>
+        setup.game.tileImprovements.register(new Road(tile))
+      );
+
+    setup.game.playerResearch
+      .getByPlayer(setup.player)
+      .addAdvance(RailroadAdvance);
+
+    await setup.takeTurns(2);
+
+    expect(settlers.busy()?.constructor.name).to.equal('BuildingRailroad');
   });
 
   it('should choose the job worth most for the turns it takes, that the worker could do there', async (): Promise<void> => {
