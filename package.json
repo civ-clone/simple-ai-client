@@ -52,7 +52,7 @@
     "@civ-clone/base-player-action-end-turn": "^0.1.0",
     "@civ-clone/base-strategy-ai": "^0.1.0",
     "@civ-clone/base-strategy-explore": "^0.1.0",
-    "@civ-clone/base-strategy-terrain-work": "^0.1.0",
+    "@civ-clone/base-strategy-terrain-work": "^0.1.1",
     "@civ-clone/base-trade-rate-luxuries": "^0.1.0",
     "@civ-clone/base-trade-rate-research": "^0.1.0",
     "@civ-clone/base-trade-rate-tax": "^0.1.0",
