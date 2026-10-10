@@ -27,6 +27,7 @@ import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import PreventDisorder from '../Strategies/City/PreventDisorder';
 import Tile from '@civ-clone/core-world/Tile';
+import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import { TraitRegistry } from '@civ-clone/core-civilization/TraitRegistry';
 import TradeRates from '../Strategies/Turn/TradeRates';
 import cityHappinessRules from '@civ-clone/civ1-city-happiness/registerRules';
@@ -281,9 +282,14 @@ describe('TradeRates', (): void => {
   });
 
   it('should add a luxury, and calm the city with it, when Entertainers alone would starve it', async (): Promise<void> => {
-    // Without irrigation, a second Entertainer would leave the city short of food (`PreventDisorder`'s `food`), and one
-    //  isn't enough at 10% luxuries. At 20% it is.
-    const setup = await setUp({ irrigated: false });
+    // A city of 6 with a Temple has two unhappy citizens (a computer player's first three are born content, and the
+    //  Temple keeps one more so). Without irrigation, a second Entertainer would leave it short of food
+    //  (`PreventDisorder`'s `food`), and one isn't enough at 10% luxuries. At 20% it is.
+    const setup = await setUp({ irrigated: false, size: 6 });
+
+    setup.game.cityImprovements.register(
+      new Temple(setup.city, setup.game.rules)
+    );
 
     expect(disorder(setup)).true;
 
