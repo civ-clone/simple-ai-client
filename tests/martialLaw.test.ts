@@ -66,11 +66,11 @@ type SetUp = {
 };
 
 // One Civ1 player with one city of `size` in the middle of a 5x5 map of irrigated Grassland, under `government`, with
-//  `warriors` Warriors on its tile. Each citizen over 5 is unhappy, and each Warrior makes one of them content where
-//  the government allows martial law.
+//  `warriors` Warriors on its tile. Each citizen over 3 is unhappy (a computer player's are born content), and each
+//  Warrior makes one of them content where the government allows martial law.
 const setUp = async ({
   government = Monarchy,
-  size = 8,
+  size = 6,
   warriors = 2,
 }: {
   government?: typeof Government;
@@ -190,7 +190,7 @@ const staysToGarrison = ({ city, dependencies }: SetUp, unit: Unit): boolean =>
 
 describe('martial law', (): void => {
   it('should keep a spare unit rather than make an Entertainer in a Monarchy city with one unhappy citizen', async (): Promise<void> => {
-    // Size 8: three citizens over five are unhappy. The two Warriors a city that size wants anyway keep two of them
+    // Size 6: the three citizens over three are unhappy. The two Warriors a city that size wants anyway keep two of them
     //  in order; the third is left unhappy, with no happy citizen to match, so the city is in disorder.
     const setup = await setUp();
 
@@ -239,7 +239,7 @@ describe('martial law', (): void => {
   });
 
   it('should want no more units than martial law can use', async (): Promise<void> => {
-    // Size 10, as big as a city grows without an Aqueduct: five unhappy citizens, but Civ1's martial law makes at most
+    // Size 10, as big as a city grows without an Aqueduct: seven unhappy citizens, but Civ1's martial law makes at most
     //  three of them content (civ-clone/web-renderer#224).
     const setup = await setUp({ size: 10, warriors: 0 });
 
@@ -253,7 +253,7 @@ describe('martial law', (): void => {
   });
 
   it('should not want a unit for a citizen a Temple already keeps content', async (): Promise<void> => {
-    // Size 8 with a Temple: the two Warriors and the Temple's one content citizen leave nobody unhappy.
+    // Size 6 with a Temple: the two Warriors and the Temple's one content citizen leave nobody unhappy.
     const setup = await setUp();
 
     setup.game.cityImprovements.register(
@@ -265,7 +265,7 @@ describe('martial law', (): void => {
   });
 
   it('should not keep a third unit where a Temple would keep the citizen content without it', async (): Promise<void> => {
-    // Size 8 with a Temple and three Warriors. Martial law comes after the Temple, which keeps one of the three unhappy
+    // Size 6 with a Temple and three Warriors. Martial law comes after the Temple, which keeps one of the three unhappy
     //  citizens content, so it only uses two of the Warriors; the third does nothing for order.
     const setup = await setUp({ warriors: 3 });
 
@@ -346,7 +346,7 @@ describe('martial law', (): void => {
   });
 
   it("should not count a unit martial law can't use", async (): Promise<void> => {
-    // Size 8, two Warriors and a Diplomat. Martial law only uses units that can attack (civ-clone/web-renderer#224),
+    // Size 6, two Warriors and a Diplomat. Martial law only uses units that can attack (civ-clone/web-renderer#224),
     //  so the Diplomat keeps no one content: two units for three unhappy citizens, and the city builds a third.
     const setup = await setUp(),
       { city, dependencies, game, player } = setup,
