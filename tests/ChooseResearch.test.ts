@@ -16,19 +16,24 @@ import {
   TheWheel,
 } from '@civ-clone/civ1-science/Advances';
 import Advance from '@civ-clone/core-science/Advance';
+import AdvanceGrade from '@civ-clone/base-leader-personality/Rules/Player/AdvanceGrade';
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
 import ChooseResearch from '../Strategies/Science/ChooseResearch';
 import Civilization from '@civ-clone/core-civilization/Civilization';
+import Effect from '@civ-clone/core-rule/Effect';
 import Leader from '@civ-clone/core-civilization/Leader';
+import { Militaristic } from '@civ-clone/civ1-civilization/Traits';
 import Player from '@civ-clone/core-player/Player';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import { PlayerResearchRegistry } from '@civ-clone/core-science/PlayerResearchRegistry';
+import Rule from '@civ-clone/core-rule/Rule';
 import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import { TraitRegistry } from '@civ-clone/core-civilization/TraitRegistry';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { expect } from 'chai';
+import leaderHas from '@civ-clone/base-leader-personality/lib/leaderHas';
 import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import requirements from '@civ-clone/civ1-science/Rules/Research/requirements';
@@ -41,12 +46,13 @@ type SetUp = {
 };
 
 // A Civ1 player led by `LeaderType` who knows every advance but `unknown`, choosing what to research with a random
-//  number generator that always returns `random`, with Civ1's personality rules if `wanted`.
+//  number generator that always returns `random`, with Civ1's personality rules if `wanted`, or `rules` in their place.
 const setUp = (
   LeaderType: typeof Leader,
   unknown: (typeof Advance)[],
   random: number,
-  wanted = true
+  wanted = true,
+  rules: ((traitRegistry: TraitRegistry) => Rule[]) | null = null
 ): SetUp => {
   const traitRegistry = new TraitRegistry(),
     ruleRegistry = new RuleRegistry(),
@@ -63,7 +69,9 @@ const setUp = (
   registerTraits(traitRegistry);
   ruleRegistry.register(...requirements());
 
-  if (wanted) {
+  if (rules !== null) {
+    ruleRegistry.register(...rules(traitRegistry));
+  } else if (wanted) {
     ruleRegistry.register(...personalityRules(traitRegistry));
   }
   advanceRegistry.register(
@@ -156,6 +164,37 @@ describe('ChooseResearch', (): void => {
       expect(setup.draws()).to.equal(2);
     })
   );
+
+  // A grade for Militaristic leaders alone leaves everyone else's research as it was: at random, with one draw, not
+  //  always the first of what's available.
+  it('should pick at random, with one draw, when no grade applies to the leader', (): void => {
+    const militaristicGrades = (traitRegistry: TraitRegistry): Rule[] => [
+        new AdvanceGrade(
+          leaderHas(traitRegistry, Militaristic),
+          new Effect(() => 5)
+        ),
+      ],
+      gandhi = setUp(
+        MahatmaGandhi,
+        [Democracy, Feudalism],
+        0.99,
+        false,
+        militaristicGrades
+      ),
+      genghisKhan = setUp(
+        GenghisKhan,
+        [Democracy, Feudalism],
+        0.99,
+        false,
+        militaristicGrades
+      );
+
+    expect(gandhi.choose()).to.equal('Feudalism');
+    expect(gandhi.draws()).to.equal(1);
+    // Graded alike, so the first highest draw: Democracy.
+    expect(genghisKhan.choose()).to.equal('Democracy');
+    expect(genghisKhan.draws()).to.equal(2);
+  });
 
   it('should pick at random, with one draw, when the ruleset grades no advance', (): void => {
     const setup = setUp(AbrahamLincoln, [Democracy, Feudalism], 0.99, false);
