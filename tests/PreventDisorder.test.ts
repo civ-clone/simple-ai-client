@@ -63,12 +63,13 @@ type SetUp = {
 };
 
 // One Civ1 player with one city of `size` in the middle of a 5x5 map of Grassland, under Monarchy (no martial law, as
-//  no unit is in it), so a city of 6 or more has an unhappy citizen for each citizen over 5 and nothing to calm them.
+//  no unit is in it), so a city of 4 or more has an unhappy citizen for each citizen over 3 (a computer player's are born
+//  content) and nothing to calm them.
 //  With `irrigated`, every tile gives 3 food; without, 2.
 const setUp = async ({
   irrigated = true,
   map = '25G',
-  size = 7,
+  size = 5,
 }: {
   irrigated?: boolean;
   map?: string;
@@ -190,15 +191,15 @@ describe('PreventDisorder', (): void => {
   });
 
   it('should take Entertainers from the worked tiles that give the least food first', async (): Promise<void> => {
-    // Hills all round, but for the four Grassland next to the city, so a city of 7 works three Hills, which give less
-    //  food than Grassland.
+    // Hills all round, but for the Grassland north and south of the city, so a city of 5 works three Hills, which give
+    //  less food than Grassland.
     //   01234
     // 0 HHHHH
     // 1 HHGHH
-    // 2 HGGGH
+    // 2 HHGHH
     // 3 HHGHH
     // 4 HHHHH
-    const setup = await setUp({ map: '7HG3H3G3HG7H' }),
+    const setup = await setUp({ map: '7HG4HG4HG7H' }),
       { city, dependencies, game } = setup,
       worked = (): Tile[] =>
         game.workedTiles
@@ -257,10 +258,10 @@ describe('PreventDisorder', (): void => {
   });
 
   it('should calm a city that will grow into disorder before it grows', async (): Promise<void> => {
-    const setup = await setUp({ size: 6 }),
+    const setup = await setUp({ size: 4 }),
       cityGrowth = setup.game.cityGrowth.getByCity(setup.city);
 
-    // One unhappy citizen at 6, two at 7.
+    // One unhappy citizen at 4, two at 5.
     expect(disorder(setup)).true;
 
     await setup.afterTurn();
@@ -285,7 +286,7 @@ describe('PreventDisorder', (): void => {
   });
 
   it('should let a city grow into a turn of disorder rather than stop it growing', async (): Promise<void> => {
-    const setup = await setUp({ size: 6 }),
+    const setup = await setUp({ size: 4 }),
       { city, dependencies, game } = setup,
       cityGrowth = game.cityGrowth.getByCity(city);
 
@@ -293,7 +294,7 @@ describe('PreventDisorder', (): void => {
 
     expect(entertainers(setup)).to.equal(1);
 
-    // It grows with no food to spare, so the second Entertainer it would want at 7 would stop it growing.
+    // It grows with no food to spare, so the second Entertainer it would want at 5 would stop it growing.
     cityGrowth.progress().set(cityGrowth.cost().value() - food(setup));
 
     expect(
