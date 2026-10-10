@@ -48,6 +48,7 @@ import cityRules from '@civ-clone/civ1-city/registerRules';
 import { dependenciesFor } from '../registerStrategies';
 import { expect } from 'chai';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
+import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
@@ -87,6 +88,7 @@ const setUp = async (
   unitRules(game);
   worldRules(game);
   registerTraits(game.traits);
+  game.rules.register(...personalityRules(game.traits));
 
   const world = await simpleRLELoader(game.rules, game.terrainFeatures)(
       '100R',

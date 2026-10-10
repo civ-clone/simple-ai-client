@@ -21,9 +21,9 @@ import { PlayerResearchRegistry } from '@civ-clone/core-science/PlayerResearchRe
 import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import { TraitRegistry } from '@civ-clone/core-civilization/TraitRegistry';
 import civ1Knowledge from '../lib/Civ1/knowledge';
-import civ1WantedAdvances from '../lib/Civ1/wantedAdvances';
 import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { expect } from 'chai';
+import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import requirements from '@civ-clone/civ1-science/Rules/Research/requirements';
 
@@ -35,7 +35,7 @@ type SetUp = {
 };
 
 // A Civ1 player led by `LeaderType` who knows every advance but `unknown`, choosing what to research with a random
-//  number generator that always returns `random`.
+//  number generator that always returns `random`, with Civ1's personality rules if `wanted`.
 const setUp = (
   LeaderType: typeof Leader,
   unknown: (typeof Advance)[],
@@ -56,6 +56,10 @@ const setUp = (
 
   registerTraits(traitRegistry);
   ruleRegistry.register(...requirements());
+
+  if (wanted) {
+    ruleRegistry.register(...personalityRules(traitRegistry));
+  }
   advanceRegistry.register(
     ...(Object.values(Advances) as unknown as (typeof Advance)[])
   );
@@ -86,9 +90,7 @@ const setUp = (
       ruleRegistry,
       traitRegistry,
     }),
-    strategy = wanted
-      ? new ChooseResearch(dependencies, civ1Knowledge, civ1WantedAdvances)
-      : new ChooseResearch(dependencies, civ1Knowledge);
+    strategy = new ChooseResearch(dependencies, civ1Knowledge);
 
   return {
     choose: (): string | null => {

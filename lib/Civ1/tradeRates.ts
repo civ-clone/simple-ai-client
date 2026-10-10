@@ -6,7 +6,6 @@ import {
 } from '@civ-clone/civ1-city-happiness/lib/calculateCitizenState';
 import { TradeRatePolicy } from '../Turn/adjustTradeRates';
 import civ1DisorderPolicy from './disorder';
-import civ1WantedAdvances from './wantedAdvances';
 import { scienceStopped } from '../Science/wantedAdvances';
 
 export const civ1TradeRatePolicy: TradeRatePolicy = {
@@ -30,9 +29,9 @@ export const civ1TradeRatePolicy: TradeRatePolicy = {
 
     return happy === unhappy;
   },
-  // Once the player has every advance its leader wants (`Civ1/wantedAdvances`), where v474.05 stops at Robotics.
-  scienceStopped: (dependencies, player) =>
-    scienceStopped(dependencies, player, civ1WantedAdvances),
+  // Once the player has every advance its leader wants (`civ1-civilization`'s `WantedAdvances` rules), where v474.05
+  //  stops at Robotics.
+  scienceStopped,
 };
 
 export default civ1TradeRatePolicy;

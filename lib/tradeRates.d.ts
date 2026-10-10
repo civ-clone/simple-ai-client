@@ -9,12 +9,12 @@ export interface TradeRateState {
   onTheEdge: boolean;
   turn: number;
   gold: number;
-  ideology: number;
+  scienceBias: number;
   scienceStopped: boolean;
   extraLuxuries?: number;
 }
 export declare const MAX_LUXURIES = 4;
-export declare const startingRates: (ideology: number) => Rates;
+export declare const startingRates: (scienceBias: number) => Rates;
 export declare const LUXURY_REDUCTION_BELOW = 10;
 export declare const tradeRates: ({
   rates,
@@ -22,7 +22,7 @@ export declare const tradeRates: ({
   onTheEdge,
   turn,
   gold,
-  ideology,
+  scienceBias,
   scienceStopped,
   extraLuxuries,
 }: TradeRateState) => Rates;

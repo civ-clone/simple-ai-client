@@ -33,7 +33,6 @@ const spending_1 = require("./lib/Civ1/spending");
 const standDown_1 = require("./lib/Civ1/standDown");
 const terrain_1 = require("./lib/Civ1/terrain");
 const tradeRates_1 = require("./lib/Civ1/tradeRates");
-const wantedAdvances_1 = require("./lib/Civ1/wantedAdvances");
 // In the order `SimpleAIClient` has always made its decisions. With no `Priority` rules, the registry keeps this
 //  order, so a strategy registered later (another plugin's) comes after all of these unless a `Priority` puts it
 //  first.
@@ -55,7 +54,7 @@ const createStrategies = (dependencies, knowledge = knowledge_1.default) => [
     // The other mandatory choices.
     new BuildExplorerShip_1.default(dependencies, knowledge),
     new ChooseProduction_1.default(dependencies, knowledge),
-    new ChooseResearch_1.default(dependencies, knowledge, wantedAdvances_1.default),
+    new ChooseResearch_1.default(dependencies, knowledge),
     new ChooseGovernment_1.default(dependencies, knowledge),
     // `chooseFromList`.
     new NegotiationAnswers_1.default(dependencies, knowledge),

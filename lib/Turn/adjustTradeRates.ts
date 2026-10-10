@@ -17,8 +17,9 @@ import PlayerTradeRates from '@civ-clone/core-trade-rate/PlayerTradeRates';
 import PlayerTreasury from '@civ-clone/core-treasury/PlayerTreasury';
 import Research from '@civ-clone/base-trade-rate-research/Research';
 import Tax from '@civ-clone/base-trade-rate-tax/Tax';
+import ScienceBias from '@civ-clone/base-leader-personality/Rules/Player/ScienceBias';
 import TradeRate from '@civ-clone/core-trade-rate/TradeRate';
-import { ideology } from '../traits';
+import { sum } from '@civ-clone/base-leader-personality/lib/combine';
 
 // The ruleset's part. `Civ1/tradeRates` has Civ1's.
 export interface TradeRatePolicy {
@@ -78,7 +79,7 @@ export const adjustTradeRates = (
   }
 
   const turn = dependencies.turn.value(),
-    playerIdeology = ideology(dependencies, player),
+    scienceBias = sum(dependencies.ruleRegistry, ScienceBias, player),
     cities = dependencies.cityRegistry.getByPlayer(player),
     luxuriesBefore = luxuries.value(),
     rates = tradeRates({
@@ -86,7 +87,7 @@ export const adjustTradeRates = (
       //  replaced on the player's first turn.
       rates:
         turn <= 1
-          ? startingRates(playerIdeology)
+          ? startingRates(scienceBias)
           : {
               luxuries: tenths(luxuries),
               science: tenths(science),
@@ -100,7 +101,7 @@ export const adjustTradeRates = (
       ),
       turn,
       gold: gold(dependencies, player),
-      ideology: playerIdeology,
+      scienceBias,
       scienceStopped: policy.scienceStopped(dependencies, player),
       extraLuxuries: extraLuxuries(memory.uncalmedCities.values()),
     });
