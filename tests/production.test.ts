@@ -1,3 +1,10 @@
+import {
+  AbrahamLincoln,
+  ElizabethI,
+  GenghisKhan,
+  MahatmaGandhi,
+  Shaka,
+} from '@civ-clone/civ1-civilization/Leaders';
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import { CeremonialBurial, MapMaking } from '@civ-clone/civ1-science/Advances';
 import {
@@ -13,11 +20,13 @@ import buildItemInCity, {
   isFoundingSettlers,
 } from '../lib/Civ1/buildItemInCity';
 import City from '@civ-clone/core-city/City';
+import Civilization from '@civ-clone/core-civilization/Civilization';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import { Game } from '@civ-clone/core-game/Game';
 import Government from '@civ-clone/core-government/Government';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
+import Leader from '@civ-clone/core-civilization/Leader';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
@@ -26,6 +35,7 @@ import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import Unit from '@civ-clone/core-unit/Unit';
 import { UnitSupportProduction } from '@civ-clone/library-city/Yields';
+import TraitRegistry from '@civ-clone/core-civilization/TraitRegistry';
 import World from '@civ-clone/core-world/World';
 import Yield from '@civ-clone/core-yield/Yield';
 import cityImprovementRules from '@civ-clone/civ1-city-improvement/registerRules';
@@ -33,6 +43,8 @@ import cityRules from '@civ-clone/civ1-city/registerRules';
 import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { createMemory } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { dependenciesFor } from '../registerStrategies';
+import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
+import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import {
   TerrainJob,
@@ -73,16 +85,18 @@ const twoContinents = '4GO4GO'.repeat(5);
 
 // One Civ1 player under `government`, with one city of `size` at (1, 2) making `shields` net shields, and, if
 //  `defended`, a fortified Warrior of its own in it, so it isn't missing a defender. It can build Warriors, Settlers
-//  and Temples.
+//  and Temples. With a `leader`, the player has Civ1's leader traits and personality rules; without one, neither.
 const setUp = async ({
   defended = true,
   government = Monarchy,
+  leader = null,
   map = twoContinents,
   shields = 1,
   size = 1,
 }: {
   defended?: boolean;
   government?: typeof Government;
+  leader?: typeof Leader | null;
   map?: string;
   shields?: number;
   size?: number;
@@ -106,6 +120,19 @@ const setUp = async ({
       10
     ),
     player = new Player(game.rules);
+
+  if (leader !== null) {
+    const civilization = new Civilization();
+
+    registerTraits(game.traits);
+    game.rules.register(...personalityRules(game.traits));
+    civilization.setLeader(
+      new (leader as unknown as new (registry: TraitRegistry) => Leader)(
+        game.traits
+      )
+    );
+    player.setCivilization(civilization);
+  }
 
   const playerResearch = new PlayerResearch(player, game.advances, game.rules);
 
@@ -604,6 +631,80 @@ describe('buildItemInCity', (): void => {
       expect(
         setup.choose({ ...defaultProductionPolicy, settlersPerCity: 1 })
       ).equal(Settlers);
+    });
+
+    // One city wants 3 + floor(0.5) = 3 by the default policy, times the leader's Expansion
+    //  (civ-clone/web-renderer#157): a third for a Perfectionist, five thirds for an Expansionist.
+    it('should want a third as many Settlers as a Perfectionist leader', async (): Promise<void> => {
+      const gandhi = await setUp({
+          leader: MahatmaGandhi,
+          shields: 2,
+          size: 2,
+        }),
+        shaka = await setUp({ leader: Shaka, shields: 2, size: 2 });
+
+      unitsOut(gandhi, 1, Settlers);
+      unitsOut(shaka, 1, Settlers);
+
+      expect(gandhi.choose()).not.equal(Settlers);
+      expect(shaka.choose()).equal(Settlers);
+    });
+
+    it('should want five thirds as many Settlers as an Expansionist leader', async (): Promise<void> => {
+      const elizabeth = await setUp({
+          leader: ElizabethI,
+          shields: 2,
+          size: 2,
+        }),
+        shaka = await setUp({ leader: Shaka, shields: 2, size: 2 });
+
+      unitsOut(elizabeth, 4, Settlers);
+      unitsOut(shaka, 3, Settlers);
+
+      expect(elizabeth.choose()).equal(Settlers);
+      expect(shaka.choose()).not.equal(Settlers);
+    });
+  });
+
+  // Warriors first, then a Temple, with as many Settlers out as any of these leaders wants. A Civilized leader weighs
+  //  improvements 4/3 and a Militaristic one 2/3 (civ-clone/web-renderer#157).
+  describe('a random pick, by the leader (civ-clone/web-renderer#157)', (): void => {
+    const pickWith = async (
+      leader: typeof Leader,
+      random: number
+    ): Promise<unknown> => {
+      const setup = await setUp({
+        government: Despotism,
+        leader,
+        shields: 1,
+        size: 2,
+      });
+
+      unitsOut(setup, 5, Settlers);
+
+      buildItemInCity(
+        createDependencies({
+          ...setup.dependencies,
+          randomNumberGenerator: (): number => random,
+        }),
+        setup.player,
+        setup.targets,
+        setup.city
+      );
+
+      return setup.game.cityBuilds.getByCity(setup.city).building()?.item();
+    };
+
+    it('should favour an improvement as a Civilized leader', async (): Promise<void> => {
+      // 0.45 of 2 is Warriors; 0.45 of 1 + 4/3 is past Warriors' 1.
+      expect(await pickWith(Shaka, 0.45)).equal(Warrior);
+      expect(await pickWith(AbrahamLincoln, 0.45)).equal(Temple);
+    });
+
+    it('should favour a unit as a Militaristic leader', async (): Promise<void> => {
+      // 0.55 of 2 is a Temple; 0.55 of 1 + 2/3 is still Warriors.
+      expect(await pickWith(Shaka, 0.55)).equal(Temple);
+      expect(await pickWith(GenghisKhan, 0.55)).equal(Warrior);
     });
   });
 });

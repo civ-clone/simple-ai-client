@@ -1,6 +1,8 @@
 // Generic: whether `player` is strong enough to pick a fight with `enemy`.
+import AttackConfidence from '@civ-clone/base-leader-personality/Rules/Player/AttackConfidence';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
+import { product } from '@civ-clone/base-leader-personality/lib/combine';
 
 // The sum of every unit's attack and defence, as `player` last worked it out this turn. Each is a pass through the
 //  rules for every unit, and the same pair of players is weighed again and again in a turn (for each neighbouring tile,
@@ -38,6 +40,8 @@ export const militaryPower = (
   return total;
 };
 
+// The player's strength, scaled by how bold its leader is (`AttackConfidence`, by Mood in Civ1), against the enemy's.
+//  Negotiation asks this too (`Diplomacy/chooseNegotiationStep`), so a bolder leader is also the readier to refuse.
 export const shouldAttack = (
   dependencies: Dependencies,
   player: Player,
@@ -45,9 +49,12 @@ export const shouldAttack = (
 ): boolean => {
   const ourPower = militaryPower(dependencies, player, player),
     enemyPower = militaryPower(dependencies, player, enemy),
-    // TODO: use Traits
-    // confidence = this.player().civilization().leader()!.traits().some((trait) => trait instanceof Militaristic) ? 1.25 : 0.9;
-    confidence = 1;
+    confidence = product(
+      dependencies.ruleRegistry,
+      AttackConfidence,
+      player,
+      enemy
+    );
 
   return ourPower * confidence >= enemyPower;
 };

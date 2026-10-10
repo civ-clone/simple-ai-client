@@ -15,8 +15,8 @@ import PlayerAction from '@civ-clone/core-player/PlayerAction';
 export class ChooseProduction extends AIStrategy {
   private _policyFor: (player: Player) => ProductionPolicy;
 
-  // `policyFor` gives each player's `ProductionPolicy`: the same for everyone until civ-clone/web-renderer#157 derives
-  //  it from the leader's traits.
+  // `policyFor` gives each player's `ProductionPolicy`, the same for everyone by default: the leader's personality comes
+  //  in through the rules `buildItemInCity` reads (civ-clone/web-renderer#157).
   constructor(
     dependencies: Dependencies,
     knowledge: Knowledge,
