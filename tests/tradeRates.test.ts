@@ -26,7 +26,7 @@ const state = (
   onTheEdge: false,
   turn: 5,
   gold: 0,
-  ideology: 0,
+  scienceBias: 0,
   scienceStopped: false,
   ...overrides,
 });
@@ -39,12 +39,12 @@ describe('tradeRates', (): void => {
       [
         'a Civilized civ with 1 lux, no disorder, on turn 5',
         '5/4/1',
-        { ideology: 1 },
+        { scienceBias: 1 },
         '5/4/1',
       ],
       ['a normal civ with 1 lux', '5/4/1', {}, '4/5/1'],
-      ['a Militaristic civ with 1 lux', '5/4/1', { ideology: -1 }, '3/6/1'],
-      ['a Civilized civ with no lux', '5/5/0', { ideology: 1 }, '6/4/0'],
+      ['a Militaristic civ with 1 lux', '5/4/1', { scienceBias: -1 }, '3/6/1'],
+      ['a Civilized civ with no lux', '5/5/0', { scienceBias: 1 }, '6/4/0'],
       ['a normal civ with 2 lux', '4/4/2', {}, '4/4/2'],
       // +1 lux when a city is in disorder and sci + tax > 6.
       ['a city in disorder', '4/5/1', { inDisorder: true }, '4/4/2'],
@@ -90,7 +90,7 @@ describe('tradeRates', (): void => {
       [
         'science stopped and rich',
         '4/5/1',
-        { scienceStopped: true, gold: 1000, ideology: 1 },
+        { scienceStopped: true, gold: 1000, scienceBias: 1 },
         '0/9/1',
       ],
       // Luxuries beyond the routine's, still never above 4.
@@ -112,12 +112,12 @@ describe('tradeRates', (): void => {
   it('should always share out all ten tenths, none below 0 and lux at most 4', (): void => {
     for (let science = 0; science <= 10; science++) {
       for (let tax = 0; tax <= 10 - science; tax++) {
-        [-1, 0, 1].forEach((ideology: number): void =>
+        [-1, 0, 1].forEach((scienceBias: number): void =>
           [false, true].forEach((inDisorder: boolean): void =>
             [0, 1000].forEach((gold: number): void => {
               const result = tradeRates(
                 state(`${science}/${tax}/${10 - science - tax}`, {
-                  ideology,
+                  scienceBias,
                   inDisorder,
                   gold,
                   turn: 8,
@@ -155,7 +155,7 @@ describe('tradeRates', (): void => {
     expect(
       show(
         tradeRates({
-          ...state('0/0/0', { ideology: 1, turn: 1 }),
+          ...state('0/0/0', { scienceBias: 1, turn: 1 }),
           rates: startingRates(1),
         })
       )

@@ -20,8 +20,9 @@ export interface TradeRateState {
   turn: number;
   // The player's treasury.
   gold: number;
-  // −1 (Militaristic), 0 or 1 (Civilized): `lib/traits`.
-  ideology: number;
+  // How far the player's leader leans towards science, in tenths: v474.05's Ideology, −1 (Militaristic), 0 or 1
+  //  (Civilized). It's the leader's `ScienceBias` (`base-leader-personality`).
+  scienceBias: number;
   // Whether the player has stopped researching for good: science is then 0.
   scienceStopped: boolean;
   // Steps of luxuries to add beyond the original's, for cities the AI couldn't otherwise keep out of disorder. Still
@@ -33,10 +34,10 @@ export const MAX_LUXURIES = 4;
 
 // A computer player's rates at the start of the game: science Ideology + 3, tax 9 − science, so 1 luxury
 //  (`StartGameMenu.cs` ~L555).
-export const startingRates = (ideology: number): Rates => ({
+export const startingRates = (scienceBias: number): Rates => ({
   luxuries: 1,
-  science: ideology + 3,
-  tax: 9 - (ideology + 3),
+  science: scienceBias + 3,
+  tax: 9 - (scienceBias + 3),
 });
 
 // Science + tax below which a luxury is taken away every 4th turn (step 3 below), so luxuries fall back to 0 once
@@ -64,7 +65,7 @@ export const tradeRates = ({
   onTheEdge,
   turn,
   gold,
-  ideology,
+  scienceBias,
   scienceStopped,
   extraLuxuries = 0,
 }: TradeRateState): Rates => {
@@ -89,7 +90,9 @@ export const tradeRates = ({
 
   const science = scienceStopped
     ? 0
-    : ideology + Math.floor((10 - luxuries) / 2) + (gold > turn + 100 ? 1 : 0);
+    : scienceBias +
+      Math.floor((10 - luxuries) / 2) +
+      (gold > turn + 100 ? 1 : 0);
 
   return {
     luxuries,

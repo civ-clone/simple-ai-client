@@ -35,13 +35,14 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Government from '@civ-clone/core-government/Government';
 import { Marketplace } from '@civ-clone/civ1-city-improvement/CityImprovements';
+import MilitaryUnhappinessTolerance from '@civ-clone/base-leader-personality/Rules/Player/MilitaryUnhappinessTolerance';
 import Player from '@civ-clone/core-player/Player';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
 import { Trade } from '@civ-clone/library-city/Yields';
 import Unit from '@civ-clone/core-unit/Unit';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
-import { ideology } from '../traits';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
+import { sum } from '@civ-clone/base-leader-personality/lib/combine';
 
 export interface GovernmentPolicy {
   // The fewest turns between one revolution and the next, once out of Despotism.
@@ -58,12 +59,17 @@ const lastRevolution = new WeakMap<PlayerGovernment, number>();
 // v474.05's case for The Republic: for each of the player's cities, a point for each tile it works that gives trade
 //  (The Republic adds one to each), less, for each unit of the city's that can attack and is away from it (or is an
 //  aircraft), 7 − Ideology, or 5 − Ideology with a Marketplace: each such unit makes a citizen unhappy under The
-//  Republic. 0 or more favours The Republic.
+//  Republic. Ideology is the leader's `MilitaryUnhappinessTolerance` (`base-leader-personality`). 0 or more favours
+//  The Republic.
 export const republicScore = (
   dependencies: Dependencies,
   player: Player
 ): number => {
-  const playerIdeology = ideology(dependencies, player);
+  const tolerance = sum(
+    dependencies.ruleRegistry,
+    MilitaryUnhappinessTolerance,
+    player
+  );
 
   return dependencies.cityRegistry
     .getByPlayer(player)
@@ -86,7 +92,7 @@ export const republicScore = (
             .getByCity(city)
             .some((improvement) => improvement instanceof Marketplace)
             ? 5
-            : 7) - playerIdeology;
+            : 7) - tolerance;
 
       return total + tradeTiles - perUnit * unitsAway;
     }, 0);

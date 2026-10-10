@@ -34,7 +34,6 @@ import civ1SpendingPolicy from './lib/Civ1/spending';
 import civ1StandDownPolicy from './lib/Civ1/standDown';
 import { civ1TerrainPolicy } from './lib/Civ1/terrain';
 import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
-import civ1WantedAdvances from './lib/Civ1/wantedAdvances';
 
 // In the order `SimpleAIClient` has always made its decisions. With no `Priority` rules, the registry keeps this
 //  order, so a strategy registered later (another plugin's) comes after all of these unless a `Priority` puts it
@@ -60,7 +59,7 @@ export const createStrategies = (
   // The other mandatory choices.
   new BuildExplorerShip(dependencies, knowledge),
   new ChooseProduction(dependencies, knowledge),
-  new ChooseResearch(dependencies, knowledge, civ1WantedAdvances),
+  new ChooseResearch(dependencies, knowledge),
   new ChooseGovernment(dependencies, knowledge),
   // `chooseFromList`.
   new NegotiationAnswers(dependencies, knowledge),
