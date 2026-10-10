@@ -113,7 +113,7 @@ export const scoreUnitMove = (
     score += 100;
   }
 
-  // TODO: weight attacking dependent on leader's personality
+  // The leader's personality decides whether to fight at all (`shouldAttack`), not how keen a fight looks here.
   if (attack && unit.attack().value() > defender.defence().value()) {
     score += 24 * (unit.attack().value() - defender.defence().value());
   }

@@ -4,6 +4,12 @@ import {
   MahatmaGandhi,
 } from '@civ-clone/civ1-civilization/Leaders';
 import {
+  AbrahamLincoln,
+  ElizabethI,
+} from '@civ-clone/civ1-civilization/Leaders';
+import {
+  Democracy,
+  Feudalism,
   NuclearPower,
   Recycling,
   Robotics,
@@ -120,7 +126,7 @@ describe('ChooseResearch', (): void => {
     expect(setup.draws()).to.equal(1);
   });
 
-  it('should draw once, among the wanted advances only, when several are available', (): void => {
+  it('should choose among the wanted advances only, drawing once for each, when several are available', (): void => {
     const setup = setUp(
       MahatmaGandhi,
       [TheWheel, Robotics, Recycling, NuclearPower],
@@ -130,14 +136,31 @@ describe('ChooseResearch', (): void => {
     expect(['NuclearPower', 'Recycling', 'Robotics']).to.include(
       setup.choose()
     );
-    expect(setup.draws()).to.equal(1);
+    expect(setup.draws()).to.equal(3);
   });
 
-  it("should pick at random as before when none of the leader's wanted advances is available", (): void => {
-    const setup = setUp(GenghisKhan, [TheWheel, Recycling], 0),
-      control = setUp(GenghisKhan, [TheWheel, Recycling], 0, false);
+  // Democracy grades 3 + 2 × Ideology and Feudalism 5 − Ideology, so at a draw of 0.5 (2 × the grade) a Civilized
+  //  leader picks Democracy (10 against 8), a Militaristic one Feudalism (12 against 2), and a normal one Feudalism
+  //  (10 against 6) (civ-clone/web-renderer#157).
+  (
+    [
+      [AbrahamLincoln, 'Democracy'],
+      [GenghisKhan, 'Feudalism'],
+      [ElizabethI, 'Feudalism'],
+    ] as [typeof Leader, string][]
+  ).forEach(([LeaderType, expected]) =>
+    it(`should research ${expected} ahead of the other as ${LeaderType.name}, by its grade`, (): void => {
+      const setup = setUp(LeaderType, [Democracy, Feudalism], 0.5);
 
-    expect(setup.choose()).to.equal(control.choose());
+      expect(setup.choose()).to.equal(expected);
+      expect(setup.draws()).to.equal(2);
+    })
+  );
+
+  it('should pick at random, with one draw, when the ruleset grades no advance', (): void => {
+    const setup = setUp(AbrahamLincoln, [Democracy, Feudalism], 0.99, false);
+
+    expect(setup.choose()).to.equal('Feudalism');
     expect(setup.draws()).to.equal(1);
   });
 

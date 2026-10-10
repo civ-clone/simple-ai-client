@@ -7,6 +7,9 @@
 //  for its kind, at its net shields; when nothing is left that it can, the cheapest improvement worth having
 //  (civ-clone/web-renderer#212). Apart from a missing defender, explorers and Settlers, no unit is started that would
 //  leave the city no shields to spare once it has to support it (civ-clone/web-renderer#229).
+import BuildWeight from '@civ-clone/base-leader-personality/Rules/Player/BuildWeight';
+import Expansion from '@civ-clone/base-leader-personality/Rules/Player/Expansion';
+import { product } from '@civ-clone/base-leader-personality/lib/combine';
 import { Attack, Defence } from '@civ-clone/core-unit/Yields';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
@@ -41,8 +44,8 @@ import isUsefulWonder from './wonders';
 import Yield from '@civ-clone/core-yield/Yield';
 
 // How many of each kind of unit a player wants, which decides when its cities stop building units and turn to
-//  improvements and Wonders. `ChooseProduction` asks for one per player, which is where civ-clone/web-renderer#157's
-//  leader traits (Ideology, Mood) come in.
+//  improvements and Wonders. `ChooseProduction` asks for one per player. The leader's personality scales the Settlers
+//  wanted (`Expansion`) and weighs the random pick (`BuildWeight`) on top of it (civ-clone/web-renderer#157).
 export interface ProductionPolicy {
   // Attackers wanted for each of the player's cities while there's something to attack.
   attackersPerCity: number;
@@ -51,9 +54,9 @@ export interface ProductionPolicy {
   explorers: number;
   explorersPerCity: number;
   maxExplorers: number;
-  // Settlers wanted, out and on order: `settlers`, and `settlersPerCity` more per city, rounded down. Counting those on
-  //  order kept the Settlers a player has in check, but at 3 for any number of cities it cost players cities by turn 300
-  //  in the arena (civ-clone/web-renderer#229).
+  // Settlers wanted, out and on order: `settlers`, and `settlersPerCity` more per city, rounded down, all times the
+  //  leader's `Expansion`. Counting those on order kept the Settlers a player has in check, but at 3 for any number of
+  //  cities it cost players cities by turn 300 in the arena (civ-clone/web-renderer#229).
   settlers: number;
   settlersPerCity: number;
   // The most turns a city spends on each kind of build, at its net shields (`lib/City/buildTime`). A city builds a
@@ -264,6 +267,28 @@ const shouldBuildWonder = (
   );
 };
 
+// One of `weighted`, each as likely as its weight, from a single `random` draw in [0, 1). With every weight 1 it's
+//  `items[Math.floor(items.length * random)]`.
+const weightedPick = <T>(
+  weighted: [T, number][],
+  random: number
+): T | undefined => {
+  const total = weighted.reduce((sum, [, weight]) => sum + weight, 0),
+    target = total * random;
+
+  let reached = 0;
+
+  for (const [item, weight] of weighted) {
+    reached += weight;
+
+    if (target < reached) {
+      return item;
+    }
+  }
+
+  return weighted[weighted.length - 1]?.[0];
+};
+
 // Improvements only worth building on purpose, never picked at random.
 const onPurposeOnly: (typeof Barracks)[] = [Barracks, CityWalls];
 
@@ -333,10 +358,18 @@ export const buildItemInCity = (
             : policy.buildTurns.improvement
         )
     ),
-    randomSelection =
-      finishable[
-        Math.floor(finishable.length * dependencies.randomNumberGenerator())
-      ]?.item(),
+    randomSelection = weightedPick(
+      finishable.map((buildItem: BuildItem): [BuildItem, number] => [
+        buildItem,
+        product(
+          dependencies.ruleRegistry,
+          BuildWeight,
+          player,
+          buildItem.item()
+        ),
+      ]),
+      dependencies.randomNumberGenerator()
+    )?.item(),
     // A defender for this city: the soonest it can, if it can't finish one within the policy's turns.
     getDefensiveUnit = (
       (UnitType?: typeof Unit): (() => typeof Unit | undefined) =>
@@ -426,7 +459,6 @@ export const buildItemInCity = (
       .some((unit: Unit): boolean =>
         isFoundingSettlers(dependencies, player, unit)
       ) &&
-    // TODO: use expansionist leader trait
     unitsAndOrders(
       dependencies,
       player,
@@ -434,7 +466,8 @@ export const buildItemInCity = (
       (item: object): boolean =>
         item === (Settlers as unknown as typeof Buildable)
     ) <
-      policy.settlers + Math.floor(policy.settlersPerCity * cities) &&
+      product(dependencies.ruleRegistry, Expansion, player) *
+        (policy.settlers + Math.floor(policy.settlersPerCity * cities)) &&
     cityGrowth.size() > 1 &&
     // With no city site they could walk to and no terrain job, they'd join a city (civ-clone/web-renderer#243).
     settlersWouldHaveWork(dependencies, player, targets, city)

@@ -7,8 +7,8 @@ const buildItemInCity_1 = require("../../lib/Civ1/buildItemInCity");
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const CityBuild_1 = require("@civ-clone/core-city-build/CityBuild");
 class ChooseProduction extends AIStrategy_1.default {
-    // `policyFor` gives each player's `ProductionPolicy`: the same for everyone until civ-clone/web-renderer#157 derives
-    //  it from the leader's traits.
+    // `policyFor` gives each player's `ProductionPolicy`, the same for everyone by default: the leader's personality comes
+    //  in through the rules `buildItemInCity` reads (civ-clone/web-renderer#157).
     constructor(dependencies, knowledge, policyFor = () => buildItemInCity_1.defaultProductionPolicy) {
         super(dependencies, knowledge);
         this._policyFor = policyFor;
