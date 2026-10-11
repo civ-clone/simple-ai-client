@@ -8,6 +8,7 @@ import {
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import {
   CeremonialBurial,
+  HorsebackRiding,
   MapMaking,
   Pottery,
   Writing,
@@ -15,6 +16,7 @@ import {
 import {
   Caravan,
   Diplomat,
+  Horseman,
   Settlers,
   Trireme,
   Warrior,
@@ -52,9 +54,6 @@ import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import { Pyramids } from '@civ-clone/civ1-wonder/Wonders';
 import { autoBuildable } from '@civ-clone/civ1-city/lib/autoBuild';
-import BuildPriority from '@civ-clone/core-city-build/Rules/BuildPriority';
-import Criterion from '@civ-clone/core-rule/Criterion';
-import Effect from '@civ-clone/core-rule/Effect';
 import rankBuildItems from '@civ-clone/core-city-build/lib/rankBuildItems';
 import wonderPriorities from '@civ-clone/civ1-wonder/Rules/City/build-priority';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -183,11 +182,7 @@ const setUp = async ({
 
   city.yields = () => [new Production(shields)];
 
-  // The last of anything a random pick could choose, so a test can tell the pick apart from a deliberate choice.
-  const dependencies = createDependencies({
-      ...dependenciesFor(game),
-      randomNumberGenerator: (): number => 0.999,
-    }),
+  const dependencies = createDependencies(dependenciesFor(game)),
     targets = createMemory().targets;
 
   return {
@@ -215,16 +210,6 @@ const unitsOut = (
   for (let i = 0; i < count; i++) {
     new UnitType(null, player, world.get(2, i % 5), game.rules);
   }
-};
-
-// Nothing ranks (civ-clone/web-renderer#194), so the city falls back on the leader-weighted random pick.
-const needNothing = ({ game }: SetUp): void => {
-  game.rules.register(
-    new BuildPriority(
-      new Criterion((): boolean => true),
-      new Effect((): number => -1000)
-    )
-  );
 };
 
 const isUnit = (item: unknown): boolean =>
@@ -290,38 +275,22 @@ describe('buildItemInCity', (): void => {
       expect(setup.choose()).equal(Warrior);
     });
 
-    it('should not pick a unit at random that would leave it no shields to spare', async (): Promise<void> => {
-      const setup = await setUp({ shields: 1 }),
-        dependencies = createDependencies({
-          ...setup.dependencies,
-          randomNumberGenerator: (): number => 0,
-        });
+    it('should not start a unit it has no need of', async (): Promise<void> => {
+      const setup = await setUp({ shields: 1 });
 
-      // Warriors first, then a Temple: a pick of 0 would be Warriors.
-      buildItemInCity(dependencies, setup.player, setup.targets, setup.city);
-
-      expect(
-        isUnit(setup.game.cityBuilds.getByCity(setup.city).building()?.item())
-      ).false;
+      expect(isUnit(setup.choose())).false;
     });
 
-    // Warriors first, then a Temple: a pick of 0 would be Warriors.
-    const pickAtRandom = (setup: SetUp): unknown => {
-      needNothing(setup);
-      buildItemInCity(
-        createDependencies({
-          ...setup.dependencies,
-          randomNumberGenerator: (): number => 0,
-        }),
-        setup.player,
-        setup.targets,
-        setup.city
-      );
+    // A defender for another of the player's cities, one with none (civ-clone/web-renderer#378), from a city with as
+    //  many Settlers out as it wants.
+    const reinforce = (setup: SetUp): unknown => {
+      unitsOut(setup, 3, Settlers);
+      setup.targets.undefendedCities.push(setup.world.get(3, 2));
 
-      return setup.game.cityBuilds.getByCity(setup.city).building()?.item();
+      return setup.choose();
     };
 
-    it('should pick a unit at random under Despotism while the city supports fewer units than its size', async (): Promise<void> => {
+    it('should build a defender for another city under Despotism while the city supports fewer units than its size', async (): Promise<void> => {
       // Size 2 with one unit of its own: Despotism supports a second for nothing.
       const setup = await setUp({
         government: Despotism,
@@ -329,16 +298,13 @@ describe('buildItemInCity', (): void => {
         size: 2,
       });
 
-      // As many Settlers as it wants, so it doesn't build more.
-      unitsOut(setup, 3, Settlers);
-
-      expect(pickAtRandom(setup)).equal(Warrior);
+      expect(reinforce(setup)).equal(Warrior);
     });
 
-    it('should not pick a unit at random under Despotism once the city supports as many units as its size', async (): Promise<void> => {
+    it('should not build a defender for another city under Despotism once the city supports as many units as its size', async (): Promise<void> => {
       const setup = await setUp({ government: Despotism, shields: 1 });
 
-      expect(isUnit(pickAtRandom(setup))).false;
+      expect(isUnit(reinforce(setup))).false;
     });
 
     // Diplomats and Caravans cost nothing, as in v474.05 (civ-clone/web-renderer#34).
@@ -700,51 +666,85 @@ describe('buildItemInCity', (): void => {
     });
   });
 
-  // Warriors first, then a Temple, with as many Settlers out as any of these leaders wants, in a city that needs no
-  //  improvement, so the random pick decides (#194). A Civilized leader weighs improvements 4/3 and a Militaristic
-  //  one 2/3 (civ-clone/web-renderer#157).
-  describe('a random pick, by the leader (civ-clone/web-renderer#157)', (): void => {
-    const pickWith = async (
+  // A Library against a defender for another city, with as many Settlers out as any of these leaders wants, ranked
+  //  together and weighed by the leader (civ-clone/web-renderer#378). A defender for another city scores 3, which a
+  //  Civilized leader weighs 2/3 and a Militaristic one 4/3; a Library 0.5 a beaker, and 10/11 of that for its upkeep
+  //  at 9 gold, which they weigh the other way round.
+  describe('one ranking, by the leader (civ-clone/web-renderer#378)', (): void => {
+    const chooseWith = async (
       leader: typeof Leader,
-      random: number
+      research: number,
+      prepare: (setup: SetUp) => void = (setup: SetUp): void => {
+        setup.targets.undefendedCities.push(setup.world.get(3, 2));
+      }
     ): Promise<unknown> => {
       const setup = await setUp({
         government: Despotism,
         leader,
-        shields: 1,
-        size: 2,
+        shields: 3,
+        size: 3,
       });
 
-      unitsOut(setup, 5, Settlers);
-      needNothing(setup);
-
-      buildItemInCity(
-        createDependencies({
-          ...setup.dependencies,
-          randomNumberGenerator: (): number => random,
-        }),
-        setup.player,
-        setup.targets,
-        setup.city
+      setup.game.availableCityBuildItems.register(
+        Library as unknown as IBuildable
       );
+      setup.game.playerResearch.getByPlayer(setup.player).addAdvance(Writing);
+      setup.city.yields = () => [
+        new Production(3),
+        new Research(research),
+        new Gold(9),
+      ];
+      unitsOut(setup, 5, Settlers);
+      prepare(setup);
 
-      return setup.game.cityBuilds.getByCity(setup.city).building()?.item();
+      return setup.choose();
     };
 
     it('should favour an improvement as a Civilized leader', async (): Promise<void> => {
-      // 0.45 of 2 is Warriors; 0.45 of 1 + 4/3 is past Warriors' 1.
-      expect(await pickWith(Shaka, 0.45)).equal(Warrior);
-      expect(await pickWith(AbrahamLincoln, 0.45)).equal(Temple);
+      // 6 beakers: a Library scores 2.7, under the defender's 3, and 3.6 to a Civilized leader, over its 2.
+      expect(await chooseWith(Shaka, 6)).equal(Warrior);
+      expect(await chooseWith(AbrahamLincoln, 6)).equal(Library);
     });
 
     it('should favour a unit as a Militaristic leader', async (): Promise<void> => {
-      // 0.55 of 2 is a Temple; 0.55 of 1 + 2/3 is still Warriors.
-      expect(await pickWith(Shaka, 0.55)).equal(Temple);
-      expect(await pickWith(GenghisKhan, 0.55)).equal(Warrior);
+      // 8 beakers: a Library scores 3.6, over the defender's 3, and 2.4 to a Militaristic leader, under its 4.
+      expect(await chooseWith(Shaka, 8)).equal(Library);
+      expect(await chooseWith(GenghisKhan, 8)).equal(Warrior);
+    });
+
+    // Explorers aren't weighed by the leader: every leader explores.
+    it('should score explorers by how far the player is short of those it wants', async (): Promise<void> => {
+      const explore =
+        (out: number) =>
+        (setup: SetUp): void => {
+          setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
+          unitsOut(setup, out);
+        };
+
+      // It wants 3 + 2 for its one city: 6 with none out, over the Library's 3.6, and 6/5 with 4 out.
+      expect(await chooseWith(Shaka, 8, explore(0))).equal(Warrior);
+      expect(await chooseWith(Shaka, 8, explore(4))).equal(Library);
+      expect(await chooseWith(AbrahamLincoln, 0, explore(0))).equal(Warrior);
+    });
+
+    // An attacker scores 0.09 when the player wants no more, a Temple it needs nothing of 0.1, and 10/11 of that for its
+    //  upkeep at 9 gold.
+    it('should build an attacker when the city needs nothing only for a leader who favours units', async (): Promise<void> => {
+      const army = (setup: SetUp): void => {
+        setup.game.availableCityBuildItems.register(
+          Horseman as unknown as IBuildable
+        );
+        setup.game.playerResearch
+          .getByPlayer(setup.player)
+          .addAdvance(HorsebackRiding);
+      };
+
+      expect(await chooseWith(Shaka, 0, army)).equal(Temple);
+      expect(await chooseWith(AbrahamLincoln, 0, army)).equal(Temple);
+      expect(await chooseWith(GenghisKhan, 0, army)).equal(Horseman);
     });
   });
-  // The improvement the city needs most, as a player's city on Auto ranks them, comes before the random pick
-  //  (civ-clone/web-renderer#194).
+  // The improvement the city needs most, as a player's city on Auto ranks them (civ-clone/web-renderer#194).
   describe('the improvement a city needs most (civ-clone/web-renderer#194)', (): void => {
     const starving = async (leader: typeof Leader | null = null) => {
       const setup = await setUp({
@@ -773,36 +773,12 @@ describe('buildItemInCity', (): void => {
       return setup;
     };
 
-    const pickWith = (setup: SetUp, random: number): unknown => {
-      buildItemInCity(
-        createDependencies({
-          ...setup.dependencies,
-          randomNumberGenerator: (): number => random,
-        }),
-        setup.player,
-        setup.targets,
-        setup.city
-      );
-
-      return setup.game.cityBuilds.getByCity(setup.city).building()?.item();
-    };
-
-    it('should build the improvement a starving city needs most when the pick lands on another', async (): Promise<void> => {
+    it('should build the improvement a starving city needs most', async (): Promise<void> => {
       const setup = await starving();
 
       setup.city.yields = () => [new Production(3), new Food(-1), new Gold(2)];
 
-      // Warriors, a Temple, a Granary and a Library: 0.3 of 4 is the Temple.
-      expect(pickWith(setup, 0.3)).equal(Granary);
-    });
-
-    it('should build the improvement a starving city needs most when the pick lands on a unit', async (): Promise<void> => {
-      const setup = await starving();
-
-      setup.city.yields = () => [new Production(3), new Food(-1), new Gold(2)];
-
-      // 0.1 of 4 is the Warriors.
-      expect(pickWith(setup, 0.1)).equal(Granary);
+      expect(setup.choose()).equal(Granary);
     });
 
     it('should build the cheapest everyday improvement when the city needs none in particular', async (): Promise<void> => {
@@ -810,7 +786,7 @@ describe('buildItemInCity', (): void => {
 
       setup.city.yields = () => [new Production(3), new Food(4), new Gold(2)];
 
-      expect(pickWith(setup, 0.1)).equal(Temple);
+      expect(setup.choose()).equal(Temple);
     });
 
     const ranked = (setup: SetUp, items: BuildItem[]): unknown[] =>
