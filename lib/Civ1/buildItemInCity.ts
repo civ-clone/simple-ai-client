@@ -3,11 +3,11 @@
 //  explore that they could reach from the city, Settlers while they'd have a city site or a terrain job to go to,
 //  attackers while there's a war to fight, a defender for a city of the player's that has none, each scored by how far
 //  the player is short of what it wants, against the improvements and Wonders the ruleset's `BuildPriority` scores
-//  (civ-clone/web-renderer#194), all weighed by the leader. A Wonder only in the player's most productive city, one at
-//  a time; never a Palace or a ship. Apart from a missing defender, each is only started if the city can finish it
-//  within the policy's `buildTurns` for its kind, at its net shields; when nothing is left that it can, the cheapest
-//  improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender, explorers and Settlers, no
-//  unit is started that would leave the city no shields to spare once it has to support it
+//  (civ-clone/web-renderer#194), all but explorers weighed by the leader. A Wonder only in the player's most productive
+//  city, one at a time; never a Palace or a ship. Apart from a missing defender and Settlers, each is only started if
+//  the city can finish it within the policy's `buildTurns` for its kind, at its net shields; when nothing is left that
+//  it can, the cheapest improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender, explorers
+//  and Settlers, no unit is started that would leave the city no shields to spare once it has to support it
 //  (civ-clone/web-renderer#229).
 import BuildWeight from '@civ-clone/base-leader-personality/Rules/Player/BuildWeight';
 import Expansion from '@civ-clone/base-leader-personality/Rules/Player/Expansion';
@@ -50,7 +50,7 @@ import rankBuildItems, {
 
 // How many of each kind of unit a player wants, which decides when its cities stop building units and turn to
 //  improvements and Wonders. `ChooseProduction` asks for one per player. The leader's personality scales the Settlers
-//  wanted (`Expansion`) and weighs everything a city could build (`BuildWeight`) on top of it
+//  wanted (`Expansion`) and weighs everything a city could build but explorers (`BuildWeight`) on top of it
 //  (civ-clone/web-renderer#157, civ-clone/web-renderer#378).
 export interface ProductionPolicy {
   // Attackers wanted for each of the player's cities while there's something to attack.
@@ -79,11 +79,12 @@ export interface ProductionPolicy {
   // What each kind of unit scores when the player has none of those it wants, against what a city's improvements score
   //  by the ruleset's `BuildPriority` (a Temple for one unhappy citizen is 4, an improvement it needs nothing of at
   //  most 0.1). It falls as the player gets closer to what it wants, and the leader's `BuildWeight` weighs it like
-  //  anything else, so a leader who favours improvements builds fewer units (civ-clone/web-renderer#378). Besides:
+  //  anything else, so a leader who favours improvements builds fewer units (civ-clone/web-renderer#378), except for
+  //  `explorer`: exploring is for every leader. Besides:
   //  - `army` is what an attacker scores when the player wants no more: just under an improvement a city needs nothing
   //    of, so that it's built when that improvement would cost the city more than it makes, or the leader favours units;
-  //  - `fortification` is the most Barracks and City Walls score before the leader weighs them: Civ1's ruleset puts
-  //    them before anything else in a city under threat, which is right for a city on Auto, that builds only
+  //  - `fortification` is the most Barracks and City Walls score before the leader weighs them: Civ1's ruleset
+  //    puts them before anything else in a city under threat, which is right for a city on Auto, that builds only
   //    improvements, but would keep a computer player's cities from the units that fight;
   //  - `wonder` is added to what the ruleset scores each Wonder the player's most productive city could build and would
   //    have use for (`isUsefulWonder`).
