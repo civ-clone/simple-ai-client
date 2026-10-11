@@ -82,9 +82,9 @@ export interface ProductionPolicy {
   //  anything else, so a leader who favours improvements builds fewer units (civ-clone/web-renderer#378). Besides:
   //  - `army` is what an attacker scores when the player wants no more: just under an improvement a city needs nothing
   //    of, so that it's built when that improvement would cost the city more than it makes, or the leader favours units;
-  //  - `fortification` is the most Barracks and City Walls score: Civ1's ruleset puts them before anything else in a
-  //    city under threat, which is right for a city on Auto, that builds only improvements, but would keep a computer
-  //    player's cities from the units that fight;
+  //  - `fortification` is the most Barracks and City Walls score before the leader weighs them: Civ1's ruleset puts
+  //    them before anything else in a city under threat, which is right for a city on Auto, that builds only
+  //    improvements, but would keep a computer player's cities from the units that fight;
   //  - `wonder` is added to what the ruleset scores each Wonder the player's most productive city could build and would
   //    have use for (`isUsefulWonder`).
   needs: {
@@ -115,7 +115,7 @@ export const defaultProductionPolicy: ProductionPolicy = {
     army: 0.09,
     attacker: 4,
     explorer: 6,
-    fortification: 2,
+    fortification: 1.5,
     reinforcement: 3,
     settlers: 4,
     wonder: 3,
@@ -636,7 +636,7 @@ export const buildItemInCity = (
       ({ buildItem, score }: RankedBuildItem): RankedBuildItem => ({
         buildItem,
         score: onPurposeOnly.includes(buildItem.item() as typeof Barracks)
-          ? Math.min(score, policy.needs.fortification)
+          ? Math.min(score, policy.needs.fortification * weight(buildItem))
           : score,
       })
     ),
