@@ -747,10 +747,12 @@ describe('buildItemInCity', (): void => {
     });
 
     // Barracks in a city under threat score the ruleset's 100, capped at `fortification` before the leader weighs them:
-    //  at 1.8, 2.4 to a Civilized leader, over the defender's 2, and 1.8 to the rest, under its 3.
+    //  at 2, 8/3 to a Civilized leader and 2 to the rest, against an explorer, which no leader weighs, at 6 × 2/5 with 3
+    //  of the 5 it wants out.
     it('should cap Barracks in a city under threat, and still weigh them by the leader', async (): Promise<void> => {
       const threatened = (setup: SetUp): void => {
-          setup.targets.undefendedCities.push(setup.world.get(3, 2));
+          setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
+          unitsOut(setup, 3);
           setup.game.availableCityBuildItems.register(
             Barracks as unknown as IBuildable
           );
@@ -763,7 +765,7 @@ describe('buildItemInCity', (): void => {
         },
         policy: ProductionPolicy = {
           ...defaultProductionPolicy,
-          needs: { ...defaultProductionPolicy.needs, fortification: 1.8 },
+          needs: { ...defaultProductionPolicy.needs, fortification: 2 },
         },
         chooseThreatened = (leader: typeof Leader): Promise<unknown> =>
           chooseWith(leader, 0, threatened, policy);
