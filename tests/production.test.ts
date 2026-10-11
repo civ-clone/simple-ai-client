@@ -28,6 +28,7 @@ import {
   UnitSupportProduction,
 } from '@civ-clone/library-city/Yields';
 import {
+  Barracks,
   Granary,
   Library,
 } from '@civ-clone/civ1-city-improvement/CityImprovements';
@@ -676,7 +677,8 @@ describe('buildItemInCity', (): void => {
       research: number,
       prepare: (setup: SetUp) => void = (setup: SetUp): void => {
         setup.targets.undefendedCities.push(setup.world.get(3, 2));
-      }
+      },
+      policy: ProductionPolicy = defaultProductionPolicy
     ): Promise<unknown> => {
       const setup = await setUp({
         government: Despotism,
@@ -697,7 +699,7 @@ describe('buildItemInCity', (): void => {
       unitsOut(setup, 5, Settlers);
       prepare(setup);
 
-      return setup.choose();
+      return setup.choose(policy);
     };
 
     it('should favour an improvement as a Civilized leader', async (): Promise<void> => {
@@ -742,6 +744,32 @@ describe('buildItemInCity', (): void => {
       expect(await chooseWith(Shaka, 0, army)).equal(Temple);
       expect(await chooseWith(AbrahamLincoln, 0, army)).equal(Temple);
       expect(await chooseWith(GenghisKhan, 0, army)).equal(Horseman);
+    });
+
+    // Barracks in a city under threat score the ruleset's 100, capped at `fortification` before the leader weighs them:
+    //  at 1.8, 2.4 to a Civilized leader, over the defender's 2, and 1.8 to the rest, under its 3.
+    it('should cap Barracks in a city under threat, and still weigh them by the leader', async (): Promise<void> => {
+      const threatened = (setup: SetUp): void => {
+          setup.targets.undefendedCities.push(setup.world.get(3, 2));
+          setup.game.availableCityBuildItems.register(
+            Barracks as unknown as IBuildable
+          );
+          new Warrior(
+            null,
+            new Player(setup.game.rules),
+            setup.world.get(3, 4),
+            setup.game.rules
+          );
+        },
+        policy: ProductionPolicy = {
+          ...defaultProductionPolicy,
+          needs: { ...defaultProductionPolicy.needs, fortification: 1.8 },
+        },
+        chooseThreatened = (leader: typeof Leader): Promise<unknown> =>
+          chooseWith(leader, 0, threatened, policy);
+
+      expect(await chooseThreatened(Shaka)).equal(Warrior);
+      expect(await chooseThreatened(AbrahamLincoln)).equal(Barracks);
     });
   });
   // The improvement the city needs most, as a player's city on Auto ranks them (civ-clone/web-renderer#194).
