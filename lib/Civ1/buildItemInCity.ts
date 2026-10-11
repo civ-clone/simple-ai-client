@@ -2,9 +2,10 @@
 //  that they could reach from the city and the player has fewer out and on order than it wants, Settlers while the
 //  player has fewer out and on order than it wants and they'd have a city site or a terrain job to go to, attackers
 //  while there's a war to fight and the player has fewer than it wants, a defender for a city of the player's that has
-//  none, a Wonder in the player's most productive city, and otherwise a random pick of the rest, never a Palace or a
-//  ship. Apart from a missing defender, each is only started if the city can finish it within the policy's `buildTurns`
-//  for its kind, at its net shields; when nothing is left that it can, the cheapest improvement worth having
+//  none, a Wonder in the player's most productive city, and otherwise a random pick of the rest weighed by the leader,
+//  never a Palace or a ship, where an improvement gives way to the one the city needs most
+//  (civ-clone/web-renderer#194). Apart from a missing defender, each is only started if the city can finish it within
+//  the policy's `buildTurns` for its kind, at its net shields; when nothing is left that it can, the cheapest improvement worth having
 //  (civ-clone/web-renderer#212). Apart from a missing defender, explorers and Settlers, no unit is started that would
 //  leave the city no shields to spare once it has to support it (civ-clone/web-renderer#229).
 import BuildWeight from '@civ-clone/base-leader-personality/Rules/Player/BuildWeight';
@@ -42,6 +43,7 @@ import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
 import isUsefulWonder from './wonders';
 import Yield from '@civ-clone/core-yield/Yield';
+import rankBuildItems from '@civ-clone/core-city-build/lib/rankBuildItems';
 
 // How many of each kind of unit a player wants, which decides when its cities stop building units and turn to
 //  improvements and Wonders. `ChooseProduction` asks for one per player. The leader's personality scales the Settlers
@@ -301,6 +303,30 @@ const fallbackRank = (buildItem: BuildItem): number =>
     ? 1
     : 0;
 
+// How much `player`'s leader favours building `buildItem` (`BuildWeight`), 1 for no preference.
+export const leaderWeight =
+  (dependencies: Dependencies, player: Player) =>
+  (buildItem: BuildItem): number =>
+    product(dependencies.ruleRegistry, BuildWeight, player, buildItem.item());
+
+// What `city` needs most of `buildItems`, by the ruleset's `BuildPriority` (`rankBuildItems`, as a player's city on
+//  Auto ranks them), weighed by the leader's preferences (civ-clone/web-renderer#194).
+export const rankImprovements = (
+  dependencies: Dependencies,
+  player: Player,
+  city: City,
+  buildItems: BuildItem[],
+  yields: Yield[] = city.yields()
+): BuildItem[] =>
+  rankBuildItems(
+    dependencies.cityBuildRegistry.getByCity(city),
+    dependencies.ruleRegistry,
+    (): boolean => true,
+    leaderWeight(dependencies, player),
+    buildItems,
+    yields
+  ).map(({ buildItem }) => buildItem);
+
 // Also run from `unitDestroyed`, during combat and so perhaps during another player's turn. It draws from the random
 //  number generator on every call, whether or not the draw is used.
 export const buildItemInCity = (
@@ -327,7 +353,8 @@ export const buildItemInCity = (
     availableUnits = availableFiltered.filter((buildItem: BuildItem): boolean =>
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
     ),
-    shields = netShields(city),
+    yields = city.yields(),
+    shields = netShields(city, yields),
     turnsToBuild = buildTime(dependencies, city, shields),
     isUnitItem = (buildItem: BuildItem): boolean =>
       Object.prototype.isPrototypeOf.call(Unit, buildItem.item()),
@@ -361,12 +388,7 @@ export const buildItemInCity = (
     randomSelection = weightedPick(
       finishable.map((buildItem: BuildItem): [BuildItem, number] => [
         buildItem,
-        product(
-          dependencies.ruleRegistry,
-          BuildWeight,
-          player,
-          buildItem.item()
-        ),
+        leaderWeight(dependencies, player)(buildItem),
       ]),
       dependencies.randomNumberGenerator()
     )?.item(),
@@ -536,6 +558,34 @@ export const buildItemInCity = (
     cityBuild.build(
       wonders[Math.floor(dependencies.randomNumberGenerator() * wonders.length)]
     );
+
+    return;
+  }
+
+  // The random pick, weighed by the leader, still decides between a unit and an improvement. An improvement gives way
+  //  to the one the city needs most, as a player's city on Auto would choose it (civ-clone/web-renderer#194). Barracks
+  //  and City Walls are among those it could need, but are only needed at war.
+  const [needed] =
+    randomSelection &&
+    Object.prototype.isPrototypeOf.call(Unit, randomSelection)
+      ? []
+      : rankImprovements(
+          dependencies,
+          player,
+          city,
+          availableFiltered.filter(
+            (buildItem: BuildItem): boolean =>
+              !isUnitItem(buildItem) &&
+              finishesWithin(
+                turnsToBuild(buildItem),
+                policy.buildTurns.improvement
+              )
+          ),
+          yields
+        );
+
+  if (needed) {
+    cityBuild.build(needed.item());
 
     return;
   }

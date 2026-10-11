@@ -36,6 +36,17 @@ export declare const chooseUnit: (
   orSoonest?: boolean,
   turnsToBuild?: (buildItem: BuildItem) => number
 ) => typeof Unit | undefined;
+export declare const leaderWeight: (
+  dependencies: Dependencies,
+  player: Player
+) => (buildItem: BuildItem) => number;
+export declare const rankImprovements: (
+  dependencies: Dependencies,
+  player: Player,
+  city: City,
+  buildItems: BuildItem[],
+  yields?: Yield[]
+) => BuildItem[];
 export declare const buildItemInCity: (
   dependencies: Dependencies,
   player: Player,
