@@ -6,6 +6,7 @@ import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
+import { RankedBuildItem } from '@civ-clone/core-city-build/lib/rankBuildItems';
 export interface ProductionPolicy {
   attackersPerCity: number;
   explorers: number;
@@ -19,6 +20,15 @@ export interface ProductionPolicy {
     wonder: number;
   };
   wonderShields: number;
+  needs: {
+    army: number;
+    attacker: number;
+    explorer: number;
+    fortification: number;
+    reinforcement: number;
+    settlers: number;
+    wonder: number;
+  };
 }
 export declare const defaultProductionPolicy: ProductionPolicy;
 export declare const isAttacker: (unit: Unit) => boolean;
@@ -40,6 +50,13 @@ export declare const leaderWeight: (
   dependencies: Dependencies,
   player: Player
 ) => (buildItem: BuildItem) => number;
+export declare const rankScored: (
+  dependencies: Dependencies,
+  player: Player,
+  city: City,
+  buildItems: BuildItem[],
+  yields?: Yield[]
+) => RankedBuildItem[];
 export declare const rankImprovements: (
   dependencies: Dependencies,
   player: Player,
@@ -47,6 +64,9 @@ export declare const rankImprovements: (
   buildItems: BuildItem[],
   yields?: Yield[]
 ) => BuildItem[];
+export declare const rankWithUnits: (
+  ranked: RankedBuildItem[]
+) => RankedBuildItem[];
 export declare const buildItemInCity: (
   dependencies: Dependencies,
   player: Player,

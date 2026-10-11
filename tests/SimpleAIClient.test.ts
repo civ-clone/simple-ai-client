@@ -2134,7 +2134,8 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
-  // The last of anything a random pick could choose, so a test can tell the pick apart from a deliberate choice.
+  // A generator that would pick the last of anything, so a test would tell a random pick from a deliberate choice,
+  //  should production ever draw one again (it's ranked: civ-clone/web-renderer#378).
   const lastPick = (): Dependencies =>
     createDependencies({
       ...dependencies,
@@ -2641,7 +2642,7 @@ describe('SimpleAIClient', (): void => {
     playerRegistry.unregister(player);
     unitRegistry.unregister(...unitRegistry.getByPlayer(player));
   });
-  it("should only pick at random among what it can finish within the policy's turns", async (): Promise<void> => {
+  it("should only start what it can finish within the policy's turns, whatever the random number generator gives", async (): Promise<void> => {
     // City Walls cost 120 shields: 120 turns at 1.
     const picks: unknown[] = [];
 
@@ -2669,7 +2670,7 @@ describe('SimpleAIClient', (): void => {
     expect(picks).not.include(CityWalls);
   });
 
-  it('should not pick Barracks or City Walls at random', async (): Promise<void> => {
+  it('should not build Barracks or City Walls in a city under no threat, whatever the random number generator gives', async (): Promise<void> => {
     // At 3 net shields, Barracks (40 shields) take 14 turns and City Walls (120) 40, both within the policy's 40.
     const picks: unknown[] = [];
 
@@ -2705,7 +2706,7 @@ describe('SimpleAIClient', (): void => {
     playerResearchRegistry.getByPlayer(player).addAdvance(CeremonialBurial);
     city.yields = () => [new ProductionYield(0)];
 
-    // The first of anything a random pick could choose, and the last.
+    // Whatever the random number generator gives.
     [0, 0.999].forEach((draw: number): void => {
       buildItemInCity(
         createDependencies({
@@ -2960,8 +2961,8 @@ describe('SimpleAIClient', (): void => {
 
     expect(building).not.null;
     expect(Object.prototype.isPrototypeOf.call(Wonder, building!.item())).false;
-    // Only the up-front random pick: nothing is drawn for a Wonder that can't be built.
-    expect(draws).equal(1);
+    // Production is ranked, not drawn at random (civ-clone/web-renderer#378).
+    expect(draws).equal(0);
 
     cityRegistry.unregister(city);
     clientRegistry.unregister(client);

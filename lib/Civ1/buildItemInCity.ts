@@ -1,13 +1,14 @@
-// Civ1: what a city builds next: a defender while it has fewer than it wants or martial law could use another unit, explorers while there's land to explore
-//  that they could reach from the city and the player has fewer out and on order than it wants, Settlers while the
-//  player has fewer out and on order than it wants and they'd have a city site or a terrain job to go to, attackers
-//  while there's a war to fight and the player has fewer than it wants, a defender for a city of the player's that has
-//  none, a Wonder in the player's most productive city, and otherwise a random pick of the rest weighed by the leader,
-//  never a Palace or a ship, where an improvement gives way to the one the city needs most
-//  (civ-clone/web-renderer#194). Apart from a missing defender, each is only started if the city can finish it within
-//  the policy's `buildTurns` for its kind, at its net shields; when nothing is left that it can, the cheapest improvement worth having
-//  (civ-clone/web-renderer#212). Apart from a missing defender, explorers and Settlers, no unit is started that would
-//  leave the city no shields to spare once it has to support it (civ-clone/web-renderer#229).
+// Civ1: what a city builds next: a defender while it has fewer than it wants or martial law could use another unit,
+//  and otherwise what it needs most of one ranking (civ-clone/web-renderer#378): explorers while there's land to
+//  explore that they could reach from the city, Settlers while they'd have a city site or a terrain job to go to,
+//  attackers while there's a war to fight, a defender for a city of the player's that has none, each scored by how far
+//  the player is short of what it wants, against the improvements and Wonders the ruleset's `BuildPriority` scores
+//  (civ-clone/web-renderer#194), all weighed by the leader. A Wonder only in the player's most productive city, one at
+//  a time; never a Palace or a ship. Apart from a missing defender, each is only started if the city can finish it
+//  within the policy's `buildTurns` for its kind, at its net shields; when nothing is left that it can, the cheapest
+//  improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender, explorers and Settlers, no
+//  unit is started that would leave the city no shields to spare once it has to support it
+//  (civ-clone/web-renderer#229).
 import BuildWeight from '@civ-clone/base-leader-personality/Rules/Player/BuildWeight';
 import Expansion from '@civ-clone/base-leader-personality/Rules/Player/Expansion';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
@@ -43,11 +44,14 @@ import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
 import isUsefulWonder from './wonders';
 import Yield from '@civ-clone/core-yield/Yield';
-import rankBuildItems from '@civ-clone/core-city-build/lib/rankBuildItems';
+import rankBuildItems, {
+  RankedBuildItem,
+} from '@civ-clone/core-city-build/lib/rankBuildItems';
 
 // How many of each kind of unit a player wants, which decides when its cities stop building units and turn to
 //  improvements and Wonders. `ChooseProduction` asks for one per player. The leader's personality scales the Settlers
-//  wanted (`Expansion`) and weighs the random pick (`BuildWeight`) on top of it (civ-clone/web-renderer#157).
+//  wanted (`Expansion`) and weighs everything a city could build (`BuildWeight`) on top of it
+//  (civ-clone/web-renderer#157, civ-clone/web-renderer#378).
 export interface ProductionPolicy {
   // Attackers wanted for each of the player's cities while there's something to attack.
   attackersPerCity: number;
@@ -72,6 +76,26 @@ export interface ProductionPolicy {
   };
   // The fewest net shields a city makes to start a Wonder, however many it has stored.
   wonderShields: number;
+  // What each kind of unit scores when the player has none of those it wants, against what a city's improvements score
+  //  by the ruleset's `BuildPriority` (a Temple for one unhappy citizen is 4, an improvement it needs nothing of at
+  //  most 0.1). It falls as the player gets closer to what it wants, and the leader's `BuildWeight` weighs it like
+  //  anything else, so a leader who favours improvements builds fewer units (civ-clone/web-renderer#378). Besides:
+  //  - `army` is what an attacker scores when the player wants no more: just under an improvement a city needs nothing
+  //    of, so that it's built when that improvement would cost the city more than it makes, or the leader favours units;
+  //  - `fortification` is the most Barracks and City Walls score: Civ1's ruleset puts them before anything else in a
+  //    city under threat, which is right for a city on Auto, that builds only improvements, but would keep a computer
+  //    player's cities from the units that fight;
+  //  - `wonder` is added to what the ruleset scores each Wonder the player's most productive city could build and would
+  //    have use for (`isUsefulWonder`).
+  needs: {
+    army: number;
+    attacker: number;
+    explorer: number;
+    fortification: number;
+    reinforcement: number;
+    settlers: number;
+    wonder: number;
+  };
 }
 
 export const defaultProductionPolicy: ProductionPolicy = {
@@ -87,6 +111,15 @@ export const defaultProductionPolicy: ProductionPolicy = {
     wonder: 100,
   },
   wonderShields: 2,
+  needs: {
+    army: 0.09,
+    attacker: 4,
+    explorer: 6,
+    fortification: 2,
+    reinforcement: 3,
+    settlers: 4,
+    wonder: 3,
+  },
 };
 
 // A unit built to attack rather than defend.
@@ -269,38 +302,18 @@ const shouldBuildWonder = (
   );
 };
 
-// One of `weighted`, each as likely as its weight, from a single `random` draw in [0, 1). With every weight 1 it's
-//  `items[Math.floor(items.length * random)]`.
-const weightedPick = <T>(
-  weighted: [T, number][],
-  random: number
-): T | undefined => {
-  const total = weighted.reduce((sum, [, weight]) => sum + weight, 0),
-    target = total * random;
-
-  let reached = 0;
-
-  for (const [item, weight] of weighted) {
-    reached += weight;
-
-    if (target < reached) {
-      return item;
-    }
-  }
-
-  return weighted[weighted.length - 1]?.[0];
-};
-
-// Improvements only worth building on purpose, never picked at random.
+// Improvements only worth building on purpose: the fallback leaves them until last.
 const onPurposeOnly: (typeof Barracks)[] = [Barracks, CityWalls];
 
-// The order `buildItemInCity` falls back on, when a city can finish nothing soon: improvements worth having, then the
-//  others, then units.
-const fallbackRank = (buildItem: BuildItem): number =>
+// The order `buildItemInCity` falls back on, when a city needs nothing it can finish soon: improvements worth having,
+//  then units it can support, then Barracks and City Walls, which cost upkeep for nothing in peace, then units it can't.
+const fallbackRank = (buildItem: BuildItem, affordable: boolean): number =>
   Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
-    ? 2
+    ? affordable
+      ? 1
+      : 3
     : onPurposeOnly.includes(buildItem.item() as typeof Barracks)
-    ? 1
+    ? 2
     : 0;
 
 // How much `player`'s leader favours building `buildItem` (`BuildWeight`), 1 for no preference.
@@ -311,13 +324,13 @@ export const leaderWeight =
 
 // What `city` needs most of `buildItems`, by the ruleset's `BuildPriority` (`rankBuildItems`, as a player's city on
 //  Auto ranks them), weighed by the leader's preferences (civ-clone/web-renderer#194).
-export const rankImprovements = (
+export const rankScored = (
   dependencies: Dependencies,
   player: Player,
   city: City,
   buildItems: BuildItem[],
   yields: Yield[] = city.yields()
-): BuildItem[] =>
+): RankedBuildItem[] =>
   rankBuildItems(
     dependencies.cityBuildRegistry.getByCity(city),
     dependencies.ruleRegistry,
@@ -325,10 +338,48 @@ export const rankImprovements = (
     leaderWeight(dependencies, player),
     buildItems,
     yields
-  ).map(({ buildItem }) => buildItem);
+  );
 
-// Also run from `unitDestroyed`, during combat and so perhaps during another player's turn. It draws from the random
-//  number generator on every call, whether or not the draw is used.
+export const rankImprovements = (
+  dependencies: Dependencies,
+  player: Player,
+  city: City,
+  buildItems: BuildItem[],
+  yields: Yield[] = city.yields()
+): BuildItem[] =>
+  rankScored(dependencies, player, city, buildItems, yields).map(
+    ({ buildItem }) => buildItem
+  );
+
+// Not `localeCompare`, which depends on the host's locale, as in `rankBuildItems`.
+const compareNames = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0;
+
+// `ranked` together, an item that appears more than once scoring what its entries add up to, highest first, then the
+//  cheaper, then by name, as `rankBuildItems` breaks ties. Anything scoring 0 or less is left out.
+export const rankWithUnits = (ranked: RankedBuildItem[]): RankedBuildItem[] =>
+  [
+    ...ranked
+      .reduce((scores: Map<BuildItem, number>, { buildItem, score }) => {
+        const same =
+          [...scores.keys()].find(
+            (other: BuildItem): boolean => other.item() === buildItem.item()
+          ) ?? buildItem;
+
+        return scores.set(same, (scores.get(same) ?? 0) + score);
+      }, new Map<BuildItem, number>())
+      .entries(),
+  ]
+    .map(([buildItem, score]): RankedBuildItem => ({ buildItem, score }))
+    .filter(({ score }): boolean => score > 0)
+    .sort(
+      (a: RankedBuildItem, b: RankedBuildItem): number =>
+        b.score - a.score ||
+        a.buildItem.cost().value() - b.buildItem.cost().value() ||
+        compareNames(a.buildItem.item().name, b.buildItem.item().name)
+    );
+
+// Also run from `unitDestroyed`, during combat and so perhaps during another player's turn.
 export const buildItemInCity = (
   dependencies: Dependencies,
   player: Player,
@@ -344,7 +395,7 @@ export const buildItemInCity = (
       (buildItem: BuildItem): boolean =>
         !restrictions.includes(buildItem.item()) &&
         !Object.prototype.isPrototypeOf.call(Wonder, buildItem.item()) &&
-        // Ships are built on purpose, where there's sea to explore, not picked at random.
+        // Ships are built on purpose, where there's sea to explore, not ranked here.
         !Object.prototype.isPrototypeOf.call(Naval, buildItem.item())
     ),
     availableWonders = available.filter((buildItem: BuildItem): boolean =>
@@ -372,26 +423,6 @@ export const buildItemInCity = (
         0,
     // The units the city can support another of, for anything but a defender it's missing.
     affordableUnits = availableUnits.filter(affordable),
-    // The rest, that the city can finish within the policy's turns for a unit or an improvement, and can support if
-    //  it's a unit. Barracks and City Walls are only worth building on purpose.
-    finishable = availableFiltered.filter(
-      (buildItem: BuildItem): boolean =>
-        affordable(buildItem) &&
-        !onPurposeOnly.includes(buildItem.item() as typeof Barracks) &&
-        finishesWithin(
-          turnsToBuild(buildItem),
-          isUnitItem(buildItem)
-            ? policy.buildTurns.unit
-            : policy.buildTurns.improvement
-        )
-    ),
-    randomSelection = weightedPick(
-      finishable.map((buildItem: BuildItem): [BuildItem, number] => [
-        buildItem,
-        leaderWeight(dependencies, player)(buildItem),
-      ]),
-      dependencies.randomNumberGenerator()
-    )?.item(),
     // A defender for this city: the soonest it can, if it can't finish one within the policy's turns.
     getDefensiveUnit = (
       (UnitType?: typeof Unit): (() => typeof Unit | undefined) =>
@@ -430,24 +461,39 @@ export const buildItemInCity = (
   const cityGrowth = dependencies.cityGrowthRegistry.getByCity(
       cityBuild.city()
     ),
-    cities = dependencies.cityRegistry.getByPlayer(player).length;
+    cities = dependencies.cityRegistry.getByPlayer(player).length,
+    weight = leaderWeight(dependencies, player),
+    itemFor = (item: unknown): BuildItem | undefined =>
+      available.find(
+        (buildItem: BuildItem): boolean => buildItem.item() === item
+      ),
+    // The units the player is short of, each scored by how short it is: `policy.needs` for one it wants and has none
+    //  of, less for each it has or has on order, and weighed by the leader unless `weighed` is false
+    //  (civ-clone/web-renderer#378).
+    unitNeeds: RankedBuildItem[] = [],
+    addNeed = (
+      buildItem: BuildItem | undefined,
+      need: number,
+      have: number,
+      wanted: number,
+      weighed: boolean = true
+    ): void => {
+      if (buildItem === undefined || wanted <= 0 || have >= wanted) {
+        return;
+      }
+
+      unitNeeds.push({
+        buildItem,
+        score:
+          ((need * (wanted - have)) / wanted) *
+          (weighed ? weight(buildItem) : 1),
+      });
+    };
 
   // Explorers count whether they're exploring or not: a unit out of the player's cities with nothing left that it can
   //  reach to explore is still one more than the player needs. And only land a unit from this city could reach counts:
   //  the coast of another continent, seen from a ship or across the water, kept the list from ever emptying.
-  if (
-    unitsAndOrders(
-      dependencies,
-      player,
-      (unit: Unit): boolean => isExploring(dependencies, unit),
-      (item: object): boolean => isExplorerType(dependencies, item)
-    ) <
-      Math.min(
-        policy.maxExplorers,
-        policy.explorers + policy.explorersPerCity * cities
-      ) &&
-    reachableLandToExplore(city, targets.landTilesToExplore) > 0
-  ) {
+  if (reachableLandToExplore(city, targets.landTilesToExplore) > 0) {
     // The cheapest land unit that can fight, if the city can finish it within the policy's turns, whether or not the city
     //  has shields to spare to support it. With units that have nothing left to do standing down rather than wandering
     //  (civ-clone/web-renderer#230), explorers are what explores, and keeping them to cities with shields to spare cost
@@ -463,63 +509,77 @@ export const buildItemInCity = (
           a.cost().value() - b.cost().value()
       );
 
-    if (explorer) {
-      cityBuild.build(explorer.item());
-
-      return;
-    }
+    addNeed(
+      explorer,
+      policy.needs.explorer,
+      unitsAndOrders(
+        dependencies,
+        player,
+        (unit: Unit): boolean => isExploring(dependencies, unit),
+        (item: object): boolean => isExplorerType(dependencies, item)
+      ),
+      Math.min(
+        policy.maxExplorers,
+        policy.explorers + policy.explorersPerCity * cities
+      ),
+      // Exploring is for every leader, not only those who favour fighting units: weighing explorers by the leader cost
+      //  a seventh of the land explored by turn 150 in the arena.
+      false
+    );
   }
 
   // Always Build Cities
   if (
-    available.some(
-      (buildItem: BuildItem) =>
-        buildItem.item() === (Settlers as unknown as typeof Buildable)
-    ) &&
     !dependencies.unitRegistry
       .getByCity(cityBuild.city())
       .some((unit: Unit): boolean =>
         isFoundingSettlers(dependencies, player, unit)
       ) &&
-    unitsAndOrders(
-      dependencies,
-      player,
-      (unit: Unit): boolean => isFoundingSettlers(dependencies, player, unit),
-      (item: object): boolean =>
-        item === (Settlers as unknown as typeof Buildable)
-    ) <
-      product(dependencies.ruleRegistry, Expansion, player) *
-        (policy.settlers + Math.floor(policy.settlersPerCity * cities)) &&
     cityGrowth.size() > 1 &&
     // With no city site they could walk to and no terrain job, they'd join a city (civ-clone/web-renderer#243).
     settlersWouldHaveWork(dependencies, player, targets, city)
   ) {
-    cityBuild.build(Settlers as unknown as typeof Buildable);
-
-    return;
+    addNeed(
+      itemFor(Settlers),
+      policy.needs.settlers,
+      unitsAndOrders(
+        dependencies,
+        player,
+        (unit: Unit): boolean => isFoundingSettlers(dependencies, player, unit),
+        (item: object): boolean =>
+          item === (Settlers as unknown as typeof Buildable)
+      ),
+      product(dependencies.ruleRegistry, Expansion, player) *
+        (policy.settlers + Math.floor(policy.settlersPerCity * cities))
+    );
   }
-
-  const offensiveUnit = getOffensiveUnit();
 
   if (
-    offensiveUnit &&
-    (targets.citiesToLiberate.length > 0 ||
-      targets.enemyCitiesToAttack.length > 0 ||
-      targets.enemyUnitsToAttack.length > 4) &&
-    unitsAndOrders(dependencies, player, isAttacker, (item: object): boolean =>
-      isAttackerType(dependencies, item)
-    ) <
-      policy.attackersPerCity * cities
+    targets.citiesToLiberate.length > 0 ||
+    targets.enemyCitiesToAttack.length > 0 ||
+    targets.enemyUnitsToAttack.length > 4
   ) {
-    cityBuild.build(offensiveUnit as unknown as typeof Buildable);
-
-    return;
+    addNeed(
+      itemFor(getOffensiveUnit()),
+      policy.needs.attacker,
+      unitsAndOrders(
+        dependencies,
+        player,
+        isAttacker,
+        (item: object): boolean => isAttackerType(dependencies, item)
+      ),
+      policy.attackersPerCity * cities
+    );
   }
 
+  // An army, however peaceful the world.
+  addNeed(itemFor(getOffensiveUnit()), policy.needs.army, 0, 1);
+
   // A defender for another city, only one this city can finish within the policy's turns.
-  const reinforcement =
-    targets.undefendedCities.length > 0
-      ? chooseUnit(
+  if (targets.undefendedCities.length > 0) {
+    addNeed(
+      itemFor(
+        chooseUnit(
           dependencies,
           city,
           affordableUnits,
@@ -528,77 +588,79 @@ export const buildItemInCity = (
           false,
           turnsToBuild
         )
-      : undefined;
-
-  if (reinforcement) {
-    cityBuild.build(reinforcement as unknown as typeof Buildable);
-
-    return;
+      ),
+      policy.needs.reinforcement,
+      0,
+      1
+    );
   }
 
-  // One Wonder at a time, in the city that can build it soonest, and only one that would do something for the player
+  // One Wonder at a time, in the city that makes the most shields, and only one that would do something for the player
   //  that the city makes enough shields to finish within the policy's turns.
-  const usefulWonders = availableWonders.filter(
-    (buildItem: BuildItem): boolean =>
-      finishesWithin(turnsToBuild(buildItem), policy.buildTurns.wonder) &&
-      isUsefulWonder(
-        dependencies,
-        player,
-        buildItem.item() as unknown as typeof Wonder
-      )
-  );
-
-  if (
-    usefulWonders.length > 0 &&
+  const wonders =
     shields >= policy.wonderShields &&
     shouldBuildWonder(dependencies, player, city)
-  ) {
-    const wonders = usefulWonders.map((cityBuild) => cityBuild.item());
+      ? availableWonders.filter(
+          (buildItem: BuildItem): boolean =>
+            finishesWithin(turnsToBuild(buildItem), policy.buildTurns.wonder) &&
+            isUsefulWonder(
+              dependencies,
+              player,
+              buildItem.item() as unknown as typeof Wonder
+            )
+        )
+      : [];
 
-    cityBuild.build(
-      wonders[Math.floor(dependencies.randomNumberGenerator() * wonders.length)]
-    );
-
-    return;
-  }
-
-  // The improvement the city needs most, as a player's city on Auto would choose it (civ-clone/web-renderer#194), and
-  //  the random pick, weighed by the leader, only when it needs none it can finish. Barracks and City Walls are among
-  //  those it could need, but are only needed at war. The unit quotas above keep it defended and growing.
-  const [needed] = rankImprovements(
-    dependencies,
-    player,
-    city,
-    availableFiltered.filter(
-      (buildItem: BuildItem): boolean =>
-        !isUnitItem(buildItem) &&
-        finishesWithin(turnsToBuild(buildItem), policy.buildTurns.improvement)
+  // What the city needs most, the units above against the improvements and Wonders it needs by the ruleset's
+  //  `BuildPriority`, as a player's city on Auto ranks them (civ-clone/web-renderer#194), all weighed by the leader
+  //  (civ-clone/web-renderer#378). Barracks and City Walls are among the improvements it could need, but are only
+  //  needed at war.
+  const [needed] = rankWithUnits([
+    ...unitNeeds,
+    ...rankScored(
+      dependencies,
+      player,
+      city,
+      [
+        ...availableFiltered.filter(
+          (buildItem: BuildItem): boolean =>
+            !isUnitItem(buildItem) &&
+            finishesWithin(
+              turnsToBuild(buildItem),
+              policy.buildTurns.improvement
+            )
+        ),
+      ],
+      yields
+    ).map(
+      ({ buildItem, score }: RankedBuildItem): RankedBuildItem => ({
+        buildItem,
+        score: onPurposeOnly.includes(buildItem.item() as typeof Barracks)
+          ? Math.min(score, policy.needs.fortification)
+          : score,
+      })
     ),
-    yields
-  );
+    ...rankScored(dependencies, player, city, wonders, yields),
+    ...wonders.map(
+      (buildItem: BuildItem): RankedBuildItem => ({
+        buildItem,
+        score: policy.needs.wonder * weight(buildItem),
+      })
+    ),
+  ]);
 
   if (needed) {
-    cityBuild.build(needed.item());
+    cityBuild.build(needed.buildItem.item());
 
     return;
   }
 
-  if (randomSelection) {
-    cityBuild.build(randomSelection);
-
-    return;
-  }
-
-  // Nothing it can finish soon, so the cheapest thing worth having once it can: an improvement, as a unit would cost
-  //  shields to support that the city doesn't have. Barracks and City Walls are only worth building on purpose. A
-  //  unit it couldn't support only if there's nothing else at all.
-  const affordableItems = availableFiltered.filter(affordable),
-    [cheapest] = [
-      ...(affordableItems.length > 0 ? affordableItems : availableFiltered),
-    ].sort(
-      (a: BuildItem, b: BuildItem): number =>
-        fallbackRank(a) - fallbackRank(b) || a.cost().value() - b.cost().value()
-    );
+  // Nothing it needs that it can finish soon, so the cheapest thing worth having once it can (`fallbackRank`).
+  const [cheapest] = [...availableFiltered].sort(
+    (a: BuildItem, b: BuildItem): number =>
+      fallbackRank(a, affordable(a)) - fallbackRank(b, affordable(b)) ||
+      a.cost().value() - b.cost().value()
+  );
 
   if (cheapest) {
     cityBuild.build(cheapest.item());
