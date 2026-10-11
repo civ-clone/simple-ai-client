@@ -52,6 +52,9 @@ import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import { Pyramids } from '@civ-clone/civ1-wonder/Wonders';
 import { autoBuildable } from '@civ-clone/civ1-city/lib/autoBuild';
+import BuildPriority from '@civ-clone/core-city-build/Rules/BuildPriority';
+import Criterion from '@civ-clone/core-rule/Criterion';
+import Effect from '@civ-clone/core-rule/Effect';
 import rankBuildItems from '@civ-clone/core-city-build/lib/rankBuildItems';
 import wonderPriorities from '@civ-clone/civ1-wonder/Rules/City/build-priority';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -214,6 +217,16 @@ const unitsOut = (
   }
 };
 
+// Nothing ranks (civ-clone/web-renderer#194), so the city falls back on the leader-weighted random pick.
+const needNothing = ({ game }: SetUp): void => {
+  game.rules.register(
+    new BuildPriority(
+      new Criterion((): boolean => true),
+      new Effect((): number => -1000)
+    )
+  );
+};
+
 const isUnit = (item: unknown): boolean =>
   Object.prototype.isPrototypeOf.call(Unit, item);
 
@@ -294,6 +307,7 @@ describe('buildItemInCity', (): void => {
 
     // Warriors first, then a Temple: a pick of 0 would be Warriors.
     const pickAtRandom = (setup: SetUp): unknown => {
+      needNothing(setup);
       buildItemInCity(
         createDependencies({
           ...setup.dependencies,
@@ -686,8 +700,9 @@ describe('buildItemInCity', (): void => {
     });
   });
 
-  // Warriors first, then a Temple, with as many Settlers out as any of these leaders wants. A Civilized leader weighs
-  //  improvements 4/3 and a Militaristic one 2/3 (civ-clone/web-renderer#157).
+  // Warriors first, then a Temple, with as many Settlers out as any of these leaders wants, in a city that needs no
+  //  improvement, so the random pick decides (#194). A Civilized leader weighs improvements 4/3 and a Militaristic
+  //  one 2/3 (civ-clone/web-renderer#157).
   describe('a random pick, by the leader (civ-clone/web-renderer#157)', (): void => {
     const pickWith = async (
       leader: typeof Leader,
@@ -701,6 +716,7 @@ describe('buildItemInCity', (): void => {
       });
 
       unitsOut(setup, 5, Settlers);
+      needNothing(setup);
 
       buildItemInCity(
         createDependencies({
@@ -727,8 +743,8 @@ describe('buildItemInCity', (): void => {
       expect(await pickWith(GenghisKhan, 0.55)).equal(Warrior);
     });
   });
-  // The random pick still chooses between a unit and an improvement, but an improvement gives way to the one the city
-  //  needs most, as a player's city on Auto ranks them (civ-clone/web-renderer#194).
+  // The improvement the city needs most, as a player's city on Auto ranks them, comes before the random pick
+  //  (civ-clone/web-renderer#194).
   describe('the improvement a city needs most (civ-clone/web-renderer#194)', (): void => {
     const starving = async (leader: typeof Leader | null = null) => {
       const setup = await setUp({
@@ -780,20 +796,21 @@ describe('buildItemInCity', (): void => {
       expect(pickWith(setup, 0.3)).equal(Granary);
     });
 
-    it('should keep the unit the pick lands on', async (): Promise<void> => {
+    it('should build the improvement a starving city needs most when the pick lands on a unit', async (): Promise<void> => {
       const setup = await starving();
 
       setup.city.yields = () => [new Production(3), new Food(-1), new Gold(2)];
 
-      expect(pickWith(setup, 0.1)).equal(Warrior);
+      // 0.1 of 4 is the Warriors.
+      expect(pickWith(setup, 0.1)).equal(Granary);
     });
 
-    it('should keep the improvement the pick lands on when the city needs none', async (): Promise<void> => {
+    it('should build the cheapest everyday improvement when the city needs none in particular', async (): Promise<void> => {
       const setup = await starving();
 
       setup.city.yields = () => [new Production(3), new Food(4), new Gold(2)];
 
-      expect(pickWith(setup, 0.3)).equal(Temple);
+      expect(pickWith(setup, 0.1)).equal(Temple);
     });
 
     const ranked = (setup: SetUp, items: BuildItem[]): unknown[] =>
