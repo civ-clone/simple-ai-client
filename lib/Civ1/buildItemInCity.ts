@@ -562,27 +562,20 @@ export const buildItemInCity = (
     return;
   }
 
-  // The random pick, weighed by the leader, still decides between a unit and an improvement. An improvement gives way
-  //  to the one the city needs most, as a player's city on Auto would choose it (civ-clone/web-renderer#194). Barracks
-  //  and City Walls are among those it could need, but are only needed at war.
-  const [needed] =
-    randomSelection &&
-    Object.prototype.isPrototypeOf.call(Unit, randomSelection)
-      ? []
-      : rankImprovements(
-          dependencies,
-          player,
-          city,
-          availableFiltered.filter(
-            (buildItem: BuildItem): boolean =>
-              !isUnitItem(buildItem) &&
-              finishesWithin(
-                turnsToBuild(buildItem),
-                policy.buildTurns.improvement
-              )
-          ),
-          yields
-        );
+  // The improvement the city needs most, as a player's city on Auto would choose it (civ-clone/web-renderer#194), and
+  //  the random pick, weighed by the leader, only when it needs none it can finish. Barracks and City Walls are among
+  //  those it could need, but are only needed at war. The unit quotas above keep it defended and growing.
+  const [needed] = rankImprovements(
+    dependencies,
+    player,
+    city,
+    availableFiltered.filter(
+      (buildItem: BuildItem): boolean =>
+        !isUnitItem(buildItem) &&
+        finishesWithin(turnsToBuild(buildItem), policy.buildTurns.improvement)
+    ),
+    yields
+  );
 
   if (needed) {
     cityBuild.build(needed.item());
