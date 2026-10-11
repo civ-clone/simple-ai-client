@@ -6,7 +6,12 @@ import {
   Shaka,
 } from '@civ-clone/civ1-civilization/Leaders';
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
-import { CeremonialBurial, MapMaking } from '@civ-clone/civ1-science/Advances';
+import {
+  CeremonialBurial,
+  MapMaking,
+  Pottery,
+  Writing,
+} from '@civ-clone/civ1-science/Advances';
 import {
   Caravan,
   Diplomat,
@@ -14,9 +19,20 @@ import {
   Trireme,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
+import {
+  Food,
+  Gold,
+  Research,
+  UnitSupportProduction,
+} from '@civ-clone/library-city/Yields';
+import {
+  Granary,
+  Library,
+} from '@civ-clone/civ1-city-improvement/CityImprovements';
 import buildItemInCity, {
   ProductionPolicy,
   defaultProductionPolicy,
+  rankImprovements,
   isFoundingSettlers,
 } from '../lib/Civ1/buildItemInCity';
 import City from '@civ-clone/core-city/City';
@@ -33,8 +49,12 @@ import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import { Production } from '@civ-clone/civ1-world/Yields';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
+import BuildItem from '@civ-clone/core-city-build/BuildItem';
+import { Pyramids } from '@civ-clone/civ1-wonder/Wonders';
+import { autoBuildable } from '@civ-clone/civ1-city/lib/autoBuild';
+import rankBuildItems from '@civ-clone/core-city-build/lib/rankBuildItems';
+import wonderPriorities from '@civ-clone/civ1-wonder/Rules/City/build-priority';
 import Unit from '@civ-clone/core-unit/Unit';
-import { UnitSupportProduction } from '@civ-clone/library-city/Yields';
 import TraitRegistry from '@civ-clone/core-civilization/TraitRegistry';
 import World from '@civ-clone/core-world/World';
 import Yield from '@civ-clone/core-yield/Yield';
@@ -705,6 +725,137 @@ describe('buildItemInCity', (): void => {
       // 0.55 of 2 is a Temple; 0.55 of 1 + 2/3 is still Warriors.
       expect(await pickWith(Shaka, 0.55)).equal(Temple);
       expect(await pickWith(GenghisKhan, 0.55)).equal(Warrior);
+    });
+  });
+  // The random pick still chooses between a unit and an improvement, but an improvement gives way to the one the city
+  //  needs most, as a player's city on Auto ranks them (civ-clone/web-renderer#194).
+  describe('the improvement a city needs most (civ-clone/web-renderer#194)', (): void => {
+    const starving = async (leader: typeof Leader | null = null) => {
+      const setup = await setUp({
+        government: Despotism,
+        leader,
+        shields: 3,
+        size: 3,
+      });
+
+      setup.game.availableCityBuildItems.register(
+        ...([Granary, Library, Pyramids] as unknown as IBuildable[])
+      );
+      [Pottery, Writing].forEach((Advance) =>
+        setup.game.playerResearch.getByPlayer(setup.player).addAdvance(Advance)
+      );
+      setup.game.rules.register(
+        ...wonderPriorities(
+          setup.game.cities,
+          setup.game.cityBuilds,
+          setup.game.playerResearch,
+          setup.game.units
+        )
+      );
+      unitsOut(setup, 5, Settlers);
+
+      return setup;
+    };
+
+    const pickWith = (setup: SetUp, random: number): unknown => {
+      buildItemInCity(
+        createDependencies({
+          ...setup.dependencies,
+          randomNumberGenerator: (): number => random,
+        }),
+        setup.player,
+        setup.targets,
+        setup.city
+      );
+
+      return setup.game.cityBuilds.getByCity(setup.city).building()?.item();
+    };
+
+    it('should build the improvement a starving city needs most when the pick lands on another', async (): Promise<void> => {
+      const setup = await starving();
+
+      setup.city.yields = () => [new Production(3), new Food(-1), new Gold(2)];
+
+      // Warriors, a Temple, a Granary and a Library: 0.3 of 4 is the Temple.
+      expect(pickWith(setup, 0.3)).equal(Granary);
+    });
+
+    it('should keep the unit the pick lands on', async (): Promise<void> => {
+      const setup = await starving();
+
+      setup.city.yields = () => [new Production(3), new Food(-1), new Gold(2)];
+
+      expect(pickWith(setup, 0.1)).equal(Warrior);
+    });
+
+    it('should keep the improvement the pick lands on when the city needs none', async (): Promise<void> => {
+      const setup = await starving();
+
+      setup.city.yields = () => [new Production(3), new Food(4), new Gold(2)];
+
+      expect(pickWith(setup, 0.3)).equal(Temple);
+    });
+
+    const ranked = (setup: SetUp, items: BuildItem[]): unknown[] =>
+      rankImprovements(setup.dependencies, setup.player, setup.city, items).map(
+        (buildItem: BuildItem) => buildItem.item()
+      );
+
+    const neededHere = (setup: SetUp): BuildItem[] =>
+      setup.game.cityBuilds
+        .getByCity(setup.city)
+        .available()
+        .filter((buildItem: BuildItem): boolean =>
+          [Granary, Library, Pyramids].includes(buildItem.item() as any)
+        );
+
+    it('should rank as a city on Auto ranks for a leader with no preference', async (): Promise<void> => {
+      const setup = await starving(Shaka);
+
+      setup.city.yields = () => [
+        new Production(6),
+        new Food(-1),
+        new Research(3),
+        new Gold(9),
+      ];
+
+      const items = neededHere(setup);
+
+      expect(ranked(setup, items)).eql(
+        rankBuildItems(
+          setup.game.cityBuilds.getByCity(setup.city),
+          setup.game.rules,
+          autoBuildable,
+          () => 1,
+          items
+        ).map(({ buildItem }) => buildItem.item())
+      );
+      expect(ranked(setup, items)).eql([Granary, Pyramids, Library]);
+    });
+
+    it("should rank a city's improvements against a Wonder by the leader's Ideology", async (): Promise<void> => {
+      const yields = () => [
+          new Production(6),
+          new Food(2),
+          new Research(3),
+          new Gold(9),
+        ],
+        lincoln = await starving(AbrahamLincoln),
+        genghis = await starving(GenghisKhan);
+
+      lincoln.city.yields = yields;
+      genghis.city.yields = yields;
+
+      // A Library is worth 3 × 0.5 × 10/11 to both; a Civilized leader weighs it 4/3, past the Pyramids' 1.5, and a
+      //  Militaristic one 2/3.
+      expect(ranked(lincoln, neededHere(lincoln)).slice(0, 2)).eql([
+        Library,
+        Pyramids,
+      ]);
+      expect(ranked(genghis, neededHere(genghis)).slice(0, 2)).eql([
+        Pyramids,
+        Library,
+      ]);
     });
   });
 });
