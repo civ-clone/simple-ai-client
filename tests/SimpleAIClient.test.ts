@@ -2095,7 +2095,7 @@ describe('SimpleAIClient', (): void => {
     unitRegistry.unregister(defender, chariot, horseman);
   });
 
-  it('should judge an attack at the strength it would be fought at, so City Walls put it off', async (): Promise<void> => {
+  it("should judge an attack at the strength it would be fought at, so City Walls take a Warrior's attack on a Warrior out of every combat term", async (): Promise<void> => {
     withCivilizations();
 
     const [client] = await createClients(),
@@ -2114,9 +2114,9 @@ describe('SimpleAIClient', (): void => {
         workedTileRegistry
       ),
       defender = new Warrior(null, enemy, city.tile(), ruleRegistry),
-      horseman = new Horseman(null, player, world.get(1, 2), ruleRegistry),
+      attacker = new Warrior(null, player, world.get(1, 2), ruleRegistry),
       unwalledScore = (client as SimpleAIClient).scoreUnitMove(
-        horseman,
+        attacker,
         city.tile()
       ),
       cityWalls = new CityWalls(city, ruleRegistry);
@@ -2124,20 +2124,22 @@ describe('SimpleAIClient', (): void => {
     cityImprovementRegistry.register(cityWalls);
 
     const walledScore = (client as SimpleAIClient).scoreUnitMove(
-      horseman,
+      attacker,
       city.tile()
     );
 
-    // A Horseman (2) against a Warrior (1), which defends at 3 behind City Walls.
-    expect(horseman.attack().value()).greaterThan(defender.defence().value());
-    expect(walledScore).lessThan(unwalledScore);
+    // A Warrior (1) against a Warrior (1) earns the even-odds and 2/3-odds terms. Behind City Walls the defender fights
+    //  at 3, below 2/3 odds, so the attack earns nothing and the AI has no reason to make it.
+    expect(attacker.attack().value()).equal(defender.defence().value());
+    expect(unwalledScore).greaterThan(0);
+    expect(walledScore).equal(0);
 
     cityImprovementRegistry.unregister(cityWalls);
     cityRegistry.unregister(city);
     clientRegistry.unregister(client);
     currentPlayerRegistry.unregister(player, enemy);
     playerRegistry.unregister(player, enemy);
-    unitRegistry.unregister(defender, horseman);
+    unitRegistry.unregister(defender, attacker);
   });
 
   it('should fortify a stronger unit in a city in place of a weaker fortified one', async (): Promise<void> => {
