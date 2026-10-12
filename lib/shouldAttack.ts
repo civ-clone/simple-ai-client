@@ -2,6 +2,7 @@
 import AttackConfidence from '@civ-clone/base-leader-personality/Rules/Player/AttackConfidence';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
+import isPacified from '@civ-clone/library-diplomacy/lib/isPacified';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
 
 // The sum of every unit's attack and defence, as `player` last worked it out this turn. Each is a pass through the
@@ -58,5 +59,16 @@ export const shouldAttack = (
 
   return ourPower * confidence >= enemyPower;
 };
+
+// Whether `player` would be hostile to `other`: break a peace with it, or turn down its peace or knowledge when they
+//  negotiate. Never while it's pacified towards `other` (`Pacified`, the Great Wall and the United Nations in Civ1,
+//  civ-clone/web-renderer#30), however strong it is; otherwise when it's strong enough to fight (`shouldAttack`).
+export const shouldBeHostile = (
+  dependencies: Dependencies,
+  player: Player,
+  other: Player
+): boolean =>
+  !isPacified(player, other, dependencies.ruleRegistry) &&
+  shouldAttack(dependencies, player, other);
 
 export default shouldAttack;

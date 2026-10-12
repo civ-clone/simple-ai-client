@@ -10,4 +10,9 @@ export declare const shouldAttack: (
   player: Player,
   enemy: Player
 ) => boolean;
+export declare const shouldBeHostile: (
+  dependencies: Dependencies,
+  player: Player,
+  other: Player
+) => boolean;
 export default shouldAttack;

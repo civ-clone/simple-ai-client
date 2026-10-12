@@ -1,5 +1,5 @@
-// Generic: the AI's answer at each step of a negotiation, declining when it's the stronger side and otherwise
-//  preferring knowledge, then peace.
+// Generic: the AI's answer at each step of a negotiation, declining when it would be hostile (`shouldBeHostile`) and
+//  otherwise preferring knowledge, then peace.
 import {
   ChoiceMeta,
   DataForChoiceMeta,
@@ -11,7 +11,7 @@ import ExchangeKnowledge from '@civ-clone/library-diplomacy/Proposals/ExchangeKn
 import { Interaction } from '@civ-clone/core-diplomacy/Interaction';
 import OfferPeace from '@civ-clone/library-diplomacy/Proposals/OfferPeace';
 import Player from '@civ-clone/core-player/Player';
-import shouldAttack from '../shouldAttack';
+import { shouldBeHostile } from '../shouldAttack';
 
 // Synchronous, so `chooseFromList` resolves in the same number of ticks as when this was inline.
 export const chooseNegotiationStep = <Name extends keyof ChoiceMetaDataMap>(
@@ -20,7 +20,7 @@ export const chooseNegotiationStep = <Name extends keyof ChoiceMetaDataMap>(
   meta: ChoiceMeta<Name>
 ): DataForChoiceMeta<ChoiceMeta<Name>> => {
   const score = (item: Interaction) => {
-    const aggressive = shouldAttack(
+    const aggressive = shouldBeHostile(
       dependencies,
       player,
       item.players().filter((other) => other !== player)[0]

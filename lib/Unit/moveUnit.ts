@@ -22,7 +22,7 @@ import Unit from '@civ-clone/core-unit/Unit';
 import canNegotiate from '../Diplomacy/negotiate';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import scoreUnitMove from './scoreUnitMove';
-import shouldAttack from '../shouldAttack';
+import { shouldBeHostile } from '../shouldAttack';
 
 // Whether any step from where `unit` stands scores above nothing: a hut, an enemy, unknown tiles it could go on to, a
 //  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
@@ -43,7 +43,7 @@ export const actionsToTake = (actions: Action[]): Action[] =>
   );
 
 // The action the AI takes on a tile, of `actions`, or none: the first it will take, unless that would break a peace
-//  treaty with a player it isn't strong enough to fight (`shouldAttack`).
+//  treaty with a player it wouldn't be hostile to (`shouldBeHostile`).
 export const actionToTake = (
   dependencies: Dependencies,
   player: Player,
@@ -56,7 +56,7 @@ export const actionToTake = (
     ((action instanceof SneakAttack ||
       action instanceof SneakCaptureCity ||
       action instanceof SneakStealTechnology) &&
-      !shouldAttack(
+      !shouldBeHostile(
         dependencies,
         player,
         (action as SneakAttack | SneakStealTechnology).enemy()
@@ -149,7 +149,7 @@ export const moveUnit = async (
 
       if (
         (move instanceof SneakCaptureCity &&
-          !shouldAttack(dependencies, player, move.enemy())) ||
+          !shouldBeHostile(dependencies, player, move.enemy())) ||
         (move &&
           !knowledge.canReturnAfter(dependencies, player, unit, move as Action))
       ) {

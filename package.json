@@ -99,7 +99,7 @@
     "@civ-clone/core-world-path": "^0.1.0",
     "@civ-clone/core-yield": "^0.1.0",
     "@civ-clone/library-city": "^0.1.4",
-    "@civ-clone/library-diplomacy": "^0.1.0",
+    "@civ-clone/library-diplomacy": "^0.1.3",
     "@civ-clone/library-unit": "^0.1.9"
   }
 }

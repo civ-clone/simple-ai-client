@@ -17,7 +17,7 @@ import { SneakAttack } from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
-import shouldAttack from '../shouldAttack';
+import { shouldBeHostile } from '../shouldAttack';
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -41,7 +41,10 @@ export const scoreUnitMove = (
     } = lookup,
     sneakAttack = lookup.sneakAttack as SneakAttack | undefined;
 
-  if (sneakAttack && !shouldAttack(dependencies, player, sneakAttack.enemy())) {
+  if (
+    sneakAttack &&
+    !shouldBeHostile(dependencies, player, sneakAttack.enemy())
+  ) {
     return -10;
   }
 
