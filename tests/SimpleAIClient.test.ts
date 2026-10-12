@@ -312,6 +312,7 @@ import unitPlayerTurnEnd from '@civ-clone/civ1-unit/Rules/Player/turnEnd';
 import unitStowed from '@civ-clone/civ1-unit/Rules/Unit/stowed';
 import unitUnsupported from '@civ-clone/civ1-unit/Rules/Unit/unsupported';
 import unitValidateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
+import unitStrength from '@civ-clone/civ1-unit/Rules/Unit/strength';
 import unitYield from '@civ-clone/civ1-unit/Rules/Unit/yield';
 import wonderCityBuild from '@civ-clone/civ1-wonder/Rules/City/build';
 import wonderCityBuildCost from '@civ-clone/civ1-wonder/Rules/City/build-cost';
@@ -895,6 +896,11 @@ describe('SimpleAIClient', (): void => {
     ...unitStowed(),
     ...unitUnsupported(),
     ...unitValidateMove(),
+    ...unitStrength(
+      cityRegistry,
+      cityImprovementRegistry,
+      unitImprovementRegistry
+    ),
     ...unitYield(unitImprovementRegistry, ruleRegistry, transportRegistry),
     ...wonderCityBuild(playerResearchRegistry, wonderRegistry),
     ...wonderCityBuildCost(),
@@ -2087,6 +2093,51 @@ describe('SimpleAIClient', (): void => {
     currentPlayerRegistry.unregister(player, enemy);
     playerRegistry.unregister(player, enemy);
     unitRegistry.unregister(defender, chariot, horseman);
+  });
+
+  it('should judge an attack at the strength it would be fought at, so City Walls put it off', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('25G', 5, 5),
+      player = client.player(),
+      enemy = new Player(ruleRegistry);
+
+    playerWorldRegistry.register(new PlayerWorld(enemy, world));
+    playerWorldRegistry.getByPlayer(player).register(...world.entries());
+
+    const city = new City(
+        enemy,
+        world.get(2, 2),
+        '',
+        ruleRegistry,
+        workedTileRegistry
+      ),
+      defender = new Warrior(null, enemy, city.tile(), ruleRegistry),
+      horseman = new Horseman(null, player, world.get(1, 2), ruleRegistry),
+      unwalledScore = (client as SimpleAIClient).scoreUnitMove(
+        horseman,
+        city.tile()
+      ),
+      cityWalls = new CityWalls(city, ruleRegistry);
+
+    cityImprovementRegistry.register(cityWalls);
+
+    const walledScore = (client as SimpleAIClient).scoreUnitMove(
+      horseman,
+      city.tile()
+    );
+
+    // A Horseman (2) against a Warrior (1), which defends at 3 behind City Walls.
+    expect(horseman.attack().value()).greaterThan(defender.defence().value());
+    expect(walledScore).lessThan(unwalledScore);
+
+    cityImprovementRegistry.unregister(cityWalls);
+    cityRegistry.unregister(city);
+    clientRegistry.unregister(client);
+    currentPlayerRegistry.unregister(player, enemy);
+    playerRegistry.unregister(player, enemy);
+    unitRegistry.unregister(defender, horseman);
   });
 
   it('should fortify a stronger unit in a city in place of a weaker fortified one', async (): Promise<void> => {
