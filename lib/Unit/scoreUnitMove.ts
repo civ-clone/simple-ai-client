@@ -17,6 +17,7 @@ import { SneakAttack } from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
+import strength from '@civ-clone/core-unit/strength';
 import { shouldBeHostile } from '../shouldAttack';
 
 export const scoreUnitMove = (
@@ -77,12 +78,22 @@ export const scoreUnitMove = (
     score += 24;
   }
 
-  const tileUnits = dependencies.unitRegistry
-      .getByTile(tile)
-      .sort(
-        (a: Unit, b: Unit): number => b.defence().value() - a.defence().value()
-      ),
-    [defender] = tileUnits,
+  const tileUnits = dependencies.unitRegistry.getByTile(tile),
+    // The strengths a battle here would be fought at (terrain, City Walls, fortified), against the unit that would
+    //  defend: the strongest against this attacker.
+    [attackStrength, defenceStrength] = attack
+      ? tileUnits
+          .map((tileUnit: Unit): [number, number] => {
+            const [attackYield, defenceYield] = strength(
+              unit,
+              tileUnit,
+              dependencies.ruleRegistry
+            );
+
+            return [attackYield.value(), defenceYield.value()];
+          })
+          .sort(([, a], [, b]): number => b - a)[0]
+      : [0, 0],
     ourUnitsOnTile = tileUnits.some((unit: Unit) => unit.player() === player);
 
   if (
@@ -117,16 +128,16 @@ export const scoreUnitMove = (
   }
 
   // The leader's personality decides whether to fight at all (`shouldAttack`), not how keen a fight looks here.
-  if (attack && unit.attack().value() > defender.defence().value()) {
-    score += 24 * (unit.attack().value() - defender.defence().value());
+  if (attack && attackStrength > defenceStrength) {
+    score += 24 * (attackStrength - defenceStrength);
   }
 
-  if (attack && unit.attack().value() >= defender.defence().value()) {
+  if (attack && attackStrength >= defenceStrength) {
     score += 16;
   }
 
   // add some jeopardy
-  if (attack && unit.attack().value() >= defender.defence().value() * (2 / 3)) {
+  if (attack && attackStrength >= defenceStrength * (2 / 3)) {
     score += 8;
   }
 
