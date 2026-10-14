@@ -81,7 +81,8 @@ import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import Tile from '@civ-clone/core-world/Tile';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
 import { landReachableFrom } from '../lib/City/explorers';
-import { expect } from 'chai';
+import * as spies from 'chai-spies';
+import { expect, spy, use } from 'chai';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
@@ -89,6 +90,8 @@ import unitSupport from '../lib/Civ1/unitSupport';
 import explorerShipFor from '../lib/City/explorerShip';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import worldRules from '@civ-clone/civ1-world/registerRules';
+
+use(spies);
 
 type SetUp = {
   city: City;
@@ -809,6 +812,49 @@ describe('buildItemInCity', (): void => {
       setup.city.yields = () => [new Production(3), new Food(-1), new Gold(2)];
 
       expect(setup.choose()).equal(Granary);
+    });
+
+    // civ-clone/web-renderer#316: whether the city should be the one to build the player's Wonder weighed its shields
+    //  against each of the player's cities, and worked them out again for each.
+    it("should work out the city's yields no more often for having other cities to weigh it against for a Wonder", async (): Promise<void> => {
+      const yieldsCalls = async (others: number[][]): Promise<number> => {
+        const setup = await starving(),
+          otherCities = others.map(([x, y]: number[]): City => {
+            const other = setup.addCity(x, y);
+
+            if (!setup.game.cities.includes(other)) {
+              setup.game.cities.register(other);
+            }
+
+            other.yields = () => [new Production(1)];
+
+            spy.on(other, ['yields']);
+
+            return other;
+          });
+
+        setup.city.yields = () => [new Production(3), new Food(2), new Gold(2)];
+
+        spy.on(setup.city, ['yields']);
+
+        setup.choose();
+
+        // Each is weighed against the city, once.
+        otherCities.forEach((other: City): void => {
+          expect(other.yields).to.have.been.called.once;
+        });
+
+        return (setup.city.yields as unknown as { __spy: { calls: unknown[] } })
+          .__spy.calls.length;
+      };
+
+      expect(
+        await yieldsCalls([
+          [3, 0],
+          [3, 4],
+          [0, 4],
+        ])
+      ).to.equal(await yieldsCalls([]));
     });
 
     it('should build the cheapest everyday improvement when the city needs none in particular', async (): Promise<void> => {
