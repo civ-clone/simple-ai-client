@@ -838,7 +838,7 @@ describe('SimpleAIClient', (): void => {
       ruleRegistry,
       cityImprovementRegistry
     ),
-    ...treasuryCitySpend(),
+    ...treasuryCitySpend(ruleRegistry),
     ...treasuryPlayerAction(cityRegistry, cityBuildRegistry),
     ...treasuryPlayerAdded(
       playerTreasuryRegistry,
