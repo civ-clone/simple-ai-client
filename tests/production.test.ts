@@ -18,6 +18,7 @@ import {
   Diplomat,
   Horseman,
   Settlers,
+  Spearman,
   Trireme,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
@@ -35,13 +36,14 @@ import {
 import buildItemInCity, {
   ProductionPolicy,
   defaultProductionPolicy,
+  isAttacker,
   rankImprovements,
   isFoundingSettlers,
 } from '../lib/Civ1/buildItemInCity';
 import City from '@civ-clone/core-city/City';
 import Civilization from '@civ-clone/core-civilization/Civilization';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
-import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
+import { Fortified, Veteran } from '@civ-clone/civ1-unit/UnitImprovements';
 import { Game } from '@civ-clone/core-game/Game';
 import Government from '@civ-clone/core-government/Government';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
@@ -80,6 +82,7 @@ import {
 import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import Tile from '@civ-clone/core-world/Tile';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
+import { attackOf, defenceOf } from '../lib/Unit/strengths';
 import { landReachableFrom } from '../lib/City/explorers';
 import * as spies from 'chai-spies';
 import { expect, spy, use } from 'chai';
@@ -265,6 +268,185 @@ describe('buildItemInCity', (): void => {
       setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
 
       expect(isUnit(setup.choose())).false;
+    });
+  });
+
+  // civ-clone/web-renderer#408: every city the player has counts its attackers and explorers as it chooses, and each
+  //  unit's `Attack` and `Defence` went through the ruleset's rules for each.
+  describe('counting the units it has (civ-clone/web-renderer#408)', (): void => {
+    // Land to explore and a war to fight, so that a city counts both its explorers and its attackers; with three more
+    //  cities, each making shields for a unit, and units of the player's out of them.
+    const atWar = async (): Promise<SetUp> => {
+      const setup = await setUp({ shields: 2 });
+
+      [
+        [1, 0],
+        [1, 4],
+        [3, 2],
+      ].forEach(([x, y]: number[]): void => {
+        const other = setup.addCity(x, y);
+
+        if (!setup.game.cities.includes(other)) {
+          setup.game.cities.register(other);
+        }
+
+        other.yields = () => [new Production(2)];
+      });
+
+      setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
+      setup.targets.enemyCitiesToAttack.push(setup.world.get(5, 0));
+      unitsOut(setup, 2, Warrior);
+      unitsOut(setup, 2, Horseman);
+      unitsOut(setup, 1, Spearman);
+      unitsOut(setup, 1, Settlers);
+
+      return setup;
+    };
+
+    const unitsOf = ({ dependencies, player }: SetUp): Unit[] =>
+      dependencies.unitRegistry.getByPlayer(player);
+
+    // What each of the player's cities chooses, in turn. With `afresh`, in a turn of its own each, so that nothing found
+    //  for one is kept for the next.
+    const cityChoices = (setup: SetUp, afresh: boolean = false): unknown[] => {
+      const { dependencies, game, player, targets } = setup;
+
+      return dependencies.cityRegistry
+        .getByPlayer(player)
+        .map((city: City): unknown => {
+          if (afresh) {
+            game.turn.increment();
+          }
+
+          buildItemInCity(dependencies, player, targets, city);
+
+          return game.cityBuilds.getByCity(city).building()?.item();
+        });
+    };
+
+    // Land units, which are all that are counted but for Settlers: a worker isn't an explorer.
+    const counted = (setup: SetUp): Unit[] =>
+      unitsOf(setup).filter(
+        (unit: Unit): boolean => !(unit instanceof Settlers)
+      );
+
+    it("should look each unit's attack up once a turn, however many cities choose", async (): Promise<void> => {
+      const setup = await atWar();
+
+      expect(setup.dependencies.cityRegistry.getByPlayer(setup.player)).length(
+        4
+      );
+      unitsOf(setup).forEach((unit: Unit): void => {
+        spy.on(unit, ['attack']);
+      });
+
+      cityChoices(setup);
+      cityChoices(setup);
+
+      counted(setup).forEach((unit: Unit): void => {
+        expect(unit.attack).to.have.been.called.once;
+      });
+
+      // A turn later they are looked up again: the units may have changed.
+      setup.game.turn.increment();
+      cityChoices(setup);
+
+      counted(setup).forEach((unit: Unit): void => {
+        expect(unit.attack).to.have.been.called.twice;
+      });
+    });
+
+    // Other rules ask for a unit's `Defence` too, so it is counted here on its own.
+    it("should look a unit's defence up once a turn", async (): Promise<void> => {
+      const setup = await atWar(),
+        [unit] = unitsOf(setup);
+
+      spy.on(unit, ['attack', 'defence']);
+
+      [1, 2, 3].forEach((): void => {
+        expect(attackOf(setup.game.turn.value(), unit)).equal(
+          unit.attack().value()
+        );
+        expect(defenceOf(setup.game.turn.value(), unit)).equal(
+          unit.defence().value()
+        );
+      });
+
+      // Once for the cache, and the three times above for the check.
+      expect(unit.attack).to.have.been.called.exactly(4);
+      expect(unit.defence).to.have.been.called.exactly(4);
+
+      setup.game.turn.increment();
+      attackOf(setup.game.turn.value(), unit);
+      defenceOf(setup.game.turn.value(), unit);
+
+      expect(unit.attack).to.have.been.called.exactly(5);
+      expect(unit.defence).to.have.been.called.exactly(5);
+    });
+
+    it('should look up the strengths of a unit that turns up part way through a turn when it is first counted, and once', async (): Promise<void> => {
+      const setup = await atWar();
+
+      cityChoices(setup);
+
+      const built = new Horseman(
+        null,
+        setup.player,
+        setup.world.get(2, 3),
+        setup.game.rules
+      );
+
+      spy.on(built, ['attack', 'defence']);
+
+      cityChoices(setup);
+
+      expect(built.attack).to.have.been.called.once;
+      expect(built.defence).to.have.been.called.once;
+    });
+
+    it('should judge a unit an attacker as working out its strengths afresh would', async (): Promise<void> => {
+      const setup = await atWar(),
+        afresh = (unit: Unit): boolean =>
+          unit.attack().value() > unit.defence().value();
+
+      // Horsemen attack 2 and defend 1, Spearmen the other way round, and the rest are no more one than the other.
+      expect(
+        unitsOf(setup)
+          .filter(afresh)
+          .map((unit: Unit): unknown => unit.constructor)
+      ).to.eql([Horseman, Horseman]);
+
+      unitsOf(setup).forEach((unit: Unit): void => {
+        expect(isAttacker(setup.dependencies, unit)).equal(afresh(unit));
+        // Again, from what was found.
+        expect(isAttacker(setup.dependencies, unit)).equal(afresh(unit));
+      });
+    });
+
+    it('should choose as it would with each unit looked up afresh for every city', async (): Promise<void> => {
+      const veterans = (setup: SetUp): void => {
+          [Warrior, Horseman, Spearman].forEach((UnitType): void => {
+            const unit = unitsOf(setup).find(
+              (unit: Unit): boolean => unit instanceof UnitType
+            ) as Unit;
+
+            setup.game.unitImprovements.register(new Veteran(unit));
+          });
+        },
+        kept = await atWar(),
+        afresh = await atWar();
+
+      expect(cityChoices(kept)).to.eql(cityChoices(afresh, true));
+      // Counted already, so what was found for them is kept for the rest of the turn, but a Veteran's attack and defence
+      //  both rise by half of its type's, so it is no more or less of an attacker.
+      veterans(kept);
+      veterans(afresh);
+      unitsOf(kept).forEach((unit: Unit): void => {
+        expect(isAttacker(kept.dependencies, unit)).equal(
+          unit.attack().value() > unit.defence().value()
+        );
+      });
+      expect(cityChoices(kept)).to.eql(cityChoices(afresh, true));
     });
   });
 
