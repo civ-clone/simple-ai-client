@@ -277,11 +277,14 @@ export const chooseUnit = (
 };
 
 // Whether `city` should be the one to build the player's next Wonder: none of its cities is building one, and none
-//  produces more.
+//  produces more. `shields` is the city's own `netShields`, which a caller that has worked it out already passes in:
+//  it was worked out again against each of the player's cities, and a city's yields aren't cheap
+//  (civ-clone/web-renderer#316).
 const shouldBuildWonder = (
   dependencies: Dependencies,
   player: Player,
-  city: City
+  city: City,
+  shields: number = netShields(city)
 ): boolean => {
   const cities = dependencies.cityRegistry.getByPlayer(player);
 
@@ -297,7 +300,7 @@ const shouldBuildWonder = (
       );
     }) &&
     cities.every(
-      (other: City): boolean => netShields(other) <= netShields(city)
+      (other: City): boolean => other === city || netShields(other) <= shields
     )
   );
 };
@@ -607,7 +610,7 @@ export const buildItemInCity = (
   //  that the city makes enough shields to finish within the policy's turns.
   const wonders =
     shields >= policy.wonderShields &&
-    shouldBuildWonder(dependencies, player, city)
+    shouldBuildWonder(dependencies, player, city, shields)
       ? availableWonders.filter(
           (buildItem: BuildItem): boolean =>
             finishesWithin(turnsToBuild(buildItem), policy.buildTurns.wonder) &&
