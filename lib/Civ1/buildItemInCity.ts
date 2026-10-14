@@ -33,6 +33,7 @@ import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
 import civ1Knowledge from './knowledge';
 import reachableLandToExplore, { continentOf } from '../City/explorers';
+import { attackOf, defenceOf } from '../Unit/strengths';
 import { civ1TerrainPolicy } from './terrain';
 import {
   hasOpenTerrainJob,
@@ -122,15 +123,18 @@ export const defaultProductionPolicy: ProductionPolicy = {
   },
 };
 
-// A unit built to attack rather than defend.
-export const isAttacker = (unit: Unit): boolean =>
-  unit instanceof Land && unit.attack().value() > unit.defence().value();
+// A unit built to attack rather than defend. Its strengths are looked up once a turn (`lib/Unit/strengths`): every city
+//  the player has counts its attackers and explorers as it chooses (civ-clone/web-renderer#408).
+export const isAttacker = (dependencies: Dependencies, unit: Unit): boolean =>
+  unit instanceof Land &&
+  attackOf(dependencies.turn.value(), unit) >
+    defenceOf(dependencies.turn.value(), unit);
 
 // A land unit that can fight and is out of the player's cities: exploring, or on its way to a target.
 const isExploring = (dependencies: Dependencies, unit: Unit): boolean =>
   unit instanceof Land &&
   !(unit instanceof Worker) &&
-  unit.attack().value() > 0 &&
+  attackOf(dependencies.turn.value(), unit) > 0 &&
   dependencies.cityRegistry.getByTile(unit.tile()) === null;
 
 // Whether one of the player's units is Settlers it has for founding cities, and so counts towards the policy's
@@ -576,7 +580,7 @@ export const buildItemInCity = (
       unitsAndOrders(
         dependencies,
         player,
-        isAttacker,
+        (unit: Unit): boolean => isAttacker(dependencies, unit),
         (item: object): boolean => isAttackerType(dependencies, item)
       ),
       policy.attackersPerCity * cities

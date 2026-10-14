@@ -31,7 +31,10 @@ export interface ProductionPolicy {
   };
 }
 export declare const defaultProductionPolicy: ProductionPolicy;
-export declare const isAttacker: (unit: Unit) => boolean;
+export declare const isAttacker: (
+  dependencies: Dependencies,
+  unit: Unit
+) => boolean;
 export declare const isFoundingSettlers: (
   dependencies: Dependencies,
   player: Player,
