@@ -33,7 +33,7 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import Terrain from '@civ-clone/core-terrain/Terrain';
 import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
-import Tile from '@civ-clone/core-world/Tile';
+import Tile, { IYieldMap } from '@civ-clone/core-world/Tile';
 import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
 import {
   Food as CityFood,
@@ -52,6 +52,7 @@ import {
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import UnitAction from '@civ-clone/core-unit/Action';
+import Yield from '@civ-clone/core-yield/Yield';
 import { terrainJobTurns } from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
 
 export const isACityTile = (
@@ -62,6 +63,69 @@ export const isACityTile = (
   dependencies.cityRegistry
     .getByPlayer(player)
     .some((city) => city.tiles().includes(tile));
+
+// The tiles around each tile, by radius, as `Tile#getSurroundingArea` lists them. The survey asks whether every tile the
+//  player knows would make a good city site, every turn, and building a `Tileset` for each of them (two, for those that
+//  score well enough) was the larger part of the survey's time (civ-clone/web-renderer#317). The tiles around a tile
+//  are fixed by the shape of the map, so each tile's are listed once; what's on them is still read afresh each time.
+//  The lists are shared, so not for changing.
+const surroundingAreas: Map<number, WeakMap<Tile, Tile[]>> = new Map();
+
+export const surroundingArea = (tile: Tile, radius: number): Tile[] => {
+  let byTile = surroundingAreas.get(radius);
+
+  if (!byTile) {
+    byTile = new WeakMap();
+    surroundingAreas.set(radius, byTile);
+  }
+
+  let area = byTile.get(tile);
+
+  if (!area) {
+    area = tile.getSurroundingArea(radius).entries();
+    byTile.set(tile, area);
+  }
+
+  return area;
+};
+
+const citySiteWeights: IYieldMap[] = [
+  [Food, 4],
+  [Production, 2],
+  [Trade, 1],
+];
+
+// Each tile's `score` as a city site's surroundings weigh it, for each player, kept with the yields it was worked out
+//  from: every candidate site within two tiles asks for it again. `Tile#yields` keeps the same list until something
+//  that changes them (an improvement, a government, what the player can see) clears it, and the score is worked out
+//  afresh from the new one.
+const citySiteScores: WeakMap<
+  Tile,
+  Map<Player | null, [Yield[], number]>
+> = new WeakMap();
+
+const citySiteScore = (tile: Tile, player: Player): number => {
+  const yields = tile.yields(player);
+
+  let byPlayer = citySiteScores.get(tile);
+
+  if (!byPlayer) {
+    byPlayer = new Map();
+    citySiteScores.set(tile, byPlayer);
+  }
+
+  const cached = byPlayer.get(player);
+
+  if (cached && cached[0] === yields) {
+    return cached[1];
+  }
+
+  const score = tile.score(player, citySiteWeights);
+
+  byPlayer.set(player, [yields, score]);
+
+  return score;
+};
 
 export const shouldBuildCity = (
   dependencies: Dependencies,
@@ -89,17 +153,16 @@ export const shouldBuildCity = (
       terrainFeatures.some(
         (feature: TerrainFeature): boolean => feature instanceof Game
       )) &&
-    tile.getSurroundingArea().score(player, [
-      [Food, 4],
-      [Production, 2],
-      [Trade, 1],
-    ]) >= 160 &&
-    !tile
-      .getSurroundingArea(4)
-      .filter(
-        (tile: Tile): boolean =>
-          dependencies.cityRegistry.getByTile(tile) !== null
-      ).length
+    // As `Tileset#score` adds them up, in the same order.
+    surroundingArea(tile, 2).reduce(
+      (total: number, tile: Tile): number =>
+        total + citySiteScore(tile, player),
+      0
+    ) >= 160 &&
+    !surroundingArea(tile, 4).some(
+      (tile: Tile): boolean =>
+        dependencies.cityRegistry.getByTile(tile) !== null
+    )
   );
 };
 

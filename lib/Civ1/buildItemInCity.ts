@@ -32,8 +32,7 @@ import { Settlers } from '@civ-clone/civ1-unit/Units';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
 import civ1Knowledge from './knowledge';
-import reachableLandToExplore from '../City/explorers';
-import { landReachableFrom } from '../City/explorers';
+import reachableLandToExplore, { continentOf } from '../City/explorers';
 import { civ1TerrainPolicy } from './terrain';
 import {
   hasOpenTerrainJob,
@@ -167,7 +166,7 @@ const settlersWouldHaveWork = (
   targets: TargetBoard,
   city: City
 ): boolean => {
-  const reachable = landReachableFrom(city.tile());
+  const reachable = continentOf(dependencies.turn.value(), city.tile());
 
   return (
     targets.goodSitesForCities.some((tile: Tile): boolean =>
@@ -494,7 +493,13 @@ export const buildItemInCity = (
   // Explorers count whether they're exploring or not: a unit out of the player's cities with nothing left that it can
   //  reach to explore is still one more than the player needs. And only land a unit from this city could reach counts:
   //  the coast of another continent, seen from a ship or across the water, kept the list from ever emptying.
-  if (reachableLandToExplore(city, targets.landTilesToExplore) > 0) {
+  if (
+    reachableLandToExplore(
+      city,
+      targets.landTilesToExplore,
+      continentOf(dependencies.turn.value(), city.tile())
+    ) > 0
+  ) {
     // The cheapest land unit that can fight, if the city can finish it within the policy's turns, whether or not the city
     //  has shields to spare to support it. With units that have nothing left to do standing down rather than wandering
     //  (civ-clone/web-renderer#230), explorers are what explores, and keeping them to cities with shields to spare cost

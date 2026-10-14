@@ -7,6 +7,7 @@ export declare const isACityTile: (
   player: Player,
   tile: Tile
 ) => boolean;
+export declare const surroundingArea: (tile: Tile, radius: number) => Tile[];
 export declare const shouldBuildCity: (
   dependencies: Dependencies,
   player: Player,
