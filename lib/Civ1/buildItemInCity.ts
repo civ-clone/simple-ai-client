@@ -492,8 +492,10 @@ export const buildItemInCity = (
 
   // Explorers count whether they're exploring or not: a unit out of the player's cities with nothing left that it can
   //  reach to explore is still one more than the player needs. And only land a unit from this city could reach counts:
-  //  the coast of another continent, seen from a ship or across the water, kept the list from ever emptying.
+  //  the coast of another continent, seen from a ship or across the water, kept the list from ever emptying. With
+  //  nothing to explore the continent isn't needed, so it isn't looked up.
   if (
+    targets.landTilesToExplore.length > 0 &&
     reachableLandToExplore(
       city,
       targets.landTilesToExplore,
