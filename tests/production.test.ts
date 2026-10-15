@@ -83,6 +83,7 @@ import { Irrigation, Road } from '@civ-clone/civ1-world/TileImprovements';
 import Tile from '@civ-clone/core-world/Tile';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
 import { attackOf, defenceOf } from '../lib/Unit/strengths';
+import { wantsUnit } from '../lib/City/defence';
 import { landReachableFrom } from '../lib/City/explorers';
 import * as spies from 'chai-spies';
 import { expect, spy, use } from 'chai';
@@ -275,7 +276,9 @@ describe('buildItemInCity', (): void => {
   //  unit's `Attack` and `Defence` went through the ruleset's rules for each.
   describe('counting the units it has (civ-clone/web-renderer#408)', (): void => {
     // Land to explore and a war to fight, so that a city counts both its explorers and its attackers; with three more
-    //  cities, each making shields for a unit, and units of the player's out of them.
+    //  cities, each making shields for a unit and fortified in by a Warrior as the first is, so that none of them is
+    //  missing a defender and every one gets as far as counting the player's units, and units of the player's out of
+    //  them.
     const atWar = async (): Promise<SetUp> => {
       const setup = await setUp({ shields: 2 });
 
@@ -291,7 +294,18 @@ describe('buildItemInCity', (): void => {
         }
 
         other.yields = () => [new Production(2)];
+        setup.game.unitImprovements.register(
+          new Fortified(
+            new Warrior(other, setup.player, other.tile(), setup.game.rules)
+          )
+        );
       });
+
+      setup.dependencies.cityRegistry
+        .getByPlayer(setup.player)
+        .forEach((city: City): void => {
+          expect(wantsUnit(setup.dependencies, civ1Knowledge, city)).false;
+        });
 
       setup.targets.landTilesToExplore.push(setup.world.get(3, 0));
       setup.targets.enemyCitiesToAttack.push(setup.world.get(5, 0));
@@ -436,17 +450,32 @@ describe('buildItemInCity', (): void => {
         kept = await atWar(),
         afresh = await atWar();
 
-      expect(cityChoices(kept)).to.eql(cityChoices(afresh, true));
+      // The baseline first: the strengths found are kept for one turn in one place for every game, so working it out
+      //  afresh, a turn for each city, replaces what `kept` is about to find.
+      const before = cityChoices(afresh, true);
+
+      veterans(afresh);
+
+      const after = cityChoices(afresh, true);
+
+      expect(cityChoices(kept)).to.eql(before);
       // Counted already, so what was found for them is kept for the rest of the turn, but a Veteran's attack and defence
       //  both rise by half of its type's, so it is no more or less of an attacker.
       veterans(kept);
-      veterans(afresh);
       unitsOf(kept).forEach((unit: Unit): void => {
         expect(isAttacker(kept.dependencies, unit)).equal(
           unit.attack().value() > unit.defence().value()
         );
       });
-      expect(cityChoices(kept)).to.eql(cityChoices(afresh, true));
+
+      // And they are, in the cities' choices after it: no unit's attack is looked up again.
+      unitsOf(kept).forEach((unit: Unit): void => {
+        spy.on(unit, ['attack']);
+      });
+      expect(cityChoices(kept)).to.eql(after);
+      unitsOf(kept).forEach((unit: Unit): void => {
+        expect(unit.attack).to.have.been.called.exactly(0);
+      });
     });
   });
 
