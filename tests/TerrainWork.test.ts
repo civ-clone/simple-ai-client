@@ -3,6 +3,7 @@ import {
   Monarchy,
   Republic,
 } from '@civ-clone/civ1-government/Governments';
+import { Forest, Grassland, Plains } from '@civ-clone/civ1-world/Terrains';
 import { Irrigation, Mine, Road } from '@civ-clone/civ1-world/TileImprovements';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
@@ -11,7 +12,10 @@ import terrainWork, {
   chooseTerrainJob,
   terrainJobs,
 } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
+import Terrain from '@civ-clone/core-terrain/Terrain';
+import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
+import WorkedTile from '@civ-clone/core-city/WorkedTile';
 import unitGame, { UnitGame, at } from './lib/unitGame';
 import Tile from '@civ-clone/core-world/Tile';
 import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
@@ -62,6 +66,66 @@ const build = (
 // A city at 1,1 working the Plains at 2,0, which can't be irrigated: no water beside it.
 const MAP = '2G2PO2GPHO4GO';
 
+// Takes away every feature `civ1-world` rolled at random for the tiles of `setup`'s map, but those the map gives,
+//  listed as `x,y`: the tests then don't depend on the roll.
+const keepFeatures = ({ game, world }: UnitGame, ...keep: string[]): void =>
+  world
+    .entries()
+    .filter((tile: Tile): boolean => !keep.includes(`${tile.x()},${tile.y()}`))
+    .forEach((tile: Tile): void =>
+      game.terrainFeatures.unregister(
+        ...game.terrainFeatures.getByTerrain(tile.terrain())
+      )
+    );
+
+// The names of the jobs the Civ1 policy offers on the tile at `x`, `y`.
+const jobNamesAt = (setup: UnitGame, x: number, y: number): string[] =>
+  jobsAt(setup, x, y).map((job: string): string => job.split(':')[0]);
+
+// Does `improvement` to `tile` at once, as the engine would once a worker finished it: an improvement replaces the one
+//  it can't share a tile with, and a terrain change takes the tile's features and improvements with it.
+const doJob = (setup: UnitGame, improvement: string, tile: Tile): void => {
+  const { game, player } = setup,
+    conversions: { [job: string]: typeof Terrain } = {
+      clearForest: Plains,
+      clearJungle: Grassland,
+      clearSwamp: Grassland,
+      plantForest: Forest,
+    },
+    improvements: { [job: string]: typeof TileImprovement } = {
+      irrigation: Irrigation,
+      mine: Mine,
+      road: Road,
+    };
+
+  if (conversions[improvement]) {
+    game.terrainFeatures.unregister(
+      ...game.terrainFeatures.getByTerrain(tile.terrain())
+    );
+    game.tileImprovements.unregister(...game.tileImprovements.getByTile(tile));
+    tile.setTerrain(new (conversions[improvement] as any)());
+  } else {
+    const Replaced = { irrigation: Mine, mine: Irrigation }[
+      improvement as 'irrigation' | 'mine'
+    ];
+
+    game.tileImprovements.unregister(
+      ...game.tileImprovements
+        .getByTile(tile)
+        .filter(
+          (existing: TileImprovement): boolean =>
+            Replaced !== undefined && existing instanceof Replaced
+        )
+    );
+    game.tileImprovements.register(
+      new (improvements[improvement] as any)(tile)
+    );
+  }
+
+  tile.clearYieldCache(player);
+  tile.clearYieldCache(null);
+};
+
 describe('TerrainWork', (): void => {
   it("should value Civ1's improvements by what they add to a tile under the player's government", async (): Promise<void> => {
     const despotism = await unitGame(MAP, 3, 5, Despotism),
@@ -71,35 +135,42 @@ describe('TerrainWork', (): void => {
 
     // Under Despotism, an irrigated Grassland tile gives no more food, but a road adds trade. Unworked: worth half.
     expect(jobsAt(despotism, 0, 1)).to.deep.equal(['road:0.5/1']);
-    // Under Monarchy it does, and food is worth twice as much as trade.
+    // Under Monarchy it does: food is worth 2.5 times as much as trade to a city with 2 to spare, and irrigation a
+    //  quarter more again.
     expect(jobsAt(monarchy, 0, 1)).to.deep.equal([
-      'irrigation:1/4',
+      'irrigation:1.5625/4',
       'road:0.5/1',
     ]);
-    // The worked Plains tile, worth twice an unworked one.
+    // The worked Plains tile, worth twice an unworked one, to a city with 1 food to spare.
     expect(jobsAt(despotism, 2, 0)).to.deep.equal([
-      'irrigation:3/4',
+      'irrigation:3.75/4',
       'road:1/1',
     ]);
     // Hills: a mine adds two shields under Despotism, three under Monarchy. Irrigating or mining Hills takes 10 turns
     //  in Civ1, counting the turn of the order, so 9 more.
     expect(jobsAt(despotism, 3, 1)).to.deep.equal([
-      'irrigation:1.5/9',
+      'irrigation:1.875/9',
       'mine:2.25/9',
     ]);
     expect(jobsAt(monarchy, 3, 1)).to.deep.equal([
-      'irrigation:1/9',
+      'irrigation:1.5625/9',
       'mine:3.375/9',
     ]);
 
-    // An improvement already there isn't offered again, and a mine replaces irrigation, losing its food.
+    // An improvement already there isn't offered again. Irrigated Hills are the only water the Plains at 2,1 could
+    //  have, so they aren't mined while those are worth irrigating.
     despotism.game.tileImprovements.register(
       new Irrigation(despotism.world.get(3, 1)),
       new Road(despotism.world.get(3, 0))
     );
 
+    expect(jobsAt(despotism, 3, 1)).to.deep.equal([]);
+    expect(jobsAt(despotism, 3, 0)).to.deep.equal(['irrigation:3.75/4']);
+
+    // Once they're irrigated, a mine replaces the Hills' irrigation, losing its food.
+    build(despotism, new Irrigation(despotism.world.get(2, 1)));
+
     expect(jobsAt(despotism, 3, 1)).to.deep.equal(['mine:0.75/9']);
-    expect(jobsAt(despotism, 3, 0)).to.deep.equal(['irrigation:1.5/4']);
   });
 
   it('should value a railroad on a road once the player has the Railroad advance, by half of each yield', async (): Promise<void> => {
@@ -123,7 +194,7 @@ describe('TerrainWork', (): void => {
     //  worth half. A railroad takes 4 turns on Grassland in Civ1, counting the turn of the order, so 3 more.
     expect(jobsAt(setup, 0, 1)).to.deep.equal(['railroad:1.5/3']);
     // The worked Plains with a road: 1 food, 1 shield, 1 trade, so a railroad adds nothing.
-    expect(jobsAt(setup, 2, 0)).to.deep.equal(['irrigation:3/4']);
+    expect(jobsAt(setup, 2, 0)).to.deep.equal(['irrigation:3.75/4']);
     // No road, no railroad.
     expect(jobsAt(setup, 1, 0)).to.deep.equal(['road:0.5/1']);
 
@@ -149,8 +220,8 @@ describe('TerrainWork', (): void => {
 
     // Grassland with a road under the Republic: 2 food, 2 trade, so a railroad adds 1 food and 1 trade.
     expect(jobsAt(setup, 0, 1)).to.deep.equal([
-      'irrigation:1/4',
-      'railroad:1.5/3',
+      'irrigation:1.5625/4',
+      'railroad:1.75/3',
     ]);
   });
 
@@ -188,11 +259,12 @@ describe('TerrainWork', (): void => {
         settlers
       );
 
-    // Irrigating the worked Plains at 2,0 would be worth most, but there's no water beside it. Next is a road there, 2
-    //  tiles away: 1 over 1 + 2 turns, ahead of irrigating the Plains at 3,0 beside the sea (1.5 over 4 + 2).
+    // Irrigating the worked Plains at 2,0 would be worth most, but there's no water beside it. Irrigating the Plains at
+    //  3,0 beside the sea is worth as much (half for itself, half for carrying water to 2,0), 3 tiles away: 3.75 over
+    //  4 + 3 turns, ahead of a road at 2,0 (1 over 1 + 2).
     expect(
       job && `${job.improvement}@${job.tile.x()},${job.tile.y()}`
-    ).to.equal('road@2,0');
+    ).to.equal('irrigation@3,0');
   });
 
   it('should not have two workers claim the same tile', async (): Promise<void> => {
@@ -221,23 +293,23 @@ describe('TerrainWork', (): void => {
     const setup = await unitGame(MAP, 3, 5, Despotism),
       city = setup.addCity(1, 1, 1),
       settlers = setup.addUnit(Settlers, 0, 0, city),
-      plains = setup.world.get(2, 0),
+      plains = setup.world.get(3, 0),
       tiles: string[] = [];
 
-    await setup.takeTurns(2, () => tiles.push(at(settlers)));
+    await setup.takeTurns(3, () => tiles.push(at(settlers)));
 
-    // Through the city, to build a road on the Plains it works.
-    expect(tiles).to.deep.equal(['1,1', '2,0']);
+    // Through the city, to irrigate the Plains beside the sea, which carry water on to the Plains the city works.
+    expect(tiles).to.deep.equal(['1,1', '2,1', '3,0']);
     expect(improvements(setup, plains)).to.deep.equal([]);
 
     // It starts the turn after it arrived with no moves left.
     await setup.takeTurns(1);
 
-    expect(settlers.busy()?.constructor.name).to.equal('BuildingRoad');
+    expect(settlers.busy()?.constructor.name).to.equal('BuildingIrrigation');
 
     // The work done, as the engine would at the start of the next turn. (A `Game` other than the default one doesn't
     //  finish delayed actions.)
-    setup.game.tileImprovements.register(new Road(plains));
+    build(setup, new Irrigation(plains));
     settlers.setBusy();
 
     await setup.takeTurns(1);
@@ -336,16 +408,15 @@ describe('TerrainWork', (): void => {
       city = setup.addCity(1, 1, 1),
       settlers = setup.addUnit(Settlers, 0, 0, city),
       memory = memoryRegistryInstance.memoryFor(setup.player),
-      plains = setup.world.get(2, 0);
+      plains = setup.world.get(3, 0);
 
-    // On its way to build a road on the Plains at 2,0, then someone else builds it and there's nothing else worth
-    //  doing.
+    // On its way to irrigate the Plains at 3,0, then someone else does it and there's nothing else worth doing.
     await setup.takeTurns(1);
 
-    expect(terrainJobs(memory).get(settlers)?.tile).to.equal(plains);
-    expect(memory.unitPathData.get(settlers)?.end()).to.equal(plains);
+    expect(terrainJobs(memory).get(settlers)?.tile === plains).true;
+    expect(memory.unitPathData.get(settlers)?.end() === plains).true;
 
-    setup.game.tileImprovements.register(new Road(plains));
+    setup.game.tileImprovements.register(new Irrigation(plains));
 
     expect(
       await terrainWork(
@@ -375,10 +446,10 @@ describe('TerrainWork', (): void => {
       settlers = setup.addUnit(Settlers, 0, 0, city),
       memory = memoryRegistryInstance.memoryFor(setup.player);
 
-    // It arrives at the Plains at 2,0 with no moves left, so starts work the turn after.
-    await setup.takeTurns(2);
+    // It arrives at the Plains at 3,0 with no moves left, so starts work the turn after.
+    await setup.takeTurns(3);
 
-    expect(at(settlers)).to.equal('2,0');
+    expect(at(settlers)).to.equal('3,0');
     expect(settlers.busy()).to.equal(null);
 
     setup.game.rules.process(TurnStart, setup.player);
@@ -393,5 +464,188 @@ describe('TerrainWork', (): void => {
       ).attempt(new ActiveUnit(setup.player, settlers))
     ).false;
     expect(terrainJobs(memory).has(settlers)).false;
+  });
+  it('should value food by how little of it the city has to spare', async (): Promise<void> => {
+    // No water anywhere. A city at 3,2 working its best tile: plain Grassland (3 food to spare, its own tile irrigated
+    //  under Monarchy) or Grassland with Game (5 to spare).
+    const plain = await unitGame('35G', 5, 7, Monarchy),
+      rich = await unitGame('16GGa18G', 5, 7, Monarchy);
+
+    keepFeatures(plain);
+    keepFeatures(rich, '2,2');
+    plain.addCity(3, 2, 1);
+    rich.addCity(3, 2, 1);
+
+    // The same unworked Grassland: under Monarchy, irrigation adds a point of food, worth 2 to the city with 3 to spare
+    //  and 1.5 to the one with 5, times a quarter more for irrigation, and half for a tile not worked.
+    expect(jobsAt(plain, 5, 3)).to.include('irrigation:1.25/4');
+    expect(jobsAt(rich, 5, 3)).to.include('irrigation:0.9375/4');
+  });
+
+  it('should clear worked Swamp and Jungle with no feature, and Forest only where the Plains could then be irrigated', async (): Promise<void> => {
+    //   0123456
+    // 0 OOSSFOO   (a Swamp, a Swamp with Oil, a Forest beside the sea)
+    // 1 OGGGFGO   (a Forest with no water beside it)
+    // 2 OGGGGGO
+    // 3 OGJGGGO   (a Jungle)
+    // 4 OOOOOOO
+    const setup = await unitGame('2OSSoF2OO3GFGOO5GOOGJ3GO7O', 5, 7, Despotism);
+
+    keepFeatures(setup, '3,0');
+
+    const city = setup.addCity(3, 2, 1);
+
+    // Not worth 15 turns' work on a tile the city doesn't work.
+    expect(jobNamesAt(setup, 2, 0)).not.to.include('clearSwamp');
+
+    // The city works them all (one of them already).
+    ['2,0', '3,0', '4,0', '4,1', '2,3']
+      .map((xy: string): Tile => {
+        const [x, y] = xy.split(',').map(Number);
+
+        return setup.world.get(x, y);
+      })
+      .filter((tile: Tile): boolean => !setup.game.workedTiles.getByTile(tile))
+      .forEach((tile: Tile): void =>
+        setup.game.workedTiles.register(new WorkedTile(tile, city))
+      );
+
+    expect(jobNamesAt(setup, 2, 0)).to.include('clearSwamp');
+    expect(jobNamesAt(setup, 2, 3)).to.include('clearJungle');
+    // Oil would be lost.
+    expect(jobNamesAt(setup, 3, 0)).not.to.include('clearSwamp');
+    // Plains beside the sea, then irrigated: a shield lost, a point of food gained. Clearing a Forest takes 5 turns in
+    //  Civ1 and irrigating Plains 5, so 4 more each.
+    expect(jobsAt(setup, 4, 0)).to.include('clearForest:1.5/8');
+    // Plains with no water to irrigate them only lose a shield.
+    expect(jobNamesAt(setup, 4, 1)).not.to.include('clearForest');
+  });
+
+  // Each job the policy offers `setup`'s player, best first, done at once (`doJob`), until there are none left or 100
+  //  are done: as `job@x,y`.
+  const doEveryJob = (setup: UnitGame, worker: Settlers): string[] => {
+    const memory = memoryRegistryInstance.memoryFor(setup.player),
+      done: string[] = [];
+
+    for (let i = 0; i < 100; i++) {
+      const job = chooseTerrainJob(
+        setup.dependencies,
+        setup.player,
+        memory,
+        civ1TerrainPolicy,
+        worker
+      );
+
+      if (!job) {
+        break;
+      }
+
+      done.push(`${job.improvement}@${job.tile.x()},${job.tile.y()}`);
+      doJob(setup, job.improvement, job.tile);
+    }
+
+    return done;
+  };
+
+  it('should carry water to a dry tile worth irrigating by clearing the Forest beside the sea first', async (): Promise<void> => {
+    // Water only at 0,1. The Desert Oasis at 2,1 has none beside it, and only the Forest at 1,1, outside the city's
+    //  tiles, could carry it there: cleared to Plains and irrigated from the sea. Under Despotism a mine adds a shield
+    //  to Desert, worth less than irrigation's food, so the Oasis isn't mined while it waits for the water.
+    //   0123456
+    // 0 TTTTTTT
+    // 1 OFdGGMT
+    // 2 TMMGMMT
+    // 3 TMGGGMT
+    // 4 TMGGGMT
+    // 5 TMMMMMT
+    // 6 TTTTTTT
+    const setup = await unitGame(
+        ['7T', 'OFDiGGMT', 'T2MG2MT', 'TM3GMT', 'TM3GMT', 'T5MT', '7T'].join(
+          ''
+        ),
+        7,
+        7,
+        Despotism
+      ),
+      forest = setup.world.get(1, 1);
+
+    keepFeatures(setup, '2,1');
+
+    const city = setup.addCity(3, 3, 1),
+      done = doEveryJob(setup, setup.addUnit(Settlers, 3, 3, city));
+
+    expect(city.tiles().includes(forest)).false;
+    expect(
+      civ1TerrainPolicy.tiles!(setup.dependencies, setup.player).includes(
+        forest
+      )
+    ).true;
+    // The jobs ran out rather than undoing each other.
+    expect(done.length).to.be.below(100);
+    expect(improvements(setup, setup.world.get(2, 1))).to.include('Irrigation');
+    expect(done.indexOf('clearForest@1,1')).to.be.above(-1);
+    expect(done.indexOf('irrigation@1,1')).to.be.above(
+      done.indexOf('clearForest@1,1')
+    );
+    expect(done.indexOf('irrigation@2,1')).to.be.above(
+      done.indexOf('irrigation@1,1')
+    );
+    // Planting the Forest back isn't worth the food it has since.
+    expect(done).not.to.include('plantForest@1,1');
+  });
+
+  it('should carry water to the Desert Oasis on the map from #426, irrigating Hills for a while', async (): Promise<void> => {
+    // The map from civ-clone/web-renderer#426, with its city at 3,3. The Desert Oasis at 2,1 has no water beside it.
+    //   0123456
+    // 0 OOTTTOO
+    // 1 OFdGPfO
+    // 2 OMGggHO
+    // 3 OmgGPTD
+    // 4 OHPGgtO
+    // 5 OHhHTFO
+    // 6 OOOAOTO
+    const setup = await unitGame(
+      [
+        '2O3T2O',
+        'OFDiGPFaO',
+        'OMGGdGdHcO',
+        'OMgGdGPTD',
+        'OHPGGdTaO',
+        'OHHcHTFO',
+        '3OAOTO',
+      ].join(''),
+      7,
+      7,
+      Monarchy
+    );
+
+    keepFeatures(
+      setup,
+      '2,1',
+      '5,1',
+      '3,2',
+      '4,2',
+      '5,2',
+      '1,3',
+      '2,3',
+      '4,4',
+      '5,4',
+      '2,5'
+    );
+
+    const city = setup.addCity(3, 3, 1),
+      done = doEveryJob(setup, setup.addUnit(Settlers, 3, 3, city));
+
+    expect(done.length).to.be.below(100);
+    expect(improvements(setup, setup.world.get(2, 1))).to.include('Irrigation');
+    // The Hills at 2,5 beside the sea are irrigated for their own food, the water is carried on from them, and they're
+    //  mined once nothing needs it.
+    expect(done.indexOf('irrigation@2,5')).to.be.above(-1);
+    expect(done.indexOf('irrigation@2,1')).to.be.above(
+      done.indexOf('irrigation@2,5')
+    );
+    expect(done.indexOf('mine@2,5')).to.be.above(
+      done.indexOf('irrigation@2,1')
+    );
   });
 });

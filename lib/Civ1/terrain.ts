@@ -1,13 +1,17 @@
 // Civ1: which tiles are worth a city, irrigation, a mine or a road, judged by Civ1's terrain and yields, and what
 //  each terrain job is worth (`civ1TerrainPolicy`, civ-clone/web-renderer#234), railroads included
-//  (civ-clone/web-renderer#349).
+//  (civ-clone/web-renderer#349), and clearing or planting terrain and carrying water to a dry tile
+//  (civ-clone/web-renderer#353, #383, #386, #426).
 import {
   Desert,
+  Forest,
   Grassland,
   Hills,
+  Jungle,
   Mountains,
   Plains,
   River,
+  Swamp,
 } from '@civ-clone/civ1-world/Terrains';
 import {
   Communism,
@@ -17,7 +21,6 @@ import {
 } from '@civ-clone/civ1-government/Governments';
 import { Food, Production, Trade } from '@civ-clone/civ1-world/Yields';
 import {
-  TerrainImprovement,
   TerrainJobValue,
   TerrainPolicy,
 } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
@@ -48,6 +51,9 @@ import {
   BuildMine,
   BuildRailroad,
   BuildRoad,
+  ClearForest,
+  ClearJungle,
+  ClearSwamp,
 } from '@civ-clone/civ1-unit/Actions';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
@@ -236,7 +242,9 @@ export const shouldRoad = (
 //  or Democracy only (`republic`). Under Despotism, an irrigated Grassland or River tile gives no more food.
 type Gain = { food?: number; shields?: number; trade?: number };
 
-const gains: [TerrainImprovement, typeof Terrain, Gain, Gain, Gain][] = [
+type Improvement = 'irrigation' | 'mine' | 'railroad' | 'road';
+
+const gains: [Improvement, typeof Terrain, Gain, Gain, Gain][] = [
   // [improvement, terrain, any government, advanced, republic]
   ['irrigation', Desert, { food: 1 }, {}, {}],
   ['irrigation', Grassland, {}, { food: 1 }, {}],
@@ -252,13 +260,13 @@ const gains: [TerrainImprovement, typeof Terrain, Gain, Gain, Gain][] = [
 ];
 
 // The improvement each one replaces: a mine and irrigation can't share a tile.
-const replaces: { [K in TerrainImprovement]?: TerrainImprovement } = {
+const replaces: { [K in Improvement]?: Improvement } = {
   irrigation: 'mine',
   mine: 'irrigation',
 };
 
 const improvementTypes: {
-  [K in TerrainImprovement]: typeof TileImprovement;
+  [K in Improvement]: typeof TileImprovement;
 } = {
   irrigation: Irrigation,
   mine: Mine,
@@ -267,21 +275,64 @@ const improvementTypes: {
 };
 
 // The worker's action for each improvement, whose turns of work come from `civ1-unit`'s `terrainJobTurns`.
-const workActions: { [K in TerrainImprovement]: typeof UnitAction } = {
+const workActions: { [K in Improvement]: typeof UnitAction } = {
   irrigation: BuildIrrigation,
   mine: BuildMine,
   railroad: BuildRailroad,
   road: BuildRoad,
 };
 
-// How much a point of food, a shield and a point of trade are worth to a city, and `SHORT` times as much for food or
-//  shields when the city has at most 1 to spare.
+// Civ1's terrain changes a worker makes (civ-clone/web-renderer#353, #386): the job, its action, the terrain it's done
+//  on and the terrain it leaves. Civ1's own AI never makes them (v474.05's `TerrainModifications` table); this improves
+//  on it. Planting Forest isn't one: in the arena it cost more than it gave.
+type Conversion = 'clearForest' | 'clearJungle' | 'clearSwamp';
+
+const conversions: [
+  Conversion,
+  typeof UnitAction,
+  (typeof Terrain)[],
+  typeof Terrain
+][] = [
+  ['clearForest', ClearForest, [Forest], Plains],
+  ['clearJungle', ClearJungle, [Jungle], Grassland],
+  ['clearSwamp', ClearSwamp, [Swamp], Grassland],
+];
+
+// Each terrain's own yields, before any feature or improvement, as `civ1-world`'s `TileYield` rules have them: what a
+//  terrain change is worth is the difference.
+const baseYields: [typeof Terrain, Gain][] = [
+  [Forest, { food: 1, shields: 2 }],
+  [Grassland, { food: 2 }],
+  [Jungle, { food: 1 }],
+  [Plains, { food: 1, shields: 1 }],
+  [Swamp, { food: 1 }],
+];
+
+// Whether `TerrainType` is `BaseType` or one of its kind.
+const isA = (TerrainType: typeof Terrain, BaseType: typeof Terrain): boolean =>
+  TerrainType === BaseType || TerrainType.prototype instanceof BaseType;
+
+const baseYieldsOf = (TerrainType: typeof Terrain): Gain =>
+  baseYields.find(([BaseType]): boolean => isA(TerrainType, BaseType))?.[1] ??
+  {};
+
+// How much a point of food, a shield and a point of trade are worth to a city. Food is worth more the less of it the
+//  city has to spare (`FOOD_BY_SURPLUS`, from a surplus of 0 or less up; more than its last is `FOOD_SURPLUS`), and
+//  shields `SHORT` times as much when it has at most 1 to spare (civ-clone/web-renderer#383).
 const FOOD = 2;
+const FOOD_BY_SURPLUS = [2, 1.5, 1.25, 1];
+const FOOD_SURPLUS = 0.75;
 const SHIELDS = 1.5;
 const TRADE = 1;
 const SHORT = 1.5;
+// What irrigation is worth against what its food alone would be, so that workers see to food first
+//  (civ-clone/web-renderer#383).
+const IRRIGATION = 1.25;
 // What improving a tile the city doesn't work yet is worth, against one it does.
 const UNWORKED = 0.5;
+// What a job is worth for the irrigation it lets a neighbouring tile have, against that irrigation itself
+//  (civ-clone/web-renderer#426).
+const CHAIN = 0.5;
 
 type Weights = { food: number; shields: number; trade: number };
 
@@ -297,9 +348,15 @@ const weightsFor = (dependencies: Dependencies, city: City): Weights => {
   }
 
   const yields = city.yields(),
+    foodSurplus = reduceYield(yields, CityFood),
+    shieldSurplus = reduceYield(yields, CityProduction),
     weights = {
-      food: FOOD * (reduceYield(yields, CityFood) <= 1 ? SHORT : 1),
-      shields: SHIELDS * (reduceYield(yields, CityProduction) <= 1 ? SHORT : 1),
+      food:
+        FOOD *
+        (foodSurplus < FOOD_BY_SURPLUS.length
+          ? FOOD_BY_SURPLUS[Math.max(0, foodSurplus)]
+          : FOOD_SURPLUS),
+      shields: SHIELDS * (shieldSurplus <= 1 ? SHORT : 1),
       trade: TRADE,
     };
 
@@ -313,6 +370,11 @@ const add = (total: Gain, gain: Gain, sign: number = 1): Gain => ({
   shields: (total.shields ?? 0) + sign * (gain.shields ?? 0),
   trade: (total.trade ?? 0) + sign * (gain.trade ?? 0),
 });
+
+const worth = (gain: Gain, weights: Weights): number =>
+  (gain.food ?? 0) * weights.food +
+  (gain.shields ?? 0) * weights.shields +
+  (gain.trade ?? 0) * weights.trade;
 
 // What a railroad adds to `tile` for `player`: half of each of its yields, rounded down, as `civ1-world`'s
 //  `YieldModifier` rules and v474.05 have it.
@@ -331,23 +393,19 @@ const railroadGain = (player: Player, tile: Tile): Gain => {
   };
 };
 
-// What `improvement` adds to `tile` under `player`'s government, if anything.
-const gainOf = (
+// What `improvement` adds to a tile of `TerrainType` under `player`'s government, if anything.
+const gainOn = (
   dependencies: Dependencies,
   player: Player,
-  tile: Tile,
-  improvement: TerrainImprovement
+  TerrainType: typeof Terrain,
+  improvement: Improvement
 ): Gain => {
-  if (improvement === 'railroad') {
-    return railroadGain(player, tile);
-  }
-
   const government = dependencies.playerGovernmentRegistry.getByPlayer(player),
     advanced = government.is(Monarchy, Communism, Republic, Democracy),
     republic = government.is(Republic, Democracy),
     row = gains.find(
-      ([rowImprovement, TerrainType]): boolean =>
-        rowImprovement === improvement && tile.terrain() instanceof TerrainType
+      ([rowImprovement, RowTerrain]): boolean =>
+        rowImprovement === improvement && isA(TerrainType, RowTerrain)
     );
 
   if (!row) {
@@ -362,6 +420,20 @@ const gainOf = (
   );
 };
 
+const terrainTypeOf = (tile: Tile): typeof Terrain =>
+  tile.terrain().constructor as typeof Terrain;
+
+// What `improvement` adds to `tile` under `player`'s government, if anything.
+const gainOf = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile,
+  improvement: Improvement
+): Gain =>
+  improvement === 'railroad'
+    ? railroadGain(player, tile)
+    : gainOn(dependencies, player, terrainTypeOf(tile), improvement);
+
 // Whether the player has the Railroad advance.
 const knowsRailroad = (dependencies: Dependencies, player: Player): boolean =>
   dependencies.playerResearchRegistry
@@ -370,66 +442,379 @@ const knowsRailroad = (dependencies: Dependencies, player: Player): boolean =>
       research.completed(RailroadAdvance)
     );
 
+const hasImprovement = (
+  dependencies: Dependencies,
+  tile: Tile,
+  improvement: Improvement
+): boolean =>
+  dependencies.tileImprovementRegistry
+    .getByTile(tile)
+    .some(
+      (tileImprovement: TileImprovement): boolean =>
+        tileImprovement instanceof improvementTypes[improvement]
+    );
+
+const hasFeature = (dependencies: Dependencies, tile: Tile): boolean =>
+  dependencies.terrainFeatureRegistry.getByTerrain(tile.terrain()).length > 0;
+
+const isCityTile = (dependencies: Dependencies, tile: Tile): boolean =>
+  dependencies.cityRegistry.getByTile(tile) !== null;
+
+// Whether `tile` could be irrigated as far as water goes, as `civ1-unit`'s `BuildIrrigation` rule has it: it's a River,
+//  or a River, water or an irrigated tile with no city on it is next to it, north, east, south or west.
+const waterBeside = (dependencies: Dependencies, tile: Tile): boolean =>
+  tile.terrain() instanceof River ||
+  tile
+    .getAdjacent()
+    .some(
+      (neighbour: Tile): boolean =>
+        neighbour.terrain() instanceof River ||
+        neighbour.isWater() ||
+        (hasImprovement(dependencies, neighbour, 'irrigation') &&
+          !isCityTile(dependencies, neighbour))
+    );
+
+// Whether irrigation gives a tile of `TerrainType` anything, under any government.
+const irrigable = (TerrainType: typeof Terrain): boolean =>
+  gains.some(
+    ([improvement, RowTerrain]): boolean =>
+      improvement === 'irrigation' && isA(TerrainType, RowTerrain)
+  );
+
+// Whether `tile` could carry water to a neighbour, once irrigated: it has water beside it and is irrigable, or a Forest
+//  with no feature that would be Plains once cleared (civ-clone/web-renderer#426). Not Hills: irrigating them to carry
+//  water took workers from their mines, and the arena had fewer mines and no more food for it.
+const couldCarryWater = (dependencies: Dependencies, tile: Tile): boolean =>
+  tile.isLand() &&
+  !isCityTile(dependencies, tile) &&
+  !(tile.terrain() instanceof Hills) &&
+  waterBeside(dependencies, tile) &&
+  (irrigable(terrainTypeOf(tile)) ||
+    (tile.terrain() instanceof Forest && !hasFeature(dependencies, tile)));
+
+// The city of the player's that works `tile`, and whether it works it, or else the nearest of its cities that could.
+const cityFor = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): [City, boolean] | null => {
+  const workedTile = dependencies.workedTileRegistry.getByTile(tile);
+
+  if (workedTile && workedTile.city().player() === player) {
+    return [workedTile.city(), true];
+  }
+
+  const city = dependencies.cityRegistry
+    .getByPlayer(player)
+    .filter((city: City): boolean => city.tiles().includes(tile))
+    .sort(
+      (a: City, b: City): number =>
+        a.tile().distanceFrom(tile) - b.tile().distanceFrom(tile)
+    )[0];
+
+  return city ? [city, false] : null;
+};
+
+// What irrigating `tile` is worth to the city that works (or could work) it, if anything, whether or not it has water
+//  beside it yet: 0 for a tile already irrigated, or that no city of the player's could work.
+const irrigationWorth = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): number => {
+  if (
+    isCityTile(dependencies, tile) ||
+    hasImprovement(dependencies, tile, 'irrigation')
+  ) {
+    return 0;
+  }
+
+  const found = cityFor(dependencies, player, tile);
+
+  if (!found) {
+    return 0;
+  }
+
+  const [city, worked] = found,
+    weights = weightsFor(dependencies, city),
+    gain = add(
+      gainOf(dependencies, player, tile, 'irrigation'),
+      hasImprovement(dependencies, tile, 'mine')
+        ? gainOf(dependencies, player, tile, 'mine')
+        : {},
+      -1
+    );
+
+  return Math.max(
+    0,
+    (worked ? 1 : UNWORKED) * IRRIGATION * worth(gain, weights)
+  );
+};
+
+// The tiles next to `tile`, north, east, south or west, that would be worth irrigating but have no water beside them:
+//  irrigating `tile` (or clearing it to irrigate it) would let them have it (civ-clone/web-renderer#426).
+const dryNeighbours = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): Tile[] =>
+  tile
+    .getAdjacent()
+    .filter(
+      (neighbour: Tile): boolean =>
+        neighbour.isLand() &&
+        irrigable(terrainTypeOf(neighbour)) &&
+        !waterBeside(dependencies, neighbour) &&
+        irrigationWorth(dependencies, player, neighbour) > 0
+    );
+
+// What carrying water to its dry neighbours is worth from `tile`, as a share of what irrigating them is worth.
+const chainWorth = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): number =>
+  couldCarryWater(dependencies, tile)
+    ? CHAIN *
+      dryNeighbours(dependencies, player, tile).reduce(
+        (total: number, neighbour: Tile): number =>
+          total + irrigationWorth(dependencies, player, neighbour),
+        0
+      )
+    : 0;
+
+// Whether `tile`'s irrigation is the only water a neighbour that's still worth irrigating could have: it isn't to be
+//  mined until that neighbour is irrigated.
+const onlyWaterFor = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): boolean =>
+  tile.getAdjacent().some(
+    (neighbour: Tile): boolean =>
+      neighbour.isLand() &&
+      irrigable(terrainTypeOf(neighbour)) &&
+      irrigationWorth(dependencies, player, neighbour) > 0 &&
+      !(neighbour.terrain() instanceof River) &&
+      neighbour
+        .getAdjacent()
+        .filter(
+          (source: Tile): boolean =>
+            source.terrain() instanceof River ||
+            source.isWater() ||
+            (hasImprovement(dependencies, source, 'irrigation') &&
+              !isCityTile(dependencies, source))
+        )
+        .every((source: Tile): boolean => source === tile)
+  );
+
+// Whether `tile` could ever have water for irrigation: beside it now, or through a neighbour that could carry it.
+const couldHaveWater = (dependencies: Dependencies, tile: Tile): boolean =>
+  waterBeside(dependencies, tile) ||
+  tile
+    .getAdjacent()
+    .some((neighbour: Tile): boolean =>
+      couldCarryWater(dependencies, neighbour)
+    );
+
+// The terrain changes worth making to `tile` (civ-clone/web-renderer#353, #386): Jungle and Swamp with no feature cleared
+//  to Grassland on a tile the city works, as only a tile worked for a long time repays 15 turns of work; and Forest with
+//  no feature cleared to Plains only when the Plains could then be irrigated (it has water beside it), with that
+//  irrigation counted in, on a tile the city works or one that would carry water on to a tile worth irrigating.
+const conversionJobs = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile,
+  weights: Weights,
+  worked: boolean
+): TerrainJobValue[] => {
+  if (hasFeature(dependencies, tile)) {
+    return [];
+  }
+
+  const water = waterBeside(dependencies, tile),
+    chain = chainWorth(dependencies, player, tile);
+
+  return conversions
+    .filter(([, , from]): boolean =>
+      from.some(
+        (FromType: typeof Terrain): boolean =>
+          tile.terrain() instanceof FromType
+      )
+    )
+    .flatMap(([job, Action, , To]): TerrainJobValue[] => {
+      if (
+        (job === 'clearForest' && !water) ||
+        (!worked && (job !== 'clearForest' || chain <= 0))
+      ) {
+        return [];
+      }
+
+      const turns = terrainJobTurns(Action, tile.terrain()) ?? 1,
+        // Irrigating the new terrain afterwards, where it could be.
+        then =
+          water && irrigable(To)
+            ? gainOn(dependencies, player, To, 'irrigation')
+            : {},
+        thenTurns =
+          (then.food ?? 0) > 0
+            ? terrainJobTurns(BuildIrrigation, new To()) ?? 0
+            : 0,
+        gain = add(
+          add(baseYieldsOf(To), baseYieldsOf(terrainTypeOf(tile)), -1),
+          then
+        ),
+        value =
+          (worked ? 1 : UNWORKED) * worth(gain, weights) +
+          (job === 'clearForest' ? chain : 0);
+
+      return [
+        {
+          improvement: job,
+          action: job,
+          value,
+          turns: turns + thenTurns,
+        },
+      ];
+    });
+};
+
+// Each turn's tiles a worker of each player may be sent to: its cities' tiles, and the tiles next to any of them that
+//  could carry water to one worth irrigating that has none (civ-clone/web-renderer#426), which can be outside every
+//  city's tiles.
+const tilesCache: WeakMap<Player, [number, Tile[]]> = new WeakMap();
+
 // Civ1's terrain jobs for `TerrainWork`: irrigation, mines, roads, and railroads on roads once the player has the
 //  Railroad advance, where they add food, shields or trade, weighed by what the city that works (or could work) the
-//  tile is short of, for a worker's turns of work.
+//  tile is short of, for a worker's turns of work. Irrigation comes first, the more so for a city short of food
+//  (civ-clone/web-renderer#383); Jungle, Swamp and Forest are cleared where that pays (civ-clone/web-renderer#353,
+//  #386); and a tile that could carry water to a neighbour worth irrigating is worth part
+//  of that irrigation too (civ-clone/web-renderer#426).
 export const civ1TerrainPolicy: TerrainPolicy = {
   jobs: (dependencies, player, tile) => {
-    const workedTile = dependencies.workedTileRegistry.getByTile(tile),
-      workedBy =
-        workedTile && workedTile.city().player() === player
-          ? workedTile.city()
-          : null,
-      city =
-        workedBy ??
-        dependencies.cityRegistry
-          .getByPlayer(player)
-          .filter((city: City): boolean => city.tiles().includes(tile))
-          .sort(
-            (a: City, b: City): number =>
-              a.tile().distanceFrom(tile) - b.tile().distanceFrom(tile)
-          )[0];
+    const found = cityFor(dependencies, player, tile),
+      chain = chainWorth(dependencies, player, tile);
 
-    if (!city) {
-      return [];
+    // A tile no city of the player's could work is only worth what it would carry water to.
+    if (!found) {
+      if (chain <= 0) {
+        return [];
+      }
+
+      if (tile.terrain() instanceof Forest) {
+        return [
+          {
+            improvement: 'clearForest',
+            action: 'clearForest',
+            value: chain,
+            turns:
+              (terrainJobTurns(ClearForest, tile.terrain()) ?? 1) +
+              (terrainJobTurns(BuildIrrigation, new Plains()) ?? 0),
+          },
+        ];
+      }
+
+      return hasImprovement(dependencies, tile, 'irrigation')
+        ? []
+        : [
+            {
+              improvement: 'irrigation',
+              value: chain,
+              turns: terrainJobTurns(BuildIrrigation, tile.terrain()) ?? 1,
+            },
+          ];
     }
 
-    const existing = dependencies.tileImprovementRegistry.getByTile(tile),
-      has = (improvement: TerrainImprovement): boolean =>
-        existing.some(
-          (tileImprovement: TileImprovement): boolean =>
-            tileImprovement instanceof improvementTypes[improvement]
-        ),
-      weights = weightsFor(dependencies, city);
+    const [city, worked] = found,
+      factor = worked ? 1 : UNWORKED,
+      weights = weightsFor(dependencies, city),
+      has = (improvement: Improvement): boolean =>
+        hasImprovement(dependencies, tile, improvement);
 
-    return (['irrigation', 'mine', 'railroad', 'road'] as TerrainImprovement[])
-      .filter(
-        (improvement: TerrainImprovement): boolean =>
-          !has(improvement) &&
-          (improvement !== 'railroad' ||
-            (has('road') && knowsRailroad(dependencies, player)))
-      )
-      .map((improvement: TerrainImprovement): TerrainJobValue => {
-        const replaced = replaces[improvement],
-          gain = add(
-            gainOf(dependencies, player, tile, improvement),
-            replaced && has(replaced)
-              ? gainOf(dependencies, player, tile, replaced)
-              : {},
-            -1
-          );
+    return [
+      ...(['irrigation', 'mine', 'railroad', 'road'] as Improvement[])
+        .filter(
+          (improvement: Improvement): boolean =>
+            !has(improvement) &&
+            (improvement !== 'railroad' ||
+              (has('road') && knowsRailroad(dependencies, player))) &&
+            // Irrigation that's the only water a neighbour worth irrigating could have stays until it's irrigated, and
+            //  a dry tile that water could reach isn't mined first if irrigating it would be worth more.
+            (improvement !== 'mine' ||
+              (has('irrigation')
+                ? !onlyWaterFor(dependencies, player, tile)
+                : waterBeside(dependencies, tile) ||
+                  !couldHaveWater(dependencies, tile) ||
+                  IRRIGATION *
+                    worth(
+                      gainOf(dependencies, player, tile, 'irrigation'),
+                      weights
+                    ) <=
+                    worth(gainOf(dependencies, player, tile, 'mine'), weights)))
+        )
+        .map((improvement: Improvement): TerrainJobValue => {
+          const replaced = replaces[improvement],
+            gain = add(
+              gainOf(dependencies, player, tile, improvement),
+              replaced && has(replaced)
+                ? gainOf(dependencies, player, tile, replaced)
+                : {},
+              -1
+            );
 
-        return {
-          improvement,
-          value:
-            (workedBy ? 1 : UNWORKED) *
-            ((gain.food ?? 0) * weights.food +
-              (gain.shields ?? 0) * weights.shields +
-              (gain.trade ?? 0) * weights.trade),
-          turns: terrainJobTurns(workActions[improvement], tile.terrain()) ?? 1,
-        };
-      })
-      .filter(({ value }: TerrainJobValue): boolean => value > 0);
+          return {
+            improvement,
+            value:
+              factor *
+                worth(gain, weights) *
+                (improvement === 'irrigation' ? IRRIGATION : 1) +
+              (improvement === 'irrigation' ? chain : 0),
+            turns:
+              terrainJobTurns(workActions[improvement], tile.terrain()) ?? 1,
+          };
+        }),
+      ...conversionJobs(dependencies, player, tile, weights, worked),
+    ].filter(({ value }: TerrainJobValue): boolean => value > 0);
+  },
+  tiles: (dependencies, player) => {
+    const turn = dependencies.turn.value(),
+      cached = tilesCache.get(player);
+
+    if (cached && cached[0] === turn) {
+      return cached[1];
+    }
+
+    const cityTiles = new Set<Tile>(
+        dependencies.cityRegistry
+          .getByPlayer(player)
+          .flatMap((city: City): Tile[] => city.tiles().entries())
+      ),
+      tiles = new Set<Tile>(cityTiles);
+
+    cityTiles.forEach((tile: Tile): void => {
+      if (
+        !tile.isLand() ||
+        !irrigable(terrainTypeOf(tile)) ||
+        waterBeside(dependencies, tile)
+      ) {
+        return;
+      }
+
+      tile.getAdjacent().forEach((neighbour: Tile): void => {
+        if (
+          !cityTiles.has(neighbour) &&
+          couldCarryWater(dependencies, neighbour)
+        ) {
+          tiles.add(neighbour);
+        }
+      });
+    });
+
+    const list = [...tiles];
+
+    tilesCache.set(player, [turn, list]);
+
+    return list;
   },
   // One for every eight cities. These don't count towards the Settlers a player builds for founding cities
   //  (`isFoundingSettlers` in `buildItemInCity`); any more on terrain jobs do. While they all counted, players founded a
