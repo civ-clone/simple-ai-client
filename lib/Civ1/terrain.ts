@@ -28,6 +28,7 @@ import { Game, Oasis } from '@civ-clone/civ1-world/TerrainFeatures';
 import {
   Irrigation,
   Mine,
+  Pollution,
   Railroad,
   Road,
 } from '@civ-clone/civ1-world/TileImprovements';
@@ -54,12 +55,18 @@ import {
   ClearForest,
   ClearJungle,
   ClearSwamp,
+  CleanPollution,
 } from '@civ-clone/civ1-unit/Actions';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import UnitAction from '@civ-clone/core-unit/Action';
 import Yield from '@civ-clone/core-yield/Yield';
-import { terrainJobTurns } from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
+import {
+  terrainJobTurns,
+  terrainMovementCost,
+} from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
+import PollutionConcern from '@civ-clone/base-leader-personality/Rules/Player/PollutionConcern';
+import { product } from '@civ-clone/base-leader-personality/lib/combine';
 
 export const isACityTile = (
   dependencies: Dependencies,
@@ -679,26 +686,289 @@ const conversionJobs = (
     });
 };
 
-// Each turn's tiles a worker of each player may be sent to: its cities' tiles, and the tiles next to any of them that
-//  could carry water to one worth irrigating that has none (civ-clone/web-renderer#426), which can be outside every
-//  city's tiles.
+// Routes between the player's cities (civ-clone/web-renderer#384): each city is joined to its `ROUTE_LINKS` nearest
+//  cities of the player's within `ROUTE_DISTANCE`, along the cheapest way over land by Civ1's movement costs, which
+//  takes a Road already there where it can. A square on a route is worth `ROUTE` more with a Road, and again with a
+//  Railroad once the player knows how, as a point of trade would be, whether or not a city works it.
+const ROUTE = 1;
+const ROUTE_DISTANCE = 10;
+const ROUTE_LINKS = 2;
+// How far a route may stray from the straight line between its cities, in squares.
+const ROUTE_MARGIN = 2;
+// What each square of straying costs a step, far less than any move, so that it only decides between equal ways.
+const STRAIGHTNESS = 0.001;
+
+// What a step onto `to` from `from` costs by Civ1's movement rules: a third between two squares with a Road, nothing
+//  between two with a Railroad, and the terrain's own cost otherwise.
+const stepCost = (dependencies: Dependencies, from: Tile, to: Tile): number => {
+  if (
+    hasImprovement(dependencies, from, 'railroad') &&
+    hasImprovement(dependencies, to, 'railroad')
+  ) {
+    return 0;
+  }
+
+  if (
+    hasImprovement(dependencies, from, 'road') &&
+    hasImprovement(dependencies, to, 'road')
+  ) {
+    return 1 / 3;
+  }
+
+  return terrainMovementCost(to.terrain()) ?? 3;
+};
+
+// The squares between `from` and `to` along the cheapest way over land, neither city included, or none if there's no
+//  way within `ROUTE_MARGIN` of the straight line. No other city is passed through.
+const route = (dependencies: Dependencies, from: Tile, to: Tile): Tile[] => {
+  const limit = from.distanceFrom(to) + 2 * ROUTE_MARGIN,
+    costs = new Map<Tile, number>([[from, 0]]),
+    previous = new Map<Tile, Tile>(),
+    open = new Set<Tile>([from]),
+    done = new Set<Tile>();
+
+  while (open.size > 0) {
+    let current: Tile | null = null;
+
+    open.forEach((tile: Tile): void => {
+      if (current === null || costs.get(tile)! < costs.get(current)!) {
+        current = tile;
+      }
+    });
+
+    const tile = current as unknown as Tile;
+
+    if (tile === to) {
+      const squares: Tile[] = [];
+
+      for (let step = previous.get(to); step && step !== from; ) {
+        squares.unshift(step);
+        step = previous.get(step);
+      }
+
+      return squares;
+    }
+
+    open.delete(tile);
+    done.add(tile);
+
+    tile.getNeighbours().forEach((neighbour: Tile): void => {
+      if (
+        done.has(neighbour) ||
+        !neighbour.isLand() ||
+        (neighbour !== to && isCityTile(dependencies, neighbour)) ||
+        neighbour.distanceFrom(from) + neighbour.distanceFrom(to) > limit
+      ) {
+        return;
+      }
+
+      // Of equally cheap ways, the straightest: a step off the straight line costs a little more.
+      const cost =
+        costs.get(tile)! +
+        stepCost(dependencies, tile, neighbour) +
+        STRAIGHTNESS *
+          (neighbour.distanceFrom(from) +
+            neighbour.distanceFrom(to) -
+            from.distanceFrom(to));
+
+      if (!costs.has(neighbour) || cost < costs.get(neighbour)!) {
+        costs.set(neighbour, cost);
+        previous.set(neighbour, tile);
+        open.add(neighbour);
+      }
+    });
+  }
+
+  return [];
+};
+
+// Each turn's squares on the routes between each player's cities.
+const routesCache: WeakMap<Player, [number, Set<Tile>]> = new WeakMap();
+
+const routeTiles = (dependencies: Dependencies, player: Player): Set<Tile> => {
+  const turn = dependencies.turn.value(),
+    cached = routesCache.get(player);
+
+  if (cached && cached[0] === turn) {
+    return cached[1];
+  }
+
+  const cities = dependencies.cityRegistry.getByPlayer(player),
+    linked = new Set<string>(),
+    tiles = new Set<Tile>();
+
+  cities.forEach((city: City, index: number): void =>
+    cities
+      .map((other: City, otherIndex: number): [City, number] => [
+        other,
+        otherIndex,
+      ])
+      .filter(
+        ([other]): boolean =>
+          other !== city &&
+          other.tile().distanceFrom(city.tile()) <= ROUTE_DISTANCE
+      )
+      .sort(
+        ([a], [b]): number =>
+          a.tile().distanceFrom(city.tile()) -
+          b.tile().distanceFrom(city.tile())
+      )
+      .slice(0, ROUTE_LINKS)
+      .forEach(([other, otherIndex]): void => {
+        const key = [index, otherIndex].sort((a, b) => a - b).join(':');
+
+        if (linked.has(key)) {
+          return;
+        }
+
+        linked.add(key);
+
+        route(dependencies, city.tile(), other.tile()).forEach(
+          (tile: Tile): void => {
+            tiles.add(tile);
+          }
+        );
+      })
+  );
+
+  routesCache.set(player, [turn, tiles]);
+
+  return tiles;
+};
+
+// The jobs on a route square for the route alone (civ-clone/web-renderer#384): a Road, then a Railroad once the
+//  player knows how.
+const routeJobs = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): TerrainJobValue[] => {
+  if (!hasImprovement(dependencies, tile, 'road')) {
+    return [
+      {
+        improvement: 'road',
+        value: ROUTE,
+        turns: terrainJobTurns(BuildRoad, tile.terrain()) ?? 1,
+      },
+    ];
+  }
+
+  return knowsRailroad(dependencies, player) &&
+    !hasImprovement(dependencies, tile, 'railroad')
+    ? [
+        {
+          improvement: 'railroad',
+          value: ROUTE,
+          turns: terrainJobTurns(BuildRailroad, tile.terrain()) ?? 1,
+        },
+      ]
+    : [];
+};
+
+// Cleaning up pollution (civ-clone/web-renderer#366): a polluted square is worth what the pollution takes from it (half
+//  of each of its yields, by Civ1's rule), weighed for the city as any other job, plus `POLLUTED` for the square
+//  itself and `POLLUTION_SPREAD` for each other polluted square of the player's: the more there are, the nearer global
+//  warming (civ-clone/web-renderer#365). All of it times how much the player's leader minds pollution
+//  (`PollutionConcern`).
+const POLLUTED = 1;
+const POLLUTION_SPREAD = 0.25;
+
+const isPolluted = (dependencies: Dependencies, tile: Tile): boolean =>
+  dependencies.tileImprovementRegistry
+    .getByTile(tile)
+    .some(
+      (improvement: TileImprovement): boolean =>
+        improvement instanceof Pollution
+    );
+
+// Each turn's count of polluted squares around each player's cities.
+const pollutedCache: WeakMap<Player, [number, number]> = new WeakMap();
+
+const pollutedCount = (dependencies: Dependencies, player: Player): number => {
+  const turn = dependencies.turn.value(),
+    cached = pollutedCache.get(player);
+
+  if (cached && cached[0] === turn) {
+    return cached[1];
+  }
+
+  const count = new Set<Tile>(
+    dependencies.cityRegistry
+      .getByPlayer(player)
+      .flatMap((city: City): Tile[] => city.tiles().entries())
+      .filter((tile: Tile): boolean => isPolluted(dependencies, tile))
+  ).size;
+
+  pollutedCache.set(player, [turn, count]);
+
+  return count;
+};
+
+const pollutionJobs = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile,
+  weights: Weights,
+  factor: number
+): TerrainJobValue[] => {
+  if (!isPolluted(dependencies, tile)) {
+    return [];
+  }
+
+  const [food, shields, trade] = reduceYields(
+      tile
+        .yields(player)
+        .filter((tileYield: Yield): boolean =>
+          tileYield
+            .values()
+            .some(([, provider]): boolean => provider === Pollution.name)
+        ),
+      Food,
+      Production,
+      Trade
+    ),
+    lost = { food: -food, shields: -shields, trade: -trade };
+
+  return [
+    {
+      improvement: 'cleanPollution',
+      action: 'cleanPollution',
+      value:
+        product(dependencies.ruleRegistry, PollutionConcern, player) *
+        (factor * worth(lost, weights) +
+          POLLUTED +
+          POLLUTION_SPREAD *
+            Math.max(0, pollutedCount(dependencies, player) - 1)),
+      turns: terrainJobTurns(CleanPollution, tile.terrain()) ?? 1,
+    },
+  ];
+};
+
+// Each turn's tiles a worker of each player may be sent to: its cities' tiles, the tiles next to any of them that
+//  could carry water to one worth irrigating that has none (civ-clone/web-renderer#426), and the squares on the routes
+//  between its cities (civ-clone/web-renderer#384), which can be outside every city's tiles.
 const tilesCache: WeakMap<Player, [number, Tile[]]> = new WeakMap();
 
 // Civ1's terrain jobs for `TerrainWork`: irrigation, mines, roads, and railroads on roads once the player has the
 //  Railroad advance, where they add food, shields or trade, weighed by what the city that works (or could work) the
 //  tile is short of, for a worker's turns of work. Irrigation comes first, the more so for a city short of food
 //  (civ-clone/web-renderer#383); Jungle, Swamp and Forest are cleared where that pays (civ-clone/web-renderer#353,
-//  #386); and a tile that could carry water to a neighbour worth irrigating is worth part
-//  of that irrigation too (civ-clone/web-renderer#426).
+//  #386); a tile that could carry water to a neighbour worth irrigating is worth part of that irrigation too
+//  (civ-clone/web-renderer#426); a square on a route between cities is worth a Road and a Railroad
+//  (civ-clone/web-renderer#384), and once the player knows Railroad a Road is worth the Railroad it allows
+//  (civ-clone/web-renderer#385); and pollution is cleaned up (civ-clone/web-renderer#366).
 export const civ1TerrainPolicy: TerrainPolicy = {
   jobs: (dependencies, player, tile) => {
     const found = cityFor(dependencies, player, tile),
-      chain = chainWorth(dependencies, player, tile);
+      chain = chainWorth(dependencies, player, tile),
+      onRoute = routeTiles(dependencies, player).has(tile);
 
-    // A tile no city of the player's could work is only worth what it would carry water to.
+    // A tile no city of the player's could work is only worth what it would carry water to, and its route.
     if (!found) {
+      const routed = onRoute ? routeJobs(dependencies, player, tile) : [];
+
       if (chain <= 0) {
-        return [];
+        return routed;
       }
 
       if (tile.terrain() instanceof Forest) {
@@ -711,17 +981,19 @@ export const civ1TerrainPolicy: TerrainPolicy = {
               (terrainJobTurns(ClearForest, tile.terrain()) ?? 1) +
               (terrainJobTurns(BuildIrrigation, new Plains()) ?? 0),
           },
+          ...routed,
         ];
       }
 
       return hasImprovement(dependencies, tile, 'irrigation')
-        ? []
+        ? routed
         : [
             {
               improvement: 'irrigation',
               value: chain,
               turns: terrainJobTurns(BuildIrrigation, tile.terrain()) ?? 1,
             },
+            ...routed,
           ];
     }
 
@@ -760,7 +1032,14 @@ export const civ1TerrainPolicy: TerrainPolicy = {
                 ? gainOf(dependencies, player, tile, replaced)
                 : {},
               -1
-            );
+            ),
+            turns =
+              terrainJobTurns(workActions[improvement], tile.terrain()) ?? 1,
+            // A Road is worth the Railroad it allows, once the player knows how, for the turns of both.
+            railroad =
+              improvement === 'road' && knowsRailroad(dependencies, player)
+                ? factor * worth(railroadGain(player, tile), weights)
+                : 0;
 
           return {
             improvement,
@@ -768,12 +1047,20 @@ export const civ1TerrainPolicy: TerrainPolicy = {
               factor *
                 worth(gain, weights) *
                 (improvement === 'irrigation' ? IRRIGATION : 1) +
-              (improvement === 'irrigation' ? chain : 0),
+              (improvement === 'irrigation' ? chain : 0) +
+              ((improvement === 'road' || improvement === 'railroad') && onRoute
+                ? ROUTE
+                : 0) +
+              railroad,
             turns:
-              terrainJobTurns(workActions[improvement], tile.terrain()) ?? 1,
+              turns +
+              (railroad > 0
+                ? terrainJobTurns(BuildRailroad, tile.terrain()) ?? 0
+                : 0),
           };
         }),
       ...conversionJobs(dependencies, player, tile, weights, worked),
+      ...pollutionJobs(dependencies, player, tile, weights, factor),
     ].filter(({ value }: TerrainJobValue): boolean => value > 0);
   },
   tiles: (dependencies, player) => {
@@ -810,17 +1097,22 @@ export const civ1TerrainPolicy: TerrainPolicy = {
       });
     });
 
+    routeTiles(dependencies, player).forEach((tile: Tile): void => {
+      tiles.add(tile);
+    });
+
     const list = [...tiles];
 
     tilesCache.set(player, [turn, list]);
 
     return list;
   },
-  // One for every eight cities. These don't count towards the Settlers a player builds for founding cities
+  // One for every six cities. These don't count towards the Settlers a player builds for founding cities
   //  (`isFoundingSettlers` in `buildItemInCity`); any more on terrain jobs do. While they all counted, players founded a
-  //  city fewer by turn 300 with one for every six, and three fewer with one for every three. Without them counting, one
-  //  for every four or six gave more improved tiles but no more trade or population, and one for every four explored
-  //  less (civ-clone/web-renderer#234).
+  //  city fewer by turn 300 with one for every six, and three fewer with one for every three. Without them counting, and
+  //  with Roads between cities to build, one for every six gave more trade, irrigation, Roads and linked cities than one
+  //  for every eight on one set of seeds, and more linked cities on another, with nothing worse; one for every four
+  //  founded fewer cities (civ-clone/web-renderer#234).
   workersWanted: (dependencies, player) =>
-    Math.floor(dependencies.cityRegistry.getByPlayer(player).length / 8),
+    Math.floor(dependencies.cityRegistry.getByPlayer(player).length / 6),
 };
