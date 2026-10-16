@@ -404,9 +404,9 @@ describe('buildItemInCity', (): void => {
 
     // Settlers with no city site and no terrain job would only join a city again (civ-clone/web-renderer#243).
     it('should not build Settlers with no city site they could walk to and no terrain job', async (): Promise<void> => {
-      // Forest, which isn't worth improving in Civ1.
+      // Tundra, which isn't worth improving in Civ1.
       const setup = await setUp({
-        map: '4FO4FO'.repeat(5),
+        map: '4TO4TO'.repeat(5),
         shields: 2,
         size: 2,
       });
@@ -535,23 +535,23 @@ describe('buildItemInCity', (): void => {
       ).true;
       expect(setup.choose()).equal(Settlers);
 
-      // With every one of the city's tiles claimed by a worker's job, none is open.
+      // With every tile the policy names claimed by a worker's job, none is open.
       const jobs = terrainJobs(memory),
-        workers = setup.city
-          .tiles()
-          .entries()
-          .map((tile: Tile): Settlers => {
-            const worker = new Settlers(
-              null,
-              setup.player,
-              tile,
-              setup.game.rules
-            );
+        workers = civ1TerrainPolicy.tiles!(
+          setup.dependencies,
+          setup.player
+        ).map((tile: Tile): Settlers => {
+          const worker = new Settlers(
+            null,
+            setup.player,
+            tile,
+            setup.game.rules
+          );
 
-            jobs.set(worker, { improvement: 'road', tile });
+          jobs.set(worker, { improvement: 'road', tile });
 
-            return worker;
-          });
+          return worker;
+        });
 
       expect(
         hasOpenTerrainJob(
