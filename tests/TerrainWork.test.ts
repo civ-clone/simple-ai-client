@@ -4,7 +4,13 @@ import {
   Republic,
 } from '@civ-clone/civ1-government/Governments';
 import { Forest, Grassland, Plains } from '@civ-clone/civ1-world/Terrains';
-import { Irrigation, Mine, Road } from '@civ-clone/civ1-world/TileImprovements';
+import {
+  Irrigation,
+  Mine,
+  Pollution,
+  Railroad,
+  Road,
+} from '@civ-clone/civ1-world/TileImprovements';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import terrainWork, {
@@ -14,6 +20,8 @@ import terrainWork, {
 } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import Terrain from '@civ-clone/core-terrain/Terrain';
 import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
+import Effect from '@civ-clone/core-rule/Effect';
+import PollutionConcern from '@civ-clone/base-leader-personality/Rules/Player/PollutionConcern';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
 import unitGame, { UnitGame, at } from './lib/unitGame';
@@ -195,8 +203,9 @@ describe('TerrainWork', (): void => {
     expect(jobsAt(setup, 0, 1)).to.deep.equal(['railroad:1.5/3']);
     // The worked Plains with a road: 1 food, 1 shield, 1 trade, so a railroad adds nothing.
     expect(jobsAt(setup, 2, 0)).to.deep.equal(['irrigation:3.75/4']);
-    // No road, no railroad.
-    expect(jobsAt(setup, 1, 0)).to.deep.equal(['road:0.5/1']);
+    // No road, no railroad yet: but a road is now worth the railroad it allows (civ-clone/web-renderer#385), 1 food
+    //  more on Grassland, for the turns of both.
+    expect(jobsAt(setup, 1, 0)).to.deep.equal(['road:2/4']);
 
     // Hills with a mine and a road: 1 food, 2 shields, so a railroad adds 1 shield, to a city with at most 1 to
     //  spare. A railroad takes 8 turns on Hills in Civ1, so 7 more.
@@ -348,16 +357,16 @@ describe('TerrainWork', (): void => {
     expect(terrainJobs(memory).has(settlers)).true;
   });
 
-  it('should want a terrain worker in Civ1 for every eight cities', async (): Promise<void> => {
+  it('should want a terrain worker in Civ1 for every six cities', async (): Promise<void> => {
     const setup = await unitGame('64G', 8, 8, Despotism),
       wanted = (): number =>
         civ1TerrainPolicy.workersWanted(setup.dependencies, setup.player);
 
-    [0, 1, 2, 3, 4, 5, 6].forEach((x) => setup.addCity(x, x % 2 === 0 ? 1 : 5));
+    [0, 1, 2, 3, 4].forEach((x) => setup.addCity(x, x % 2 === 0 ? 1 : 5));
 
     expect(wanted()).to.equal(0);
 
-    setup.addCity(7, 1);
+    setup.addCity(5, 5);
 
     expect(wanted()).to.equal(1);
   });
@@ -519,6 +528,97 @@ describe('TerrainWork', (): void => {
     expect(jobsAt(setup, 4, 0)).to.include('clearForest:1.5/8');
     // Plains with no water to irrigate them only lose a shield.
     expect(jobNamesAt(setup, 4, 1)).not.to.include('clearForest');
+  });
+
+  it('should build a Road, then a Railroad, along the route between two cities', async (): Promise<void> => {
+    // Grassland, no water, wide enough not to wrap round: cities at 2,3 and 8,3, whose tiles don't reach 5,3.
+    const setup = await unitGame('105G', 7, 15, Despotism),
+      between = setup.world.get(5, 3);
+
+    keepFeatures(setup);
+    setup.addCity(2, 3, 1);
+    setup.addCity(8, 3, 1);
+
+    expect(
+      civ1TerrainPolicy.tiles!(setup.dependencies, setup.player).includes(
+        between
+      )
+    ).true;
+    // Worth a point of trade for the route alone. A Road takes 2 turns on Grassland in Civ1, so 1 more.
+    expect(jobsAt(setup, 5, 3)).to.deep.equal(['road:1/1']);
+    // Off the route, outside the cities' tiles: nothing.
+    expect(jobsAt(setup, 5, 0)).to.deep.equal([]);
+
+    // With Roads all the way, and Railroad known: a Railroad, for the route alone, as no city works the square.
+    [3, 4, 5, 6, 7].forEach((x: number): void =>
+      build(setup, new Road(setup.world.get(x, 3)))
+    );
+    setup.game.playerResearch
+      .getByPlayer(setup.player)
+      .addAdvance(RailroadAdvance);
+
+    expect(jobsAt(setup, 5, 3)).to.deep.equal(['railroad:1/3']);
+
+    build(setup, new Railroad(between));
+
+    expect(jobsAt(setup, 5, 3)).to.deep.equal([]);
+  });
+
+  it('should build a Road where only the Railroad it allows adds anything, once Railroad is known', async (): Promise<void> => {
+    // A River at 2,0 beside a city at 2,2: a Road adds nothing to a River in Civ1.
+    const setup = await unitGame('2GR22G', 5, 5, Monarchy);
+
+    keepFeatures(setup);
+    setup.addCity(2, 2, 1);
+
+    expect(jobNamesAt(setup, 2, 0)).not.to.include('road');
+
+    setup.game.playerResearch
+      .getByPlayer(setup.player)
+      .addAdvance(RailroadAdvance);
+
+    // The Railroad then adds a point of food to the River's 2.
+    expect(jobNamesAt(setup, 2, 0)).to.include('road');
+  });
+
+  it('should clean up pollution, the more where the city works the square and the more its leader minds', async (): Promise<void> => {
+    const setup = await unitGame('25G', 5, 5, Monarchy),
+      jobFor = (x: number, y: number): number =>
+        civ1TerrainPolicy
+          .jobs(setup.dependencies, setup.player, setup.world.get(x, y))
+          .find(
+            ({ improvement }: TerrainJobValue): boolean =>
+              improvement === 'cleanPollution'
+          )?.value ?? 0;
+
+    keepFeatures(setup);
+
+    const city = setup.addCity(2, 2, 1),
+      [worked] = setup.game.workedTiles
+        .getByCity(city)
+        .map((workedTile) => workedTile.tile())
+        .filter((tile: Tile): boolean => tile !== city.tile()),
+      unworked = setup.world
+        .entries()
+        .find(
+          (tile: Tile): boolean =>
+            tile !== worked &&
+            tile !== city.tile() &&
+            city.tiles().includes(tile)
+        )!;
+
+    build(setup, new Pollution(worked), new Pollution(unworked));
+
+    expect(jobFor(worked.x(), worked.y())).to.be.above(
+      jobFor(unworked.x(), unworked.y())
+    );
+    expect(jobFor(unworked.x(), unworked.y())).to.be.above(0);
+
+    const before = jobFor(worked.x(), worked.y());
+
+    setup.game.rules.register(new PollutionConcern(new Effect(() => 2)));
+
+    expect(jobFor(worked.x(), worked.y())).to.be.closeTo(2 * before, 1e-9);
   });
 
   // Each job the policy offers `setup`'s player, best first, done at once (`doJob`), until there are none left or 100

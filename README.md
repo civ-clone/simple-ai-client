@@ -70,9 +70,14 @@ units claim the same tile, nor a tile one is heading for. Civ1's policy (`civ1Te
 values irrigation, mines and roads by what `civ1-world`'s yield rules say they add under the player's government (an
 irrigated Grassland or River tile adds nothing under Despotism), food at 2, shields at 1.5 and trade at 1, food or
 shields half as much again when the city has at most 1 of it to spare, and half for a tile the city doesn't work; it
-wants a terrain worker for every eight cities. Those terrain workers don't count towards the Settlers Civ1's production
+wants a terrain worker for every six cities. Those terrain workers don't count towards the Settlers Civ1's production
 builds for founding cities (`isFoundingSettlers` in `lib/Civ1/buildItemInCity.ts`); any more on terrain jobs, which took
 one for want of a site, do.
+
+Civ1's policy also has workers build a Road, and once the player knows Railroad a Railroad, on each tile of the way
+between neighbouring cities (civ-clone/web-renderer#384); once Railroad is known, a Road is worth what the Railroad it
+allows would add, so one goes down on a River (#385). Cleaning up a polluted tile is valued by what the
+pollution costs the city and how much the leader minds it (`PollutionConcern`, #366).
 
 A worker with no city site it can reach, no terrain job and no step that scores above nothing joins one of the
 player's cities (civ-clone/web-renderer#243, #230), as v474.05's computer players do with Settlers they have no use
