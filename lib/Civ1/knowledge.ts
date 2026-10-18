@@ -25,6 +25,11 @@ export const civ1Knowledge: Knowledge = {
   canReturnAfter: (dependencies, player, unit, action) =>
     aircraftCanReturn(dependencies, player, unit, action) &&
     triremeCanReturn(dependencies, player, unit, action),
+  // One defender, and one more for each five sizes over five, whether to build or to keep.
+  defendersKept: (dependencies, city) =>
+    Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5),
+  defendersWanted: (dependencies, city) =>
+    Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5),
   isAircraft: (dependencies, unit) => aircraftFuel(dependencies, unit) !== null,
   martialLaw: civ1MartialLawPolicy,
   shouldBuildCity,
