@@ -1,5 +1,6 @@
 // Generic: what a unit with nothing to do does, in place of walking back and forth for ever (civ-clone/web-renderer#230).
 //  In order:
+//  0. a unit that could defend goes with a founder waiting in a port for an escort overseas;
 //  1. a unit that could defend a city goes to the nearest of the player's cities it can reach that still wants a unit
 //     in it, to defend it or for martial law to use, counting the units already on their way there;
 //  2. failing that, it's disbanded, if the ruleset's policy finds it costs more than it's worth;
@@ -20,6 +21,7 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import moveUnit from './moveUnit';
+import { planEscort, travel } from './overseas';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 import takeUpStation from './homeCity';
@@ -230,6 +232,17 @@ export const standDown = async (
 
   const reachableCities = (): City[] =>
     (cities ??= citiesInReach(dependencies, player, unit));
+
+  // A founder waiting in a port for an escort overseas takes this one along (`lib/Unit/overseas`).
+  const escort = planEscort(dependencies, memory, unit);
+
+  if (escort) {
+    if (!travel(dependencies, player, memory, unit, escort)) {
+      await moveUnit(dependencies, player, memory, knowledge, unit);
+    }
+
+    return;
+  }
 
   if (isDefender(unit) && unit instanceof Land) {
     const path = firstPath(

@@ -2,6 +2,7 @@ import Buildable from '@civ-clone/core-city-build/Buildable';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 export declare const isOnSea: (city: City, seaSize?: number) => boolean;
@@ -21,3 +22,10 @@ export declare const explorerShipFor: (
   turns?: number
 ) => typeof Buildable | null;
 export default explorerShipFor;
+export declare const ferryWait = 2;
+export declare const ferryShipFor: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  city: City
+) => typeof Buildable | null;

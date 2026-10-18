@@ -8,6 +8,7 @@ import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
 import { Worker } from '@civ-clone/library-unit/Types';
 import idleWorker from '../../lib/Unit/idleWorker';
+import { planPassenger, travel } from '../../lib/Unit/overseas';
 import settlerWork from '../../lib/Unit/settlerWork';
 import unitTurnContextFor from '@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor';
 
@@ -57,6 +58,31 @@ export class WorkerTurn extends AIStrategy {
         unit
       )
     ) {
+      // A city site on another landmass, with nothing to do here: it goes overseas (`lib/Unit/overseas`,
+      //  civ-clone/web-renderer#374), from its port.
+      const passenger = planPassenger(
+        this.dependencies(),
+        player,
+        memory,
+        unit,
+        'founder',
+        memory.targets.goodSitesForCities
+      );
+
+      if (passenger) {
+        if (!travel(this.dependencies(), player, memory, unit, passenger)) {
+          await moveUnit(
+            this.dependencies(),
+            player,
+            memory,
+            this.knowledge(),
+            unit
+          );
+        }
+
+        return true;
+      }
+
       await idleWorker(
         this.dependencies(),
         player,
