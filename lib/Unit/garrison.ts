@@ -1,7 +1,7 @@
 // Generic: a unit in one of the player's cities fortifies there if the city needs more defenders, if martial law needs
 //  it there to keep order, or if it can relieve a weaker one, and makes the city its home (`homeCity`).
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
-import { defendersWanted, isDefender, keepsOrder } from '../City/defence';
+import { defendersKept, isDefender, keepsOrder } from '../City/defence';
 import { Fortified } from '@civ-clone/library-unit/UnitImprovements';
 import { Fortify } from '@civ-clone/library-unit/Actions';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
@@ -38,7 +38,7 @@ export const garrison = (
     city &&
     (cityUnitWithLowerDefence ||
       tileUnits.filter(isDefender).length <=
-        defendersWanted(dependencies, city) ||
+        defendersKept(dependencies, knowledge, city) ||
       keepsOrder(dependencies, knowledge, city, unit))
   ) {
     // Its garrison now: the city becomes its home, if it can support it.
