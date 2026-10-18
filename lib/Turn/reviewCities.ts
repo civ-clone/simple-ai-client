@@ -1,9 +1,11 @@
-// Generic: the start-of-turn pass over the player's cities, assigning their workers and noting any left undefended.
+// Generic: the start-of-turn pass over the player's cities, assigning their workers, noting any left undefended, and
+//  letting a defender go from a city with more than it keeps (`releaseDefenders`).
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Player from '@civ-clone/core-player/Player';
 import Memory, { claimedTiles } from '@civ-clone/base-strategy-ai/lib/Memory';
+import releaseDefenders from './releaseDefenders';
 
 export const reviewCities = (
   dependencies: Dependencies,
@@ -28,6 +30,8 @@ export const reviewCities = (
       targets.undefendedCities.push(city.tile());
     }
   });
+
+  releaseDefenders(dependencies, player, knowledge);
 };
 
 export default reviewCities;

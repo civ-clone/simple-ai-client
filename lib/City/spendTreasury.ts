@@ -93,7 +93,7 @@ const kindOf = (
   if (isA(Unit, item)) {
     // Only a unit that would meet what the city is short of: one that can defend it, or one martial law would use.
     if (
-      (wantsDefender(dependencies, city) &&
+      (wantsDefender(dependencies, knowledge, city) &&
         isDefenderType(dependencies, item)) ||
       (wantsMartialLawUnit(dependencies, knowledge, city, yields) &&
         knowledge.martialLaw.wouldUse(dependencies, item))

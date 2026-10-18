@@ -1,5 +1,6 @@
-// Generic: how many defenders a city wants, judged the same way by city production and by the units deciding whether to
-//  stay and fortify there. When the two disagreed, cities built a defender, it walked off, and they built another.
+// Generic: how many defenders a city wants. Production builds up to `defendersWanted`, and units stay and fortify, or come
+//  in, up to `defendersKept`, which is never fewer: when the units kept fewer than the city built, cities built a
+//  defender, it walked off, and they built another.
 import { MartialLaw, Unhappiness } from '@civ-clone/library-city/Yields';
 import City from '@civ-clone/core-city/City';
 import Cost from '@civ-clone/core-city/Rules/Cost';
@@ -90,12 +91,23 @@ export const martialLawUnitsWanted = (
   );
 };
 
-// One defender, and one more for each five sizes over five.
+// How many defenders `city` builds or buys up to: the ruleset's judgement (`Knowledge`, civ-clone/web-renderer#423).
 export const defendersWanted = (
   dependencies: Dependencies,
+  knowledge: Knowledge,
+  city: City
+): number => knowledge.defendersWanted(dependencies, city);
+
+// How many defenders `city` keeps fortified, and calls idle ones in to: at least as many as it builds.
+export const defendersKept = (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
   city: City
 ): number =>
-  Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5);
+  Math.max(
+    knowledge.defendersKept(dependencies, city),
+    defendersWanted(dependencies, knowledge, city)
+  );
 
 // The units in `city` that martial law is using now, by the ruleset's own rules. A defender keeps order as well as any
 //  unit, and so might a unit that couldn't defend the city at all.
@@ -110,9 +122,11 @@ export const martialLawUnitsIn = (
 // Whether `city` wants another defender in it.
 export const wantsDefender = (
   dependencies: Dependencies,
+  knowledge: Knowledge,
   city: City
 ): boolean =>
-  defendersIn(dependencies, city).length < defendersWanted(dependencies, city);
+  defendersIn(dependencies, city).length <
+  defendersWanted(dependencies, knowledge, city);
 
 // Whether `city` wants another unit in it for martial law to use.
 export const wantsMartialLawUnit = (
@@ -130,7 +144,7 @@ export const wantsUnit = (
   knowledge: Knowledge,
   city: City
 ): boolean =>
-  wantsDefender(dependencies, city) ||
+  wantsDefender(dependencies, knowledge, city) ||
   wantsMartialLawUnit(dependencies, knowledge, city);
 
 // Whether `city` needs `unit` to keep order: martial law is using it, and wouldn't have the units it wants without it.

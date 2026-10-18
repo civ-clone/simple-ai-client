@@ -6,7 +6,7 @@
 //  3. otherwise it waits in the player's city it's in, ready for a mission when one comes up;
 //  4. or heads for the nearest of the player's cities it can reach, a ship for the sea beside one and then into it;
 //  5. or, with none it can reach, stays where it is, fortified if it can be.
-import { defendersIn, defendersWanted, isDefender } from '../City/defence';
+import { defendersIn, defendersKept, isDefender } from '../City/defence';
 import { martialLawUnitsIn, martialLawUnitsWanted } from '../City/defence';
 import { ActionLookup } from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import City from '@civ-clone/core-city/City';
@@ -33,7 +33,7 @@ export interface StandDownPolicy {
 // How many of the cities nearest a unit it looks for a path to, nearest first, before giving up on the rest.
 const CITIES_TRIED = 3;
 
-// How many more units `city` wants in it: defenders, or units for martial law to use, whichever it's shorter of.
+// How many more units `city` wants in it: defenders it keeps, or units for martial law to use, whichever it's shorter of.
 export const unitsWanted = (
   dependencies: Dependencies,
   knowledge: Knowledge,
@@ -43,7 +43,7 @@ export const unitsWanted = (
 
   return Math.max(
     0,
-    defendersWanted(dependencies, city) -
+    defendersKept(dependencies, knowledge, city) -
       defendersIn(dependencies, city).length,
     martialLawUnitsWanted(dependencies, knowledge, city, yields) -
       martialLawUnitsIn(city, yields).length
@@ -269,8 +269,8 @@ export const standDown = async (
     return;
   }
 
-  // Not fortified: the city has the defenders it wants, so this one waits, ready for a mission when one comes up. A
-  //  fortified unit stays fortified for good.
+  // Not fortified: the city has the defenders it keeps, so this one waits, ready for a mission when one comes up. A
+  //  fortified unit stays until `releaseDefenders` lets it go.
   if (inOwnCity) {
     noOrders(dependencies, unit);
 

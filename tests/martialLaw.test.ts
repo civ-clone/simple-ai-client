@@ -128,11 +128,7 @@ const setUp = async ({
   }
 
   const dependencies = dependenciesFor(game),
-    strategy = new PreventDisorder(
-      dependencies,
-      civ1Knowledge,
-      civ1DisorderPolicy
-    ),
+    strategy = new PreventDisorder(dependencies, knowledge, civ1DisorderPolicy),
     addWarrior = (): Unit => {
       const warrior = new Warrior(city, player, city.tile(), game.rules);
 
@@ -177,6 +173,16 @@ const fortifyAction = (unit: Unit): Fortify | undefined =>
     | Fortify
     | undefined;
 
+// Civ1's knowledge with the city's defenders pinned to one per five sizes, as before civ-clone/web-renderer#423, so that
+//  these tests see martial law alone: a size-6 city keeps two defenders, whether or not it's the capital.
+const knowledge = {
+  ...civ1Knowledge,
+  defendersWanted: (dependencies: Dependencies, city: City): number =>
+    Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5),
+  defendersKept: (dependencies: Dependencies, city: City): number =>
+    Math.ceil(dependencies.cityGrowthRegistry.getByCity(city).size() / 5),
+};
+
 // Whether `unit`, just arrived in the city, stays there to defend it.
 const staysToGarrison = ({ city, dependencies }: SetUp, unit: Unit): boolean =>
   garrison(
@@ -185,7 +191,7 @@ const staysToGarrison = ({ city, dependencies }: SetUp, unit: Unit): boolean =>
     city.tile(),
     dependencies.unitRegistry.getByTile(city.tile()),
     fortifyAction(unit),
-    civ1Knowledge
+    knowledge
   );
 
 describe('martial law', (): void => {
