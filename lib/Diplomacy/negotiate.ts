@@ -9,6 +9,7 @@ import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
 import Player from '@civ-clone/core-player/Player';
 import Resolution from '@civ-clone/core-diplomacy/Proposal/Resolution';
 import Unit from '@civ-clone/core-unit/Unit';
+import mayNegotiate from '@civ-clone/library-diplomacy/lib/mayNegotiate';
 
 declare global {
   interface ChoiceMetaDataMap {
@@ -17,13 +18,9 @@ declare global {
 }
 
 const awaitTimeout = (delay: number, reason?: any) =>
-    new Promise<void>((resolve, reject) =>
-      setTimeout(
-        () => (reason === undefined ? resolve() : reject(reason)),
-        delay
-      )
-    ),
-  MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION = 15;
+  new Promise<void>((resolve, reject) =>
+    setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay)
+  );
 
 export const handleNegotiation = async (
   dependencies: Dependencies,
@@ -98,8 +95,8 @@ export const handleNegotiation = async (
   return negotiation;
 };
 
-// Negotiates, one after another, with each other player that has a unit next to `unit` and hasn't negotiated with
-//  `player` recently.
+// Negotiates, one after another, with each other player that has a unit next to `unit` and may negotiate with `player`
+//  now.
 export const canNegotiate = async (
   dependencies: Dependencies,
   player: Player,
@@ -124,19 +121,15 @@ export const canNegotiate = async (
   }
 
   await surroundingPlayers
+    // How often players talk is the ruleset's to say (`MayNegotiate`).
     .filter((other) =>
-      dependencies.interactionRegistry
-        .getByPlayer(other)
-        .filter(
-          (interaction) =>
-            interaction instanceof Negotiation &&
-            interaction.isBetween(other, player)
-        )
-        .every(
-          (interaction) =>
-            dependencies.turn.value() - interaction.when() >
-            MIN_NUMBER_OF_TURNS_BEFORE_NEW_NEGOTIATION
-        )
+      mayNegotiate(
+        player,
+        other,
+        dependencies.ruleRegistry,
+        dependencies.interactionRegistry,
+        dependencies.turn
+      )
     )
     .reduce(
       (promise, other): Promise<any> =>

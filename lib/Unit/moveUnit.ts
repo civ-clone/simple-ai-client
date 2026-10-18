@@ -22,7 +22,6 @@ import Unit from '@civ-clone/core-unit/Unit';
 import canNegotiate from '../Diplomacy/negotiate';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import scoreUnitMove from './scoreUnitMove';
-import { shouldBeHostile } from '../shouldAttack';
 
 // Whether any step from where `unit` stands scores above nothing: a hut, an enemy, unknown tiles it could go on to, a
 //  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
@@ -42,8 +41,16 @@ export const actionsToTake = (actions: Action[]): Action[] =>
       )
   );
 
+// Whether `action` would break a peace treaty. A computer player keeps its treaties: it ends one only by declaring war
+//  when it meets the other player, or by quietly dropping a peace it never meant (civ-clone/web-renderer#427), so
+//  nothing it does on the map breaks one.
+export const breaksTreaty = (action: unknown): boolean =>
+  action instanceof SneakAttack ||
+  action instanceof SneakCaptureCity ||
+  action instanceof SneakStealTechnology;
+
 // The action the AI takes on a tile, of `actions`, or none: the first it will take, unless that would break a peace
-//  treaty with a player it wouldn't be hostile to (`shouldBeHostile`).
+//  treaty (`breaksTreaty`).
 export const actionToTake = (
   dependencies: Dependencies,
   player: Player,
@@ -51,17 +58,7 @@ export const actionToTake = (
 ): Action | null => {
   const [action] = actionsToTake(actions);
 
-  if (
-    !action ||
-    ((action instanceof SneakAttack ||
-      action instanceof SneakCaptureCity ||
-      action instanceof SneakStealTechnology) &&
-      !shouldBeHostile(
-        dependencies,
-        player,
-        (action as SneakAttack | SneakStealTechnology).enemy()
-      ))
-  ) {
+  if (!action || breaksTreaty(action)) {
     return null;
   }
 
@@ -148,8 +145,7 @@ export const moveUnit = async (
             : moves;
 
       if (
-        (move instanceof SneakCaptureCity &&
-          !shouldBeHostile(dependencies, player, move.enemy())) ||
+        breaksTreaty(move) ||
         (move &&
           !knowledge.canReturnAfter(dependencies, player, unit, move as Action))
       ) {

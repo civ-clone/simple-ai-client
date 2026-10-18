@@ -18,7 +18,6 @@ import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import strength from '@civ-clone/core-unit/strength';
-import { shouldBeHostile } from '../shouldAttack';
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -42,10 +41,8 @@ export const scoreUnitMove = (
     } = lookup,
     sneakAttack = lookup.sneakAttack as SneakAttack | undefined;
 
-  if (
-    sneakAttack &&
-    !shouldBeHostile(dependencies, player, sneakAttack.enemy())
-  ) {
+  // A computer player keeps its treaties (`breaksTreaty`).
+  if (sneakAttack) {
     return -10;
   }
 
@@ -127,7 +124,6 @@ export const scoreUnitMove = (
     score += 100;
   }
 
-  // The leader's personality decides whether to fight at all (`shouldAttack`), not how keen a fight looks here.
   if (attack && attackStrength > defenceStrength) {
     score += 24 * (attackStrength - defenceStrength);
   }
