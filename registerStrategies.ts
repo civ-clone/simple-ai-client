@@ -1,5 +1,7 @@
 // Civ1: the strategy pack `SimpleAIClient` plays with, generic strategies given Civ1's `Knowledge` plus the Civ1 ones,
 //  registered into a game's `StrategyRegistry`.
+import Ferry from './Strategies/Unit/Ferry';
+import TravelOverseas from './Strategies/Unit/TravelOverseas';
 import { Game, defaultGame } from '@civ-clone/core-game';
 import Dependencies, {
   dependenciesFor as gameDependencies,
@@ -50,6 +52,8 @@ export const createStrategies = (
   // A unit's turn: the first that handles it wins.
   new WaitForCarrier(dependencies, knowledge),
   new UnloadTransport(dependencies, knowledge),
+  new Ferry(dependencies, knowledge),
+  new TravelOverseas(dependencies, knowledge),
   new FoundCapital(dependencies, knowledge),
   new TerrainWork(dependencies, knowledge, civ1TerrainPolicy, travelToPathEnd),
   new WorkerTurn(dependencies, knowledge),

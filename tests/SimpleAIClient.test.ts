@@ -1037,7 +1037,7 @@ describe('SimpleAIClient', (): void => {
     unitRegistry.unregister(unit as Unit);
   });
 
-  it('should embark land units onto naval transport units', async (): Promise<void> => {
+  it('should not embark a land unit with nothing to go overseas for (civ-clone/web-renderer#211)', async (): Promise<void> => {
     //   01234
     // 0 ~~~~~
     // 1 ~#~~~
@@ -1058,8 +1058,9 @@ describe('SimpleAIClient', (): void => {
 
     await takeTurns(client);
 
-    expect(unit.tile()).to.not.equal(world.get(1, 1));
-    expect(transport.tile()).to.not.equal(world.get(2, 2));
+    // Compared by position: a failed comparison of two tiles prints the whole world.
+    expect([unit.tile().x(), unit.tile().y()]).to.deep.equal([1, 1]);
+    expect(transportRegistry.hasUnit(unit)).to.false;
 
     clientRegistry.unregister(client);
     currentPlayerRegistry.unregister(player);

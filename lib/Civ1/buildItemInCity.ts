@@ -9,6 +9,7 @@
 //  it can, the cheapest improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender, explorers
 //  and Settlers, no unit is started that would leave the city no shields to spare once it has to support it
 //  (civ-clone/web-renderer#229).
+import { canFerryFromLandmassOf } from '../Unit/overseas';
 import BuildWeight from '@civ-clone/base-leader-personality/Rules/Player/BuildWeight';
 import Expansion from '@civ-clone/base-leader-personality/Rules/Player/Expansion';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
@@ -157,7 +158,7 @@ export const isFoundingSettlers = (
   );
 };
 
-// Whether Settlers built in `city` would have something to do: a city site on the board they could walk to, or a
+// Whether Settlers built in `city` would have something to do: a city site on the board they could walk or sail to, or a
 //  terrain job there no unit of the player's has claimed. With neither, they'd join a city (`lib/Unit/idleWorker`),
 //  which gives back the citizen they cost but not the shields.
 const settlersWouldHaveWork = (
@@ -172,6 +173,11 @@ const settlersWouldHaveWork = (
     targets.goodSitesForCities.some((tile: Tile): boolean =>
       reachable.has(tile)
     ) ||
+    // A site overseas, from a landmass the player can sail from (`lib/Unit/overseas`, civ-clone/web-renderer#374).
+    (targets.goodSitesForCities.some(
+      (tile: Tile): boolean => !reachable.has(tile)
+    ) &&
+      canFerryFromLandmassOf(dependencies, player, city.tile())) ||
     hasOpenTerrainJob(
       dependencies,
       player,

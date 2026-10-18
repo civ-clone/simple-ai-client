@@ -8,7 +8,9 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import buildTime, { finishesWithin, netShields } from './buildTime';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
-import { Naval } from '@civ-clone/library-unit/Types';
+import { Naval, NavalTransport } from '@civ-clone/library-unit/Types';
+import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
+import { waitingAt } from '../Unit/overseas';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
@@ -126,3 +128,57 @@ export const explorerShipFor = (
 };
 
 export default explorerShipFor;
+
+// How many turns passengers wait in a port before it builds a transport for them.
+export const ferryWait = 2;
+
+// The cheapest transport `city` can build for passengers that have waited in it `ferryWait` turns or more
+//  (`lib/Unit/overseas`, civ-clone/web-renderer#211), if the player has no empty transport to send and none on order.
+//  Otherwise `null`.
+export const ferryShipFor = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  city: City
+): typeof Buildable | null => {
+  const turn = dependencies.turn.value(),
+    waiting = waitingAt(memory, city).filter(
+      ([, passenger]): boolean =>
+        passenger.since !== null && turn - passenger.since >= ferryWait
+    ),
+    isTransport = (item: object): boolean =>
+      Object.prototype.isPrototypeOf.call(NavalTransport, item),
+    [ship] = dependencies.cityBuildRegistry
+      .getByCity(city)
+      .available()
+      .filter((buildItem: BuildItem): boolean => isTransport(buildItem.item()))
+      .sort(
+        (a: BuildItem, b: BuildItem): number =>
+          a.cost().value() - b.cost().value()
+      );
+
+  if (
+    waiting.length === 0 ||
+    !ship ||
+    dependencies.unitRegistry
+      .getByPlayer(player)
+      .some(
+        (unit: Unit): boolean =>
+          unit instanceof NavalTransport &&
+          !(unit as unknown as { hasCargo(): boolean }).hasCargo()
+      ) ||
+    dependencies.cityRegistry
+      .getByPlayer(player)
+      .some(
+        (other: City): boolean =>
+          dependencies.cityBuildRegistry.getByCity(other).building() !== null &&
+          isTransport(
+            dependencies.cityBuildRegistry.getByCity(other).building()!.item()
+          )
+      )
+  ) {
+    return null;
+  }
+
+  return ship.item() as unknown as typeof Buildable;
+};

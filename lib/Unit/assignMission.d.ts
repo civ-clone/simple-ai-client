@@ -10,6 +10,7 @@ export declare const defendUndefendedCity: Mission;
 export declare const liberateCity: Mission;
 export declare const attackEnemyUnits: Mission;
 export declare const attackEnemyCity: Mission;
+export declare const goOverseas: Mission;
 export type { Mission };
 export { exploreLand, exploreSea };
 export declare const missions: Mission[];

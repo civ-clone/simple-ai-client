@@ -9,6 +9,7 @@ const moveUnit_1 = require("../../lib/Unit/moveUnit");
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const Types_1 = require("@civ-clone/library-unit/Types");
 const idleWorker_1 = require("../../lib/Unit/idleWorker");
+const overseas_1 = require("../../lib/Unit/overseas");
 const settlerWork_1 = require("../../lib/Unit/settlerWork");
 const unitTurnContextFor_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor");
 class WorkerTurn extends AIStrategy_1.default {
@@ -30,6 +31,15 @@ class WorkerTurn extends AIStrategy_1.default {
             unit.tile() === tile &&
             !memory.unitTargetData.has(unit) &&
             !(0, moveUnit_1.hasStepWorthTaking)(this.dependencies(), player, memory, this.knowledge(), unit)) {
+            // A city site on another landmass, with nothing to do here: it goes overseas (`lib/Unit/overseas`,
+            //  civ-clone/web-renderer#374), from its port.
+            const passenger = (0, overseas_1.planPassenger)(this.dependencies(), player, memory, unit, 'founder', memory.targets.goodSitesForCities);
+            if (passenger) {
+                if (!(0, overseas_1.travel)(this.dependencies(), player, memory, unit, passenger)) {
+                    await (0, moveUnit_1.default)(this.dependencies(), player, memory, this.knowledge(), unit);
+                }
+                return true;
+            }
             await (0, idleWorker_1.default)(this.dependencies(), player, memory, this.knowledge(), unit, actions);
             return true;
         }

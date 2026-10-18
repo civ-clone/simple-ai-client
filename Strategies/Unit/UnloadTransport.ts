@@ -1,4 +1,5 @@
-// Generic: a transport at the coast unloads cargo that hasn't just come from there, then waits. Handles the action
+// Generic: a transport at the coast unloads cargo that's meant to go ashore there (`lib/Unit/unloadTransport`), then
+//  waits. Handles the action
 //  only when it unloads. The first unit strategy to read the unit's turn context, so the one that creates it.
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
@@ -20,6 +21,7 @@ export class UnloadTransport extends AIStrategy {
     } = unitTurnContextFor(this.dependencies(), action);
 
     return unloadTransport(
+      this.dependencies(),
       this.memoryFor(action.player()),
       action.value(),
       tile,

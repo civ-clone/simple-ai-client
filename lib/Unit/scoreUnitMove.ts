@@ -1,5 +1,6 @@
 // Generic: how good a move to `tile` looks for `unit`, for the move executor's greedy step. Below 0 rules it out. The
 //  exploring terms are `base-strategy-explore`'s, added in the order they always were around the others.
+import { isPassenger } from './overseas';
 import {
   discoverableTilesTerm,
   goodyHutTerm,
@@ -111,12 +112,14 @@ export const scoreUnitMove = (
     score += 16;
   }
 
-  if (embark) {
-    score += 16;
+  // Only a passenger boards: a land unit with work at home, next to a ship exploring the coast, used to climb aboard
+  //  and be carried off, or sink with it (civ-clone/web-renderer#211). Passengers board in `TravelOverseas`, so a
+  //  move onto a ship scores nothing here.
+  if (embark && !isPassenger(memory, unit)) {
+    return -10;
   }
 
-  // TODO: move to far off continents
-  if (disembark /* && tile.continentId !== unit.departureContinentId*/) {
+  if (disembark) {
     score += 16;
   }
 
