@@ -38,41 +38,19 @@ describe('Diplomats', (): void => {
   });
 
   describe('stealing from a player at peace', (): void => {
-    // `shouldAttack` weighs each side's units' attack and defence; the units here are only that.
-    const unitOf = (strength: number) => ({
-        attack: () => ({ value: () => strength }),
-        defence: () => ({ value: () => 0 }),
-      }),
-      setUp = (ours: number, theirs: number) => {
-        const player = new Player(),
-          rival = new Player(),
-          dependencies = {
-            // `shouldAttack` keeps each turn's totals in the player's memory.
-            memoryRegistry: new MemoryRegistry(),
-            // No personality rules: every leader is as bold as the next.
-            ruleRegistry: new RuleRegistry(),
-            turn: { value: () => 1 },
-            unitRegistry: {
-              getByPlayer: (owner: Player) => [
-                unitOf(owner === player ? ours : theirs),
-              ],
-            },
-          } as unknown as Dependencies,
-          steal = Object.assign(Object.create(SneakStealTechnology.prototype), {
-            _enemy: rival,
-          }) as Action;
-
-        return { dependencies, player, steal };
-      };
-
-    it('should steal, breaking the treaty, when strong enough to fight', (): void => {
-      const { dependencies, player, steal } = setUp(10, 5);
-
-      expect(actionToTake(dependencies, player, [steal])).to.equal(steal);
-    });
-
-    it('should do nothing when not strong enough to fight', (): void => {
-      const { dependencies, player, steal } = setUp(5, 10);
+    // A computer player keeps its treaties, however strong it is (civ-clone/web-renderer#427).
+    it('should do nothing, even when much the stronger', (): void => {
+      const player = new Player(),
+        rival = new Player(),
+        dependencies = {
+          memoryRegistry: new MemoryRegistry(),
+          ruleRegistry: new RuleRegistry(),
+          turn: { value: () => 1 },
+          unitRegistry: { getByPlayer: () => [] },
+        } as unknown as Dependencies,
+        steal = Object.assign(Object.create(SneakStealTechnology.prototype), {
+          _enemy: rival,
+        }) as Action;
 
       expect(actionToTake(dependencies, player, [steal])).to.null;
     });

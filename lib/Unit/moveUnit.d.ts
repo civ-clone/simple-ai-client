@@ -5,6 +5,7 @@ import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
 export declare const actionsToTake: (actions: Action[]) => Action[];
+export declare const breaksTreaty: (action: unknown) => boolean;
 export declare const actionToTake: (
   dependencies: Dependencies,
   player: Player,
