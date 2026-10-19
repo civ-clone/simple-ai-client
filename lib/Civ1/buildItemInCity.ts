@@ -6,10 +6,13 @@
 //  (civ-clone/web-renderer#194), all but explorers weighed by the leader. A Wonder only in the player's most productive
 //  city, one at a time; never a Palace or a ship. Apart from a missing defender and Settlers, each is only started if
 //  the city can finish it within the policy's `buildTurns` for its kind, at its net shields; when nothing is left that
-//  it can, the cheapest improvement worth having (civ-clone/web-renderer#212). Apart from a missing defender, explorers
-//  and Settlers, no unit is started that would leave the city no shields to spare once it has to support it
-//  (civ-clone/web-renderer#229).
+//  it can, the cheapest improvement worth having (civ-clone/web-renderer#212). How many attackers it wants is scaled by
+//  the leader's `ArmySize` for the rival it could take on, if any, and only enemies (no peace treaty) give it something
+//  to attack (civ-clone/web-renderer#424). Apart from a missing defender, explorers and Settlers, no unit is started
+//  that would leave the city no shields to spare once it has to support it (civ-clone/web-renderer#229).
 import { canFerryFromLandmassOf } from '../Unit/overseas';
+import ArmySize from '@civ-clone/base-leader-personality/Rules/Player/ArmySize';
+import rivalOf, { isEnemy } from '../Player/rivals';
 import BuildWeight from '@civ-clone/base-leader-personality/Rules/Player/BuildWeight';
 import Expansion from '@civ-clone/base-leader-personality/Rules/Player/Expansion';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
@@ -568,10 +571,25 @@ export const buildItemInCity = (
     );
   }
 
+  // Only an enemy's cities and units are something to attack.
+  const enemyAt = (tile: Tile): boolean => {
+    const tileCity = dependencies.cityRegistry.getByTile(tile);
+
+    if (tileCity) {
+      return isEnemy(dependencies, player, tileCity.player());
+    }
+
+    return dependencies.unitRegistry
+      .getByTile(tile)
+      .some((unit: Unit): boolean =>
+        isEnemy(dependencies, player, unit.player())
+      );
+  };
+
   if (
     targets.citiesToLiberate.length > 0 ||
-    targets.enemyCitiesToAttack.length > 0 ||
-    targets.enemyUnitsToAttack.length > 4
+    targets.enemyCitiesToAttack.some(enemyAt) ||
+    targets.enemyUnitsToAttack.filter(enemyAt).length > 4
   ) {
     addNeed(
       itemFor(getOffensiveUnit()),
@@ -582,7 +600,14 @@ export const buildItemInCity = (
         isAttacker,
         (item: object): boolean => isAttackerType(dependencies, item)
       ),
-      policy.attackersPerCity * cities
+      policy.attackersPerCity *
+        cities *
+        product(
+          dependencies.ruleRegistry,
+          ArmySize,
+          player,
+          rivalOf(dependencies, player)
+        )
     );
   }
 
