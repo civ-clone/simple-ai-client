@@ -1,4 +1,10 @@
-import { Horseman, Trireme, Warrior } from '@civ-clone/civ1-unit/Units';
+import {
+  Horseman,
+  Settlers,
+  Trireme,
+  Warrior,
+} from '@civ-clone/civ1-unit/Units';
+import OverseasSettlers from '@civ-clone/base-leader-personality/Rules/Player/OverseasSettlers';
 import Effect from '@civ-clone/core-rule/Effect';
 import MilitaryStrength from '@civ-clone/core-power/Rules/MilitaryStrength';
 import Never from '@civ-clone/core-diplomacy/Expiries/Never';
@@ -29,6 +35,7 @@ import {
   planGarrison,
   planInvasion,
   planPassenger,
+  settlesOverseas,
   travel,
 } from '../lib/Unit/overseas';
 import civ1Knowledge from '../lib/Civ1/knowledge';
@@ -386,5 +393,30 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
     expect(await ferry(dependencies, player, memory, civ1Knowledge, ship)).true;
     expect(ship.tile().isWater()).true;
     expect(ship.tile().isNeighbourOf(port.tile())).true;
+  });
+
+  it("sends overseas the share of founders its leader's OverseasSettlers says, while home has sites", async (): Promise<void> => {
+    const { dependencies, game, player, world } = await setUp(),
+      settlers = Array.from(
+        { length: 40 },
+        (): Unit => new Settlers(null, player, world.get(1, 1), game.rules)
+      ),
+      share = (): number =>
+        settlers.filter((unit: Unit): boolean =>
+          settlesOverseas(dependencies, player, unit)
+        ).length;
+
+    expect(share()).equal(0);
+
+    game.rules.register(new OverseasSettlers(new Effect(() => 0.5)));
+
+    expect(share()).within(10, 30);
+    expect(
+      settlesOverseas(
+        dependencies,
+        player,
+        new Warrior(null, player, world.get(1, 1), game.rules)
+      )
+    ).false;
   });
 });
