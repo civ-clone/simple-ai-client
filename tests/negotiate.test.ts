@@ -1,85 +1,50 @@
-import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
-import { ChoiceMeta } from '@civ-clone/core-client/ChoiceMeta';
-import DemandTribute from '@civ-clone/library-diplomacy/Proposals/DemandTribute';
 import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
-import Never from '@civ-clone/core-diplomacy/Expiries/Never';
-import Peace from '@civ-clone/base-diplomacy-declaration-peace/Peace';
+import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
 import Player from '@civ-clone/core-player/Player';
+import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
+import { choosers } from '../lib/Diplomacy/negotiate';
 import { expect } from 'chai';
-import { handleNegotiation } from '../lib/Diplomacy/negotiate';
-import interaction from '@civ-clone/civ1-diplomacy/Rules/Negotiation/interaction';
-import position from '@civ-clone/civ1-diplomacy/tests/lib/position';
-import resolved from '@civ-clone/civ1-diplomacy/Rules/Proposal/resolved';
-import step from '@civ-clone/civ1-diplomacy/Rules/Negotiation/step';
 
-describe('handleNegotiation (civ-clone/web-renderer#450)', (): void => {
-  it('asks the player whose move it is, so the human chooses after the hand-over', async (): Promise<void> => {
-    // At peace, the computer player afraid (fear 2) and with $200: after the hand-over the human may demand tribute.
-    const setup = position([
-        {
-          gold: 200,
-          cities: [0, 0],
-          units: [{ on: 0, attack: 1, defence: 2 }],
-        },
-        { human: true, units: [{ on: 0, attack: 4, defence: 1 }] },
-      ]),
-      { dependencies, players, ruleRegistry } = setup,
-      [computer, human] = players,
-      asked = new Map<Player, string[][]>(
-        players.map((player) => [player, []])
-      ),
-      // Each client records what it's offered and takes a demand, then an acceptance, then the first step.
-      clientFor = (player: Player) => ({
-        player: () => player,
-        chooseFromList: async (meta: ChoiceMeta<'negotiation.next-step'>) => {
-          const steps = meta
-            .choices()
-            .map((choice) => choice.value() as unknown as IAction);
+// By identity: a failed deep comparison of two players would print the whole game.
+const only = (players: Player[], player: Player): boolean =>
+  players.length === 1 && players[0] === player;
 
-          asked
-            .get(player)!
-            .push(steps.map((action) => action.constructor.name));
+// A meeting between `computer` and `human`, its last interaction for `lastFor` (or none), and steps made by `by`.
+const setUp = (lastFor: 'computer' | 'human' | null) => {
+  const ruleRegistry = new RuleRegistry(),
+    computer = new Player(ruleRegistry),
+    human = new Player(ruleRegistry),
+    players = { computer, human },
+    negotiation = Object.assign(
+      new Negotiation(computer, human, ruleRegistry),
+      {
+        lastInteraction: () =>
+          lastFor === null ? null : { for: () => [players[lastFor]] },
+      }
+    ) as unknown as Negotiation,
+    steps = (...by: ('computer' | 'human')[]): IAction[] =>
+      by.map((who) => ({ by: () => players[who] } as unknown as IAction));
 
-          return (
-            steps.find(
-              (action) =>
-                action instanceof DemandTribute && action.by() === player
-            ) ??
-            steps.find((action) => action instanceof Accept) ??
-            steps[0]
-          );
-        },
-      });
+  return { computer, human, negotiation, steps };
+};
 
-    ruleRegistry.register(
-      ...step(dependencies, () => 0.9),
-      ...resolved(dependencies, () => 0.9),
-      ...interaction(dependencies)
-    );
-    setup.interactionRegistry.register(
-      new Peace(computer, human, new Never(), ruleRegistry)
-    );
+describe('choosers (civ-clone/web-renderer#450)', (): void => {
+  it("asks the player whose steps are on offer, even when the last interaction was for the other: the human's move after the hand-over", (): void => {
+    // The human's OK to "You respond..." is for the computer player, but the demand and the goodbye are the human's.
+    const { human, negotiation, steps } = setUp('computer');
 
-    const clients = new Map(
-      players.map((player) => [player, clientFor(player)])
-    );
+    expect(only(choosers(negotiation, steps('human', 'human')), human)).true;
+  });
 
-    // The rules still tell a human from a computer player by the helper's `getBy`.
-    Object.assign(dependencies.clientRegistry, {
-      getByPlayer: (player: Player) => clients.get(player),
-    });
+  it("asks whoever the last interaction was for when the steps are more than one player's", (): void => {
+    const { human, negotiation, steps } = setUp('human');
 
-    await handleNegotiation(dependencies, computer, human);
+    expect(only(choosers(negotiation, steps('computer', 'human')), human)).true;
+  });
 
-    expect(asked.get(human)).deep.include(['DemandTribute', 'Terminate']);
-    expect(
-      asked
-        .get(computer)!
-        .some(
-          (offered) =>
-            offered.includes('Terminate') && offered.includes('DemandTribute')
-        )
-    ).false;
-    expect(setup.gold.get(human)).equal(100);
+  it('asks the player met when nothing has been said yet', (): void => {
+    const { human, negotiation, steps } = setUp(null);
+
+    expect(only(choosers(negotiation, steps('computer', 'human')), human)).true;
   });
 });
