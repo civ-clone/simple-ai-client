@@ -27,6 +27,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
+import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 
 export type Role = 'explorer' | 'founder' | 'escort' | 'garrison' | 'invader';
 
@@ -445,6 +446,19 @@ export const planInvasion = (
         invasionTargets(dependencies, player, unit)
       )
     : null;
+
+// Whether `ship` could sail alongside `port`: a water tile beside it is one it can reach.
+export const canBerthAt = (ship: Unit, port: City): boolean => {
+  const reachable = reachableTiles(ship);
+
+  return port
+    .tile()
+    .getNeighbours()
+    .some(
+      (tile: Tile): boolean =>
+        tile.isWater() && (reachable === null || reachable.has(tile))
+    );
+};
 
 // Whether `unit`, a ship, is busy ferrying: it has passengers aboard, or took or sailed for some in the last turn.
 export const isFerrying = (

@@ -10,7 +10,7 @@ import buildTime, { finishesWithin, netShields } from './buildTime';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { Naval, NavalTransport } from '@civ-clone/library-unit/Types';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
-import { isFerrying, waitingAt } from '../Unit/overseas';
+import { canBerthAt, isFerrying, waitingAt } from '../Unit/overseas';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
@@ -139,7 +139,8 @@ export default explorerShipFor;
 export const ferryWait = 2;
 
 // The cheapest transport `city` can build for passengers that have waited in it `ferryWait` turns or more
-//  (`lib/Unit/overseas`, civ-clone/web-renderer#211), if the player has no empty transport to send and none on order.
+//  (`lib/Unit/overseas`, civ-clone/web-renderer#211), if the player has no empty transport that could sail alongside
+//  it and none on order. One on another sea doesn't count (civ-clone/web-renderer#374).
 //  Otherwise `null`.
 export const ferryShipFor = (
   dependencies: Dependencies,
@@ -171,7 +172,8 @@ export const ferryShipFor = (
       .some(
         (unit: Unit): boolean =>
           unit instanceof NavalTransport &&
-          !(unit as unknown as { hasCargo(): boolean }).hasCargo()
+          !(unit as unknown as { hasCargo(): boolean }).hasCargo() &&
+          canBerthAt(unit as unknown as Unit, city)
       ) ||
     dependencies.cityRegistry
       .getByPlayer(player)

@@ -31,6 +31,7 @@ import {
   travel,
 } from '../lib/Unit/overseas';
 import civ1Knowledge from '../lib/Civ1/knowledge';
+import ferry from '../lib/Unit/ferry';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
 import unloadTransport from '../lib/Unit/unloadTransport';
@@ -367,5 +368,21 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
         )
       ).null;
     });
+  });
+
+  it('sails a transport out of its port city to the sea beside it, where passengers can board', async (): Promise<void> => {
+    const { dependencies, game, memory, player, port, trireme, world } =
+        await setUp(),
+      explorer = new Warrior(null, player, world.get(3, 2), game.rules),
+      ship = trireme(3, 2);
+
+    planPassenger(dependencies, player, memory, explorer, 'explorer', [
+      world.get(7, 2),
+    ])!.since = 0;
+    ship.setActive(true);
+
+    expect(await ferry(dependencies, player, memory, civ1Knowledge, ship)).true;
+    expect(ship.tile().isWater()).true;
+    expect(ship.tile().isNeighbourOf(port.tile())).true;
   });
 });

@@ -80,6 +80,7 @@ export declare const planInvasion: (
   memory: Memory,
   unit: Unit
 ) => Passenger | null;
+export declare const canBerthAt: (ship: Unit, port: City) => boolean;
 export declare const isFerrying: (
   dependencies: Dependencies,
   memory: Memory,
