@@ -22,6 +22,26 @@ const awaitTimeout = (delay: number, reason?: any) =>
     setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay)
   );
 
+// Who chooses the next step of `negotiation` from `offered`: the player whose steps they are, or, when they're more
+//  than one player's, whoever the last interaction was for. Usually those are the same, but not always: after the
+//  hand-over in a meeting at peace, the other player's acknowledgement is for the computer player, and the next move
+//  is the other player's (civ-clone/web-renderer#450). The page's own client asks the same way.
+export const choosers = (
+  negotiation: Negotiation,
+  offered: IAction[]
+): Player[] => {
+  const actors = Array.from(new Set(offered.map((step) => step.by()))),
+    lastInteraction = negotiation.lastInteraction();
+
+  if (actors.length === 1) {
+    return actors;
+  }
+
+  return lastInteraction !== null
+    ? lastInteraction.for()
+    : negotiation.players().slice(1);
+};
+
 export const handleNegotiation = async (
   dependencies: Dependencies,
   player: Player,
@@ -34,18 +54,17 @@ export const handleNegotiation = async (
   );
 
   while (!negotiation.terminated()) {
-    const lastInteraction = negotiation.lastInteraction(),
-      players =
-        lastInteraction !== null
-          ? lastInteraction.for()
-          : negotiation.players().slice(1);
+    // The steps on offer, worked out once for the first player asked: each call makes new actions.
+    let offered: IAction[] | null = negotiation.nextSteps();
+
+    const players = choosers(negotiation, offered);
 
     await players.reduce(
       async (promise, participant) =>
         promise
           .then(async () => {
             const client = dependencies.clientRegistry.getByPlayer(participant),
-              nextSteps = negotiation.nextSteps(),
+              nextSteps = offered ?? negotiation.nextSteps(),
               resultPromise = Promise.race([
                 client.chooseFromList(
                   new ChoiceMeta(
@@ -65,6 +84,8 @@ export const handleNegotiation = async (
                     )
                   : new Promise<void>(() => {}),
               ]);
+
+            offered = null;
 
             const interaction = await resultPromise;
 
