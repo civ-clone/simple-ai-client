@@ -378,7 +378,7 @@ describe('buildItemInCity', (): void => {
       return explorerShipFor(
         dependencies,
         player,
-        targets,
+        { ...createMemory(), targets },
         city,
         civ1Knowledge
       );

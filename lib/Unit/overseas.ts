@@ -9,9 +9,11 @@
 //  again from the survey's board. A game loaded mid-voyage carries on, unloading on the first other landmass reached.
 import { Embark } from '@civ-clone/library-unit/Actions';
 import { Land, NavalTransport, Worker } from '@civ-clone/library-unit/Types';
+import { defendersIn, defendersKept, isDefender } from '../City/defence';
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
@@ -20,10 +22,11 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
-export type Role = 'explorer' | 'founder' | 'escort';
+export type Role = 'explorer' | 'founder' | 'escort' | 'garrison';
 
 export interface Passenger {
-  // What it's going for: a tile to explore or a site for a city on another landmass. An escort shares its founder's.
+  // What it's going for: a tile to explore, a site for a city or a city of the player's that's short of defenders, on
+  //  another landmass. An escort shares its founder's.
   target: Tile;
   role: Role;
   port: City;
@@ -35,13 +38,23 @@ interface OverseasState {
   passengers: Map<Unit, Passenger>;
   // The landmass each unit aboard set out from, so that it's unloaded somewhere else.
   origins: Map<Unit, Set<Tile>>;
+  // The last turn each transport ferried passengers or sailed for a port with some waiting, so that the player knows
+  //  it's not free to explore (civ-clone/web-renderer#440).
+  ferried: Map<Unit, number>;
+  // The port each empty transport is sailing for, so that only one goes for each.
+  heading: Map<Unit, City>;
 }
 
 const states = new WeakMap<Memory, OverseasState>();
 
 export const overseasStateFor = (memory: Memory): OverseasState => {
   if (!states.has(memory)) {
-    states.set(memory, { passengers: new Map(), origins: new Map() });
+    states.set(memory, {
+      passengers: new Map(),
+      origins: new Map(),
+      ferried: new Map(),
+      heading: new Map(),
+    });
   }
 
   return states.get(memory)!;
@@ -280,18 +293,74 @@ export const isPassenger = (memory: Memory, unit: Unit): boolean =>
 export const originOf = (memory: Memory, unit: Unit): Set<Tile> | null =>
   overseasStateFor(memory).origins.get(unit) ?? null;
 
-// The candidates `unit`'s role chooses from: land to explore, sites for cities, or, for an escort, the targets of the
-//  founders it could go with.
-export const candidatesFor = (memory: Memory, unit: Unit, role: Role): Tile[] =>
+// The player's cities that are short of the defenders they keep, wherever they are.
+export const citiesShortOfDefenders = (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  player: Player
+): Tile[] =>
+  dependencies.cityRegistry
+    .getByPlayer(player)
+    .filter(
+      (city: City): boolean =>
+        defendersIn(dependencies, city).length <
+        defendersKept(dependencies, knowledge, city)
+    )
+    .map((city: City): Tile => city.tile());
+
+// The candidates `unit`'s role chooses from: land to explore, sites for cities, cities short of defenders, or, for an
+//  escort, the targets of the founders it could go with.
+export const candidatesFor = (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  player: Player,
+  memory: Memory,
+  unit: Unit,
+  role: Role
+): Tile[] =>
   role === 'explorer'
     ? memory.targets.landTilesToExplore
     : role === 'founder'
     ? memory.targets.goodSitesForCities
+    : role === 'garrison'
+    ? citiesShortOfDefenders(dependencies, knowledge, player)
     : [...overseasStateFor(memory).passengers.entries()]
         .filter(
           ([other, passenger]) => other !== unit && passenger.role === 'founder'
         )
         .map(([, passenger]) => passenger.target);
+
+// A defender with nothing to do on its own landmass goes to a city of the player's on another one that's short of
+//  defenders, one at a time for each city (civ-clone/web-renderer#441): a new city overseas is founded with a single
+//  escort, and its garrison grows only if it can build one.
+export const planGarrison = (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  player: Player,
+  memory: Memory,
+  unit: Unit
+): Passenger | null =>
+  isDefender(unit)
+    ? planPassenger(
+        dependencies,
+        player,
+        memory,
+        unit,
+        'garrison',
+        citiesShortOfDefenders(dependencies, knowledge, player)
+      )
+    : null;
+
+// Whether `unit`, a ship, is busy ferrying: it has passengers aboard, or took or sailed for some in the last turn.
+export const isFerrying = (
+  dependencies: Dependencies,
+  memory: Memory,
+  unit: Unit
+): boolean =>
+  (unit instanceof NavalTransport &&
+    (unit as unknown as { hasCargo(): boolean }).hasCargo()) ||
+  (overseasStateFor(memory).ferried.get(unit) ?? -Infinity) >=
+    dependencies.turn.value() - 1;
 
 // An escort for a founder waiting in a port on `unit`'s landmass that has none yet: `unit` goes with it, to the same
 //  target from the same port. Settlers go overseas with an escort (Dom, on #374).

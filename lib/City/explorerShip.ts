@@ -10,7 +10,7 @@ import buildTime, { finishesWithin, netShields } from './buildTime';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { Naval, NavalTransport } from '@civ-clone/library-unit/Types';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
-import { waitingAt } from '../Unit/overseas';
+import { isFerrying, waitingAt } from '../Unit/overseas';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
@@ -79,18 +79,21 @@ export const reachesSeaToExplore = (
 // How many turns, at its net shields, a city spends on a ship to explore with (civ-clone/web-renderer#212).
 export const explorerShipTurns = 20;
 
-// The cheapest ship `city` can build, if the player has another city, no ship and none on order, the city has its
+// The cheapest ship `city` can build, if the player has another city, no ship free to explore (one that's ferrying
+//  isn't, civ-clone/web-renderer#440) and none on order, the city has its
 //  defenders, it's on a sea it can explore, it can finish the ship within `turns`, and it would still have shields to
 //  spare once it supported the ship (civ-clone/web-renderer#229). Otherwise `null`. A player's only city has better
 //  things to build.
 export const explorerShipFor = (
   dependencies: Dependencies,
   player: Player,
-  targets: TargetBoard,
+  memory: Memory,
   city: City,
   knowledge: Knowledge,
   turns: number = explorerShipTurns
 ): typeof Buildable | null => {
+  const { targets } = memory;
+
   const [ship] = dependencies.cityBuildRegistry
     .getByCity(city)
     .available()
@@ -105,7 +108,10 @@ export const explorerShipFor = (
     dependencies.cityRegistry.getByPlayer(player).length < 2 ||
     dependencies.unitRegistry
       .getByPlayer(player)
-      .some((unit: Unit): boolean => unit instanceof Naval) ||
+      .some(
+        (unit: Unit): boolean =>
+          unit instanceof Naval && !isFerrying(dependencies, memory, unit)
+      ) ||
     dependencies.cityRegistry
       .getByPlayer(player)
       .some((other: City): boolean => {

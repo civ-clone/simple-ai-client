@@ -16,7 +16,7 @@ export declare const explorerShipTurns = 20;
 export declare const explorerShipFor: (
   dependencies: Dependencies,
   player: Player,
-  targets: TargetBoard,
+  memory: Memory,
   city: City,
   knowledge: Knowledge,
   turns?: number
