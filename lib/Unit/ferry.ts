@@ -56,6 +56,14 @@ const landingFor = (
   );
 };
 
+const oneStep = (to: Tile): Path => {
+  const path = new Path();
+
+  path.push(to);
+
+  return path;
+};
+
 // Sets `ship` off towards `to`, then lets the move executor take it. Returns whether it has a way there.
 const sailTo = async (
   dependencies: Dependencies,
@@ -72,12 +80,10 @@ const sailTo = async (
   }
 
   if (memory.unitPathData.get(ship)?.end() !== to) {
-    const path = Path.for(
-      ship,
-      ship.tile(),
-      to,
-      dependencies.pathFinderRegistry
-    );
+    // One step, as from a port city to the sea beside it, which the path finder finds no way for (it starts on land).
+    const path = ship.tile().getNeighbours().includes(to)
+      ? oneStep(to)
+      : Path.for(ship, ship.tile(), to, dependencies.pathFinderRegistry);
 
     if (!path) {
       return false;
