@@ -8,6 +8,10 @@ declare global {
     'negotiation.next-step': IAction;
   }
 }
+export declare const choosers: (
+  negotiation: Negotiation,
+  offered: IAction[]
+) => Player[];
 export declare const handleNegotiation: (
   dependencies: Dependencies,
   player: Player,
