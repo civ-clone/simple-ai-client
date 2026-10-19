@@ -12,7 +12,9 @@ import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
 import isUnitAction from '@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction';
+import { Disembark } from '@civ-clone/library-unit/Actions';
 import { Land } from '@civ-clone/library-unit/Types';
+import Tile from '@civ-clone/core-world/Tile';
 import moveUnit from '../../lib/Unit/moveUnit';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
@@ -40,14 +42,18 @@ export class TravelOverseas extends AIStrategy {
     // At sea: a passenger waits for its ship to put it ashore (`unloadTransport`). Any other land unit goes ashore if
     //  it can, and otherwise waits: next to a coast held by an enemy, it may have nowhere to step.
     if (isAtSea(unit)) {
-      if (!known) {
-        await moveUnit(
-          this.dependencies(),
-          player,
-          memory,
-          this.knowledge(),
-          unit
-        );
+      // One step ashore, by `Disembark` itself: `moveUnit` here could keep picking a move that leaves its moves as
+      //  they were, for ever, within the one action.
+      const disembark = known
+        ? undefined
+        : unit
+            .tile()
+            .getNeighbours()
+            .flatMap((tile: Tile) => unit.actions(tile))
+            .find((action): boolean => action instanceof Disembark);
+
+      if (disembark) {
+        unit.action(disembark);
       }
 
       if (unit.active() && unit.moves().value() > 0) {
