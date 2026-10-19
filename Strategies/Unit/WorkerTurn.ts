@@ -31,11 +31,11 @@ export class WorkerTurn extends AIStrategy {
       ),
       { buildIrrigation, buildMine, buildRoad, foundCity } = actions;
 
-    // One of the founders its leader sends overseas while there are still sites at home, with no site of its own yet:
+    // One of the founders its leader sends overseas before home is full, with no site of its own yet:
     //  it goes for one overseas, if there is one it could be ferried to (`lib/Unit/overseas`, civ-clone/web-renderer#374).
     if (
       !memory.unitTargetData.has(unit) &&
-      settlesOverseas(this.dependencies(), player, unit)
+      settlesOverseas(this.dependencies(), player, memory, unit)
     ) {
       const passenger = planPassenger(
         this.dependencies(),

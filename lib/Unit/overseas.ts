@@ -389,16 +389,39 @@ const shareOf = (unit: Unit): number =>
     7
   );
 
-// Whether `unit`, a founder, is one of the share its leader sends overseas while there are still sites at home
-//  (`OverseasSettlers`, civ-clone/web-renderer#374).
+// How few sites for cities a landmass has left, by the survey's board, for it to count as filling up.
+export const SCARCE_SITES = 6;
+
+// Whether `unit`'s landmass is filling up, with fewer than `SCARCE_SITES` sites left (Dom, on
+//  civ-clone/web-renderer#374). Counting a landmass shared with another player too sent Expansionists away from room
+//  they had at home, and they founded fewer cities.
+const homeIsFillingUp = (
+  dependencies: Dependencies,
+  memory: Memory,
+  unit: Unit
+): boolean => {
+  const home = landmassOf(dependencies, unit.tile());
+
+  return (
+    memory.targets.goodSitesForCities.filter((tile: Tile): boolean =>
+      home.has(tile)
+    ).length < SCARCE_SITES
+  );
+};
+
+// Whether `unit`, a founder, is one of the share its leader sends overseas before its landmass is full, once it's
+//  filling up (`OverseasSettlers`, civ-clone/web-renderer#374). Sent while there was still plenty of room
+//  at home, Expansionists founded fewer cities in all.
 export const settlesOverseas = (
   dependencies: Dependencies,
   player: Player,
+  memory: Memory,
   unit: Unit
 ): boolean =>
   isFounder(unit) &&
   shareOf(unit) <
-    100 * sum(dependencies.ruleRegistry, OverseasSettlers, player);
+    100 * sum(dependencies.ruleRegistry, OverseasSettlers, player) &&
+  homeIsFillingUp(dependencies, memory, unit);
 
 // The passengers waiting in `port`.
 export const waitingAt = (memory: Memory, port: City): [Unit, Passenger][] =>
