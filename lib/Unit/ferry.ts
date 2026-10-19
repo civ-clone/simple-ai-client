@@ -34,13 +34,22 @@ interface Ferry {
 // The turn a transport took its first passenger aboard, so it doesn't wait for more for ever.
 const loading = new WeakMap<Unit, number>();
 
-// The water tile `ship` can reach that's beside `landmass`, nearest `target`, if any.
+// The water tile `ship` can reach that's beside `landmass`, nearest `target`, if any: beside a tile its passengers can
+//  step on to, with no other player's city or units on it (civ-clone/web-renderer#374), when `free` says so.
 const landingFor = (
+  dependencies: Dependencies,
   ship: Unit,
   landmass: Set<Tile>,
-  target: Tile
+  target: Tile,
+  free: boolean = true
 ): Tile | null => {
-  const reachable = reachableTiles(ship);
+  const reachable = reachableTiles(ship),
+    isFree = (tile: Tile): boolean =>
+      !free ||
+      (dependencies.cityRegistry.getByTile(tile) === null &&
+        dependencies.unitRegistry
+          .getByTile(tile)
+          .every((unit: Unit): boolean => unit.player() === ship.player()));
 
   return (
     [...(reachable ?? [])]
@@ -49,7 +58,10 @@ const landingFor = (
           tile.isWater() &&
           tile
             .getNeighbours()
-            .some((neighbour: Tile): boolean => landmass.has(neighbour))
+            .some(
+              (neighbour: Tile): boolean =>
+                landmass.has(neighbour) && isFree(neighbour)
+            )
       )
       .sort(
         (a: Tile, b: Tile): number =>
@@ -209,7 +221,7 @@ const ferryTurn = async (
           a.distanceFrom(ship.tile()) - b.distanceFrom(ship.tile())
       ),
       landmass = continentOf(turn, target),
-      landing = landingFor(ship, landmass, target);
+      landing = landingFor(dependencies, ship, landmass, target);
 
     if (!landing) {
       // Nowhere to land them: they give up their plans and go ashore where they can.
@@ -249,7 +261,13 @@ const ferryTurn = async (
       );
 
   for (const port of ports) {
-    const berth = landingFor(ship, new Set([port.tile()]), port.tile());
+    const berth = landingFor(
+      dependencies,
+      ship,
+      new Set([port.tile()]),
+      port.tile(),
+      false
+    );
 
     if (
       berth &&
