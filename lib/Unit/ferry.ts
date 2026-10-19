@@ -92,7 +92,17 @@ const sailTo = async (
     memory.unitPathData.set(ship, path);
   }
 
-  await moveUnit(dependencies, player, memory, knowledge, ship);
+  // No further than `to`: wandering on with moves to spare took it away again, back into port, where no one can board
+  //  it (civ-clone/web-renderer#374).
+  await moveUnit(dependencies, player, memory, knowledge, ship, {
+    stopAtPathEnd: true,
+    wander: false,
+  });
+
+  // Arrived, or held up on the way: it waits for next turn rather than be asked again.
+  if (ship.active()) {
+    noOrders(dependencies, ship);
+  }
 
   return true;
 };
