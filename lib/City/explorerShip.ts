@@ -138,10 +138,18 @@ export default explorerShipFor;
 // How many turns passengers wait in a port before it builds a transport for them.
 export const ferryWait = 2;
 
+// What a transport on order is taken to carry, before it's built and its own capacity is known.
+const ORDERED_CAPACITY = 2;
+
+interface Transport {
+  capacity(): { value(): number };
+  cargo(): Unit[];
+}
+
 // The cheapest transport `city` can build for passengers that have waited in it `ferryWait` turns or more
-//  (`lib/Unit/overseas`, civ-clone/web-renderer#211), if the player has no empty transport that could sail alongside
-//  it and none on order. One on another sea doesn't count (civ-clone/web-renderer#374).
-//  Otherwise `null`.
+//  (`lib/Unit/overseas`, civ-clone/web-renderer#211), while they outnumber the room on the player's empty transports
+//  that could sail alongside it and those on order. One on another sea doesn't count, and for invaders gathering a
+//  force, a port builds as many as they need (civ-clone/web-renderer#374). Otherwise `null`.
 export const ferryShipFor = (
   dependencies: Dependencies,
   player: Player,
@@ -164,29 +172,36 @@ export const ferryShipFor = (
           a.cost().value() - b.cost().value()
       );
 
-  if (
-    waiting.length === 0 ||
-    !ship ||
-    dependencies.unitRegistry
-      .getByPlayer(player)
-      .some(
-        (unit: Unit): boolean =>
-          unit instanceof NavalTransport &&
-          !(unit as unknown as { hasCargo(): boolean }).hasCargo() &&
-          canBerthAt(unit as unknown as Unit, city)
-      ) ||
-    dependencies.cityRegistry
-      .getByPlayer(player)
-      .some(
-        (other: City): boolean =>
-          dependencies.cityBuildRegistry.getByCity(other).building() !== null &&
-          isTransport(
-            dependencies.cityBuildRegistry.getByCity(other).building()!.item()
-          )
-      )
-  ) {
+  if (waiting.length === 0 || !ship) {
     return null;
   }
 
-  return ship.item() as unknown as typeof Buildable;
+  const room =
+    dependencies.unitRegistry
+      .getByPlayer(player)
+      .filter(
+        (unit: Unit): boolean =>
+          unit instanceof NavalTransport &&
+          (unit as unknown as Transport).cargo().length === 0 &&
+          canBerthAt(unit as unknown as Unit, city)
+      )
+      .reduce(
+        (total: number, unit: Unit): number =>
+          total + (unit as unknown as Transport).capacity().value(),
+        0
+      ) +
+    ORDERED_CAPACITY *
+      dependencies.cityRegistry
+        .getByPlayer(player)
+        .filter((other: City): boolean => {
+          const building = dependencies.cityBuildRegistry
+            .getByCity(other)
+            .building();
+
+          return building !== null && isTransport(building.item());
+        }).length;
+
+  return waiting.length > room
+    ? (ship.item() as unknown as typeof Buildable)
+    : null;
 };

@@ -34,4 +34,8 @@ export declare const rivalOf: (
   dependencies: Dependencies,
   player: Player
 ) => Player | null;
+export declare const rivalIsOverseas: (
+  dependencies: Dependencies,
+  player: Player
+) => boolean;
 export default rivalOf;

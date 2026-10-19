@@ -20,7 +20,9 @@ interface OverseasState {
 }
 export declare const overseasStateFor: (memory: Memory) => OverseasState;
 export declare const ESCORT_WAIT = 3;
-export declare const INVADERS = 4;
+export declare const INVADERS = 8;
+export declare const MUSTER = 2;
+export declare const MUSTER_WAIT = 15;
 export declare const canFerryFrom: (
   dependencies: Dependencies,
   player: Player,
@@ -40,6 +42,21 @@ export declare const travel: (
   player: Player,
   memory: Memory,
   unit: Unit,
+  passenger: Passenger
+) => boolean;
+export declare const invadersFor: (
+  memory: Memory,
+  target: Tile
+) => [Unit, Passenger][];
+export declare const musterWaited: (
+  dependencies: Dependencies,
+  memory: Memory,
+  target: Tile
+) => number;
+export declare const mustered: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
   passenger: Passenger
 ) => boolean;
 export declare const waitingAt: (
