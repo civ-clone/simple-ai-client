@@ -395,15 +395,15 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
     expect(ship.tile().isNeighbourOf(port.tile())).true;
   });
 
-  it("sends overseas the share of founders its leader's OverseasSettlers says, while home has sites", async (): Promise<void> => {
-    const { dependencies, game, player, world } = await setUp(),
+  it("sends overseas the share of founders its leader's OverseasSettlers says, once home is filling up", async (): Promise<void> => {
+    const { dependencies, game, memory, player, world } = await setUp(),
       settlers = Array.from(
         { length: 40 },
         (): Unit => new Settlers(null, player, world.get(1, 1), game.rules)
       ),
       share = (): number =>
         settlers.filter((unit: Unit): boolean =>
-          settlesOverseas(dependencies, player, unit)
+          settlesOverseas(dependencies, player, memory, unit)
         ).length;
 
     expect(share()).equal(0);
@@ -411,10 +411,18 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
     game.rules.register(new OverseasSettlers(new Effect(() => 0.5)));
 
     expect(share()).within(10, 30);
+
+    // Not while home has plenty of room.
+    memory.targets.goodSitesForCities.push(
+      ...[0, 1, 2, 3, 4, 5].map((y: number) => world.get(y % 4, y % 5))
+    );
+
+    expect(share()).equal(0);
     expect(
       settlesOverseas(
         dependencies,
         player,
+        memory,
         new Warrior(null, player, world.get(1, 1), game.rules)
       )
     ).false;
