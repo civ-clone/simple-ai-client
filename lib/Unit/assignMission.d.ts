@@ -11,6 +11,7 @@ export declare const liberateCity: Mission;
 export declare const attackEnemyUnits: Mission;
 export declare const attackEnemyCity: Mission;
 export declare const goOverseas: Mission;
+export declare const invadeOverseas: Mission;
 export type { Mission };
 export { exploreLand, exploreSea };
 export declare const missions: Mission[];
