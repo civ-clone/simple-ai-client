@@ -35,7 +35,14 @@ export class TravelOverseas extends AIStrategy {
         memory,
         unit,
         known.role,
-        candidatesFor(memory, unit, known.role)
+        candidatesFor(
+          this.dependencies(),
+          this.knowledge(),
+          player,
+          memory,
+          unit,
+          known.role
+        )
       );
 
     if (!passenger) {

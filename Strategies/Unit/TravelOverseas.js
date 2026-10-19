@@ -14,7 +14,7 @@ class TravelOverseas extends AIStrategy_1.default {
             (0, overseas_1.overseasStateFor)(this.memoryFor(action.player())).passengers.has(action.value()));
     }
     async attempt(action) {
-        const player = action.player(), unit = action.value(), memory = this.memoryFor(player), known = (0, overseas_1.overseasStateFor)(memory).passengers.get(unit), passenger = (0, overseas_1.planPassenger)(this.dependencies(), player, memory, unit, known.role, (0, overseas_1.candidatesFor)(memory, unit, known.role));
+        const player = action.player(), unit = action.value(), memory = this.memoryFor(player), known = (0, overseas_1.overseasStateFor)(memory).passengers.get(unit), passenger = (0, overseas_1.planPassenger)(this.dependencies(), player, memory, unit, known.role, (0, overseas_1.candidatesFor)(this.dependencies(), this.knowledge(), player, memory, unit, known.role));
         if (!passenger) {
             (0, overseas_1.dropPassenger)(memory, unit);
             return false;

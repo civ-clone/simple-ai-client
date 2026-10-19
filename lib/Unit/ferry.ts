@@ -1,7 +1,8 @@
 // Generic: a transport's turn as a ferry (civ-clone/web-renderer#211, #374), for `Strategies/Unit/Ferry`. With
 //  passengers aboard, it sails, once they're all aboard, to the coast nearest their target and unloads them there
-//  (`unloadTransport` unloads). Empty, it sails alongside a port where passengers are waiting (`lib/Unit/overseas`).
-//  Otherwise it does nothing here, and goes on exploring.
+//  (`unloadTransport` unloads). Empty, it sails alongside a port where passengers are waiting (`lib/Unit/overseas`),
+//  unless another transport is on its way there already. Otherwise it does nothing here, and goes on exploring, and
+//  while it's ferrying the player may build another ship to explore with (civ-clone/web-renderer#440).
 import {
   ESCORT_WAIT,
   dropPassenger,
@@ -136,7 +137,7 @@ const readyToSail = (
   return !stillComing;
 };
 
-export const ferry = async (
+const ferryTurn = async (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
@@ -145,10 +146,12 @@ export const ferry = async (
 ): Promise<boolean> => {
   // Not `Unit & Ferry`: a type with members of its own isn't assignable to `Unit` (civ-clone/web-renderer#21).
   const cargo = (ship as unknown as Ferry).cargo(),
-    { passengers } = overseasStateFor(memory),
+    { passengers, heading } = overseasStateFor(memory),
     turn = dependencies.turn.value();
 
   if (cargo.length > 0) {
+    heading.delete(ship);
+
     if (!loading.has(ship)) {
       loading.set(ship, turn);
     }
@@ -187,17 +190,30 @@ export const ferry = async (
 
   loading.delete(ship);
 
-  // Empty: alongside the nearest port with passengers waiting in it.
-  const ports = [
-    ...new Set(
-      [...passengers.values()]
-        .filter((passenger): boolean => passenger.since !== null)
-        .map((passenger): City => passenger.port)
+  // Empty: alongside the nearest port with passengers waiting in it that no other transport is sailing for.
+  const taken = new Set(
+      [...heading.entries()]
+        .filter(
+          ([other]): boolean =>
+            other !== ship &&
+            !other.destroyed() &&
+            (other as unknown as Ferry).hasCapacity()
+        )
+        .map(([, port]): City => port)
     ),
-  ].sort(
-    (a: City, b: City): number =>
-      a.tile().distanceFrom(ship.tile()) - b.tile().distanceFrom(ship.tile())
-  );
+    ports = [
+      ...new Set(
+        [...passengers.values()]
+          .filter((passenger): boolean => passenger.since !== null)
+          .map((passenger): City => passenger.port)
+      ),
+    ]
+      .filter((port: City): boolean => !taken.has(port))
+      .sort(
+        (a: City, b: City): number =>
+          a.tile().distanceFrom(ship.tile()) -
+          b.tile().distanceFrom(ship.tile())
+      );
 
   for (const port of ports) {
     const berth = landingFor(ship, new Set([port.tile()]), port.tile());
@@ -206,11 +222,37 @@ export const ferry = async (
       berth &&
       (await sailTo(dependencies, player, memory, knowledge, ship, berth))
     ) {
+      heading.set(ship, port);
+
       return true;
     }
   }
 
+  heading.delete(ship);
+
   return false;
+};
+
+export const ferry = async (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  knowledge: Knowledge,
+  ship: Unit
+): Promise<boolean> => {
+  const ferried = await ferryTurn(
+    dependencies,
+    player,
+    memory,
+    knowledge,
+    ship
+  );
+
+  if (ferried) {
+    overseasStateFor(memory).ferried.set(ship, dependencies.turn.value());
+  }
+
+  return ferried;
 };
 
 export default ferry;

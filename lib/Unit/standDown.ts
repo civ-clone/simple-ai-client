@@ -2,7 +2,8 @@
 //  In order:
 //  0. a unit that could defend goes with a founder waiting in a port for an escort overseas;
 //  1. a unit that could defend a city goes to the nearest of the player's cities it can reach that still wants a unit
-//     in it, to defend it or for martial law to use, counting the units already on their way there;
+//     in it, to defend it or for martial law to use, counting the units already on their way there, or failing that
+//     to one overseas that's short of defenders (civ-clone/web-renderer#441);
 //  2. failing that, it's disbanded, if the ruleset's policy finds it costs more than it's worth;
 //  3. otherwise it waits in the player's city it's in, ready for a mission when one comes up;
 //  4. or heads for the nearest of the player's cities it can reach, a ship for the sea beside one and then into it;
@@ -21,7 +22,7 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import moveUnit from './moveUnit';
-import { planEscort, travel } from './overseas';
+import { Passenger, planEscort, planGarrison, travel } from './overseas';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 import takeUpStation from './homeCity';
@@ -236,10 +237,15 @@ export const standDown = async (
   // A founder waiting in a port for an escort overseas takes this one along (`lib/Unit/overseas`).
   const escort = planEscort(dependencies, memory, unit);
 
-  if (escort) {
-    if (!travel(dependencies, player, memory, unit, escort)) {
+  // Its plan as a passenger, if it has one: going with a founder, or to a city overseas that's short of defenders.
+  const voyage = async (passenger: Passenger): Promise<void> => {
+    if (!travel(dependencies, player, memory, unit, passenger)) {
       await moveUnit(dependencies, player, memory, knowledge, unit);
     }
+  };
+
+  if (escort) {
+    await voyage(escort);
 
     return;
   }
@@ -256,6 +262,20 @@ export const standDown = async (
 
     if (path) {
       await go(path);
+
+      return;
+    }
+
+    const garrison = planGarrison(
+      dependencies,
+      knowledge,
+      player,
+      memory,
+      unit
+    );
+
+    if (garrison) {
+      await voyage(garrison);
 
       return;
     }

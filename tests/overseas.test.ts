@@ -18,7 +18,14 @@ import { dependenciesFor } from '../registerStrategies';
 import { expect } from 'chai';
 import { ferryShipFor } from '../lib/City/explorerShip';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
-import { overseasStateFor, planPassenger, travel } from '../lib/Unit/overseas';
+import {
+  isFerrying,
+  overseasStateFor,
+  planGarrison,
+  planPassenger,
+  travel,
+} from '../lib/Unit/overseas';
+import civ1Knowledge from '../lib/Civ1/knowledge';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
 import unloadTransport from '../lib/Unit/unloadTransport';
@@ -188,5 +195,56 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
     game.units.unregister(ship);
 
     expect(ferryShipFor(dependencies, player, memory, port)).equal(Trireme);
+  });
+
+  it('sends a defender to a city on another island that is short of defenders, one at a time (#441)', async (): Promise<void> => {
+    const { dependencies, game, memory, player, trireme, world } =
+        await setUp(),
+      defender = new Warrior(null, player, world.get(1, 1), game.rules),
+      another = new Warrior(null, player, world.get(1, 2), game.rules),
+      island = new City(
+        player,
+        world.get(7, 2),
+        '',
+        game.rules,
+        game.workedTiles
+      );
+
+    trireme(4, 2);
+
+    const passenger = planGarrison(
+      dependencies,
+      civ1Knowledge,
+      player,
+      memory,
+      defender
+    );
+
+    expect(passenger?.role).equal('garrison');
+    expect(passenger?.target === island.tile()).true;
+    // That city has one on its way.
+    expect(planGarrison(dependencies, civ1Knowledge, player, memory, another))
+      .null;
+  });
+
+  it('counts a transport as ferrying while it has cargo or ferried last turn (#440)', async (): Promise<void> => {
+    const { dependencies, game, memory, player, trireme, world } =
+        await setUp(),
+      ship = trireme(4, 2) as Unit & { stow(unit: Unit): boolean };
+
+    expect(isFerrying(dependencies, memory, ship)).false;
+
+    overseasStateFor(memory).ferried.set(ship, dependencies.turn.value());
+
+    expect(isFerrying(dependencies, memory, ship)).true;
+
+    game.turn.increment();
+    game.turn.increment();
+
+    expect(isFerrying(dependencies, memory, ship)).false;
+
+    ship.stow(new Warrior(null, player, world.get(3, 2), game.rules));
+
+    expect(isFerrying(dependencies, memory, ship)).true;
   });
 });

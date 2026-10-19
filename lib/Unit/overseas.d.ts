@@ -1,10 +1,11 @@
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-export type Role = 'explorer' | 'founder' | 'escort';
+export type Role = 'explorer' | 'founder' | 'escort' | 'garrison';
 export interface Passenger {
   target: Tile;
   role: Role;
@@ -14,6 +15,8 @@ export interface Passenger {
 interface OverseasState {
   passengers: Map<Unit, Passenger>;
   origins: Map<Unit, Set<Tile>>;
+  ferried: Map<Unit, number>;
+  heading: Map<Unit, City>;
 }
 export declare const overseasStateFor: (memory: Memory) => OverseasState;
 export declare const ESCORT_WAIT = 3;
@@ -45,11 +48,31 @@ export declare const waitingAt: (
 export declare const isFounder: (unit: Unit) => boolean;
 export declare const isPassenger: (memory: Memory, unit: Unit) => boolean;
 export declare const originOf: (memory: Memory, unit: Unit) => Set<Tile> | null;
+export declare const citiesShortOfDefenders: (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  player: Player
+) => Tile[];
 export declare const candidatesFor: (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  player: Player,
   memory: Memory,
   unit: Unit,
   role: Role
 ) => Tile[];
+export declare const planGarrison: (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  player: Player,
+  memory: Memory,
+  unit: Unit
+) => Passenger | null;
+export declare const isFerrying: (
+  dependencies: Dependencies,
+  memory: Memory,
+  unit: Unit
+) => boolean;
 export declare const planEscort: (
   dependencies: Dependencies,
   memory: Memory,
