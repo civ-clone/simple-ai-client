@@ -7,6 +7,7 @@ exports.TravelOverseas = void 0;
 const overseas_1 = require("../../lib/Unit/overseas");
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
+const Actions_1 = require("@civ-clone/library-unit/Actions");
 const Types_1 = require("@civ-clone/library-unit/Types");
 const moveUnit_1 = require("../../lib/Unit/moveUnit");
 const orders_1 = require("@civ-clone/base-strategy-ai/lib/Unit/orders");
@@ -23,8 +24,17 @@ class TravelOverseas extends AIStrategy_1.default {
         // At sea: a passenger waits for its ship to put it ashore (`unloadTransport`). Any other land unit goes ashore if
         //  it can, and otherwise waits: next to a coast held by an enemy, it may have nowhere to step.
         if (isAtSea(unit)) {
-            if (!known) {
-                await (0, moveUnit_1.default)(this.dependencies(), player, memory, this.knowledge(), unit);
+            // One step ashore, by `Disembark` itself: `moveUnit` here could keep picking a move that leaves its moves as
+            //  they were, for ever, within the one action.
+            const disembark = known
+                ? undefined
+                : unit
+                    .tile()
+                    .getNeighbours()
+                    .flatMap((tile) => unit.actions(tile))
+                    .find((action) => action instanceof Actions_1.Disembark);
+            if (disembark) {
+                unit.action(disembark);
             }
             if (unit.active() && unit.moves().value() > 0) {
                 (0, orders_1.noOrders)(this.dependencies(), unit);
