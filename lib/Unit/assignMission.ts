@@ -11,7 +11,7 @@ import {
   exploreLand,
   exploreSea,
 } from '@civ-clone/base-strategy-explore/lib/Unit/explore';
-import { isFounder, planPassenger, travel } from './overseas';
+import { isFounder, planInvasion, planPassenger, travel } from './overseas';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 
@@ -127,6 +127,21 @@ export const goOverseas: Mission = (dependencies, memory, unit) => {
   return true;
 };
 
+// With no enemy city it can reach and nothing to explore on its own landmass, an attacker goes for an enemy city
+//  overseas it's strong enough to take on (`lib/Unit/overseas`, civ-clone/web-renderer#374): first to its port.
+export const invadeOverseas: Mission = (dependencies, memory, unit) => {
+  const player = unit.player(),
+    passenger = planInvasion(dependencies, player, memory, unit);
+
+  if (!passenger) {
+    return false;
+  }
+
+  travel(dependencies, player, memory, unit, passenger);
+
+  return true;
+};
+
 // In priority order. Hunting enemy units comes after exploring, by land or by sea: ahead of it (as it was written, when
 //  the list was always empty), units chase enemies instead of exploring, and the AI explores and researches measurably
 //  less, and ships built to explore are sunk hunting other ships.
@@ -138,6 +153,7 @@ export const missions: Mission[] = [
   liberateCity,
   attackEnemyCity,
   exploreLand,
+  invadeOverseas,
   goOverseas,
   exploreSea,
   attackEnemyUnits,

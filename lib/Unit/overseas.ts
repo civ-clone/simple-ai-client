@@ -10,6 +10,12 @@
 import { Embark } from '@civ-clone/library-unit/Actions';
 import { Land, NavalTransport, Worker } from '@civ-clone/library-unit/Types';
 import { defendersIn, defendersKept, isDefender } from '../City/defence';
+import {
+  confidentPower,
+  knownEnemyCities,
+  powerOf,
+  powerOfPlayer,
+} from '../Player/rivals';
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
@@ -22,11 +28,11 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
-export type Role = 'explorer' | 'founder' | 'escort' | 'garrison';
+export type Role = 'explorer' | 'founder' | 'escort' | 'garrison' | 'invader';
 
 export interface Passenger {
-  // What it's going for: a tile to explore, a site for a city or a city of the player's that's short of defenders, on
-  //  another landmass. An escort shares its founder's.
+  // What it's going for: a tile to explore, a site for a city, a city of the player's that's short of defenders or an
+  //  enemy city to attack, on another landmass. An escort shares its founder's.
   target: Tile;
   role: Role;
   port: City;
@@ -62,6 +68,9 @@ export const overseasStateFor = (memory: Memory): OverseasState => {
 
 // How long a lone founder waits in port for an escort before sailing without one.
 export const ESCORT_WAIT = 3;
+
+// How many invaders go for the same enemy city: a ferry's load, where other roles go one to a target.
+export const INVADERS = 4;
 
 const landmassOf = (dependencies: Dependencies, tile: Tile): Set<Tile> =>
   continentOf(dependencies.turn.value(), tile);
@@ -105,23 +114,31 @@ export const canFerryFrom = (
     );
 
 // The nearest of `candidates` on another landmass than `unit`'s, and the port it would sail from, if the player can
-//  ferry it. Targets another passenger is already going for are left to that one.
+//  ferry it. Targets other passengers are already going for are left to them: one each, or `INVADERS` invaders.
 const destination = (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
   unit: Unit,
+  role: Role,
   candidates: Tile[]
 ): { target: Tile; port: City } | null => {
   const home = landmassOf(dependencies, unit.tile()),
-    taken = new Set(
-      [...overseasStateFor(memory).passengers.entries()]
-        .filter(([other]) => other !== unit)
-        .map(([, passenger]) => passenger.target)
-    );
+    going = new Map<Tile, number>(),
+    share = role === 'invader' ? INVADERS : 1;
+
+  overseasStateFor(memory).passengers.forEach(
+    (passenger: Passenger, other: Unit): void => {
+      if (other !== unit && !other.destroyed()) {
+        going.set(passenger.target, (going.get(passenger.target) ?? 0) + 1);
+      }
+    }
+  );
 
   for (const target of [...candidates]
-    .filter((tile: Tile): boolean => !home.has(tile) && !taken.has(tile))
+    .filter(
+      (tile: Tile): boolean => !home.has(tile) && (going.get(tile) ?? 0) < share
+    )
     .sort(
       (a: Tile, b: Tile): number =>
         a.distanceFrom(unit.tile()) - b.distanceFrom(unit.tile())
@@ -163,7 +180,14 @@ export const planPassenger = (
     return null;
   }
 
-  const found = destination(dependencies, player, memory, unit, candidates);
+  const found = destination(
+    dependencies,
+    player,
+    memory,
+    unit,
+    role,
+    candidates
+  );
 
   if (!found) {
     passengers.delete(unit);
@@ -324,6 +348,8 @@ export const candidatesFor = (
     ? memory.targets.goodSitesForCities
     : role === 'garrison'
     ? citiesShortOfDefenders(dependencies, knowledge, player)
+    : role === 'invader'
+    ? invasionTargets(dependencies, player, unit)
     : [...overseasStateFor(memory).passengers.entries()]
         .filter(
           ([other, passenger]) => other !== unit && passenger.role === 'founder'
@@ -348,6 +374,75 @@ export const planGarrison = (
         unit,
         'garrison',
         citiesShortOfDefenders(dependencies, knowledge, player)
+      )
+    : null;
+
+// An attacker: a land unit with more attack than defence, not a worker.
+const isInvader = (unit: Unit): boolean =>
+  unit instanceof Land &&
+  !isFounder(unit) &&
+  unit.attack().value() > unit.defence().value();
+
+// The enemy cities `player` knows of, on another landmass than `unit`'s, where the city's owner is weaker than
+//  `player`, its units there against all of `player`'s, as its leader sees it (`AttackConfidence`): an Aggressive leader
+//  takes on a stronger enemy than a Friendly one (civ-clone/web-renderer#374).
+export const invasionTargets = (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+): Tile[] => {
+  const home = landmassOf(dependencies, unit.tile()),
+    power = powerOfPlayer(dependencies, player),
+    // Each owner's power on each landmass, worked out once: `continentOf` gives each landmass one set a turn.
+    defended = new Map<Player, Map<Set<Tile>, number>>(),
+    defenceOf = (owner: Player, landmass: Set<Tile>): number => {
+      if (!defended.has(owner)) {
+        defended.set(owner, new Map());
+      }
+
+      const byLandmass = defended.get(owner)!;
+
+      if (!byLandmass.has(landmass)) {
+        byLandmass.set(
+          landmass,
+          powerOf(
+            dependencies,
+            dependencies.unitRegistry
+              .getByPlayer(owner)
+              .filter((other: Unit): boolean => landmass.has(other.tile()))
+          )
+        );
+      }
+
+      return byLandmass.get(landmass)!;
+    };
+
+  return knownEnemyCities(dependencies, player)
+    .filter(
+      (city: City): boolean =>
+        !home.has(city.tile()) &&
+        defenceOf(city.player(), landmassOf(dependencies, city.tile())) <
+          confidentPower(dependencies, player, city.player(), power)
+    )
+    .map((city: City): Tile => city.tile());
+};
+
+// An attacker with no enemy city it can reach, and nothing to explore, goes for one overseas (civ-clone/web-renderer#374),
+//  up to `INVADERS` to a city, so that a ferry sails with a load.
+export const planInvasion = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  unit: Unit
+): Passenger | null =>
+  isInvader(unit)
+    ? planPassenger(
+        dependencies,
+        player,
+        memory,
+        unit,
+        'invader',
+        invasionTargets(dependencies, player, unit)
       )
     : null;
 

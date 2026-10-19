@@ -1,4 +1,8 @@
-import { Trireme, Warrior } from '@civ-clone/civ1-unit/Units';
+import { Horseman, Trireme, Warrior } from '@civ-clone/civ1-unit/Units';
+import Effect from '@civ-clone/core-rule/Effect';
+import MilitaryStrength from '@civ-clone/core-power/Rules/MilitaryStrength';
+import Never from '@civ-clone/core-diplomacy/Expiries/Never';
+import Peace from '@civ-clone/base-diplomacy-declaration-peace/Peace';
 import { Despotism } from '@civ-clone/civ1-government/Governments';
 import { MapMaking } from '@civ-clone/civ1-science/Advances';
 import City from '@civ-clone/core-city/City';
@@ -22,6 +26,7 @@ import {
   isFerrying,
   overseasStateFor,
   planGarrison,
+  planInvasion,
   planPassenger,
   travel,
 } from '../lib/Unit/overseas';
@@ -246,5 +251,121 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
     ship.stow(new Warrior(null, player, world.get(3, 2), game.rules));
 
     expect(isFerrying(dependencies, memory, ship)).true;
+  });
+
+  describe('invasions (#374)', (): void => {
+    // An enemy with an undefended city on island B, and the units' power counted as their attack and defence.
+    const withEnemy = async () => {
+      const setup = await setUp(),
+        { game, world } = setup,
+        enemy = new Player(game.rules);
+
+      game.rules.register(
+        new MilitaryStrength(
+          new Effect((unit: Unit) => ({
+            attack: unit.attack().value(),
+            defence: unit.defence().value(),
+          }))
+        )
+      );
+      game.playerWorlds.register(new PlayerWorld(enemy, world));
+
+      const city = new City(
+        enemy,
+        world.get(7, 2),
+        '',
+        game.rules,
+        game.workedTiles
+      );
+
+      setup.trireme(4, 2);
+
+      return { ...setup, city, enemy };
+    };
+
+    it("sends an attacker for an enemy's city on another island", async (): Promise<void> => {
+      const { city, dependencies, game, memory, player, world } =
+          await withEnemy(),
+        horseman = new Horseman(null, player, world.get(1, 1), game.rules),
+        passenger = planInvasion(dependencies, player, memory, horseman);
+
+      expect(passenger?.role).equal('invader');
+      expect(passenger?.target === city.tile()).true;
+    });
+
+    it('leaves alone a city of a player at peace, or one too strong there', async (): Promise<void> => {
+      const atPeace = await withEnemy();
+
+      atPeace.game.interactions.register(
+        new Peace(
+          atPeace.player,
+          atPeace.enemy,
+          new Never(),
+          atPeace.game.rules
+        )
+      );
+
+      expect(
+        planInvasion(
+          atPeace.dependencies,
+          atPeace.player,
+          atPeace.memory,
+          new Horseman(
+            null,
+            atPeace.player,
+            atPeace.world.get(1, 1),
+            atPeace.game.rules
+          )
+        )
+      ).null;
+
+      const strong = await withEnemy();
+
+      for (let i = 0; i < 3; i++) {
+        new Warrior(
+          strong.city,
+          strong.enemy,
+          strong.city.tile(),
+          strong.game.rules
+        );
+      }
+
+      expect(
+        planInvasion(
+          strong.dependencies,
+          strong.player,
+          strong.memory,
+          new Horseman(
+            null,
+            strong.player,
+            strong.world.get(1, 1),
+            strong.game.rules
+          )
+        )
+      ).null;
+    });
+
+    it('sends up to four invaders for the same city, and not a defender', async (): Promise<void> => {
+      const { dependencies, game, memory, player, world } = await withEnemy(),
+        invaders = [0, 1, 2, 3, 4].map(
+          (y: number): Unit =>
+            new Horseman(null, player, world.get(0, y), game.rules)
+        );
+
+      expect(
+        invaders.map(
+          (unit: Unit): boolean =>
+            planInvasion(dependencies, player, memory, unit) !== null
+        )
+      ).eql([true, true, true, true, false]);
+      expect(
+        planInvasion(
+          dependencies,
+          player,
+          memory,
+          new Warrior(null, player, world.get(1, 1), game.rules)
+        )
+      ).null;
+    });
   });
 });

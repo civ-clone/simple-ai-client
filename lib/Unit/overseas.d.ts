@@ -5,7 +5,7 @@ import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-export type Role = 'explorer' | 'founder' | 'escort' | 'garrison';
+export type Role = 'explorer' | 'founder' | 'escort' | 'garrison' | 'invader';
 export interface Passenger {
   target: Tile;
   role: Role;
@@ -20,6 +20,7 @@ interface OverseasState {
 }
 export declare const overseasStateFor: (memory: Memory) => OverseasState;
 export declare const ESCORT_WAIT = 3;
+export declare const INVADERS = 4;
 export declare const canFerryFrom: (
   dependencies: Dependencies,
   player: Player,
@@ -64,6 +65,17 @@ export declare const candidatesFor: (
 export declare const planGarrison: (
   dependencies: Dependencies,
   knowledge: Knowledge,
+  player: Player,
+  memory: Memory,
+  unit: Unit
+) => Passenger | null;
+export declare const invasionTargets: (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+) => Tile[];
+export declare const planInvasion: (
+  dependencies: Dependencies,
   player: Player,
   memory: Memory,
   unit: Unit
