@@ -5,7 +5,10 @@
 //  while it's ferrying the player may build another ship to explore with (civ-clone/web-renderer#440).
 import {
   ESCORT_WAIT,
+  MUSTER_WAIT,
   dropPassenger,
+  invadersFor,
+  musterWaited,
   isFounder,
   overseasStateFor,
   waitingAt,
@@ -123,7 +126,8 @@ const portBeside = (
     ) ?? null;
 
 // Whether a transport with `cargo` aboard sets sail: it's full; or no one else is waiting or on their way to the port
-//  it's beside; or it has waited long enough. A lone founder waits a little longer for an escort.
+//  it's beside; or it has waited long enough. A lone founder waits a little longer for an escort. Invaders wait for
+//  each other.
 const readyToSail = (
   dependencies: Dependencies,
   memory: Memory,
@@ -141,6 +145,19 @@ const readyToSail = (
         ([unit, passenger]): boolean =>
           passenger.port === port && !cargo.includes(unit) && !unit.destroyed()
       );
+
+  // Invaders sail together: once all of them going for their target are aboard, or they've waited long enough.
+  const invading = cargo
+    .map((unit: Unit) => passengers.get(unit))
+    .find((passenger): boolean => passenger?.role === 'invader');
+
+  if (invading) {
+    return (
+      invadersFor(memory, invading.target).every(([unit]): boolean =>
+        unit.tile().isWater()
+      ) || musterWaited(dependencies, memory, invading.target) >= MUSTER_WAIT
+    );
+  }
 
   if (!(ship as unknown as Ferry).hasCapacity() || waited >= ESCORT_WAIT) {
     return true;

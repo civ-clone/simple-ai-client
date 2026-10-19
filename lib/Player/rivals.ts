@@ -67,18 +67,35 @@ export const knownEnemyCities = (
     );
 };
 
-const rivals = new WeakMap<Player, { turn: number; rival: Player | null }>();
+const rivals = new WeakMap<
+  Player,
+  { turn: number; rival: Player | null; overseas: boolean }
+>();
 
-// `player`'s nearest rival, if it has one. Worked out once a turn.
+// `player`'s rival, its campaign's one enemy at a time (Dom, on civ-clone/web-renderer#374): kept while it's still a
+//  rival and no rival next door has turned up, and otherwise the nearest, one with a city on a landmass where `player`
+//  has one before any overseas.
+//  Worked out once a turn, from the game as it is, so nothing needs saving.
 export const rivalOf = (
   dependencies: Dependencies,
   player: Player
-): Player | null => {
+): Player | null => rivalryOf(dependencies, player).rival;
+
+// Whether `player`'s rival is only overseas: it has no city on a landmass where `player` has one.
+export const rivalIsOverseas = (
+  dependencies: Dependencies,
+  player: Player
+): boolean => rivalryOf(dependencies, player).overseas;
+
+const rivalryOf = (
+  dependencies: Dependencies,
+  player: Player
+): { rival: Player | null; overseas: boolean } => {
   const turn = dependencies.turn.value(),
     known = rivals.get(player);
 
   if (known && known.turn === turn) {
-    return known.rival;
+    return known;
   }
 
   const cities = dependencies.cityRegistry.getByPlayer(player),
@@ -86,6 +103,10 @@ export const rivalOf = (
     landmasses = cities.map(
       (city: City): Set<Tile> => continentOf(turn, city.tile())
     ),
+    isNeighbour = (city: City): boolean =>
+      landmasses.some((landmass: Set<Tile>): boolean =>
+        landmass.has(city.tile())
+      ),
     canFerry =
       power > 0 &&
       cities.some((city: City): boolean =>
@@ -109,24 +130,39 @@ export const rivalOf = (
           own.tile().distanceFrom(city.tile())
         )
       ),
-    [nearest] =
+    targets =
       power > 0 && cities.length > 0
-        ? knownEnemyCities(dependencies, player)
-            .filter(
-              (city: City): boolean =>
-                (canFerry ||
-                  landmasses.some((landmass: Set<Tile>): boolean =>
-                    landmass.has(city.tile())
-                  )) &&
-                isWeaker(city.player())
-            )
-            .sort((a: City, b: City): number => distance(a) - distance(b))
+        ? knownEnemyCities(dependencies, player).filter(
+            (city: City): boolean =>
+              (canFerry || isNeighbour(city)) && isWeaker(city.player())
+          )
         : [],
-    rival = nearest?.player() ?? null;
+    previous = known?.rival ?? null,
+    [nearest] = [...targets].sort(
+      (a: City, b: City): number =>
+        Number(isNeighbour(b)) - Number(isNeighbour(a)) ||
+        distance(a) - distance(b)
+    ),
+    // An overseas rival gives way to one next door.
+    keep = targets.some(
+      (city: City): boolean =>
+        city.player() === previous &&
+        (isNeighbour(city) || !isNeighbour(nearest))
+    ),
+    rival = keep ? previous : nearest?.player() ?? null,
+    rivalry = {
+      turn,
+      rival,
+      overseas:
+        rival !== null &&
+        !targets.some(
+          (city: City): boolean => city.player() === rival && isNeighbour(city)
+        ),
+    };
 
-  rivals.set(player, { turn, rival });
+  rivals.set(player, rivalry);
 
-  return rival;
+  return rivalry;
 };
 
 export default rivalOf;

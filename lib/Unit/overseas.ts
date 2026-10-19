@@ -15,7 +15,11 @@ import {
   knownEnemyCities,
   powerOf,
   powerOfPlayer,
+  rivalOf,
 } from '../Player/rivals';
+import AttackConfidence from '@civ-clone/base-leader-personality/Rules/Player/AttackConfidence';
+import { militaryStrength } from '@civ-clone/core-power/lib/strength';
+import { product } from '@civ-clone/base-leader-personality/lib/combine';
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
@@ -70,8 +74,14 @@ export const overseasStateFor = (memory: Memory): OverseasState => {
 // How long a lone founder waits in port for an escort before sailing without one.
 export const ESCORT_WAIT = 3;
 
-// How many invaders go for the same enemy city: a ferry's load, where other roles go one to a target.
-export const INVADERS = 4;
+// How many invaders go for the same enemy city, where other roles go one to a target.
+export const INVADERS = 8;
+
+// How much stronger in attack invaders gathered for a city must be than its owner's defence on its landmass before they
+//  board, as their leader sees it (`AttackConfidence`), and the most turns they wait to be (Dom, on
+//  civ-clone/web-renderer#374: landing one unit at a time lost most of them).
+export const MUSTER = 2;
+export const MUSTER_WAIT = 15;
 
 const landmassOf = (dependencies: Dependencies, tile: Tile): Set<Tile> =>
   continentOf(dependencies.turn.value(), tile);
@@ -285,7 +295,11 @@ export const travel = (
         | Embark
         | undefined);
 
-  if (embark) {
+  if (
+    embark &&
+    (passenger.role !== 'invader' ||
+      mustered(dependencies, player, memory, passenger))
+  ) {
     overseasStateFor(memory).origins.set(unit, landmassOf(dependencies, tile));
 
     // The `instanceof` narrows it to a type that isn't assignable to `Action` (civ-clone/web-renderer#21).
@@ -297,6 +311,73 @@ export const travel = (
   noOrders(dependencies, unit);
 
   return true;
+};
+
+// The invaders going for `target`, that have reached their port or set sail.
+export const invadersFor = (
+  memory: Memory,
+  target: Tile
+): [Unit, Passenger][] =>
+  [...overseasStateFor(memory).passengers.entries()].filter(
+    ([unit, passenger]): boolean =>
+      passenger.role === 'invader' &&
+      passenger.target === target &&
+      passenger.since !== null &&
+      !unit.destroyed()
+  );
+
+// How long the first of the invaders going for `target` has waited.
+export const musterWaited = (
+  dependencies: Dependencies,
+  memory: Memory,
+  target: Tile
+): number =>
+  Math.max(
+    0,
+    ...invadersFor(memory, target).map(
+      ([, passenger]): number => dependencies.turn.value() - passenger.since!
+    )
+  );
+
+// Whether the invaders going for `passenger`'s target are strong enough to take it (`MUSTER`), or have waited long
+//  enough (`MUSTER_WAIT`).
+export const mustered = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  passenger: Passenger
+): boolean => {
+  const city = dependencies.cityRegistry.getByTile(passenger.target);
+
+  if (
+    city === null ||
+    musterWaited(dependencies, memory, passenger.target) >= MUSTER_WAIT
+  ) {
+    return true;
+  }
+
+  const landmass = landmassOf(dependencies, passenger.target),
+    { attack } = militaryStrength(
+      invadersFor(memory, passenger.target).map(([unit]): Unit => unit),
+      dependencies.ruleRegistry
+    ),
+    { defence } = militaryStrength(
+      dependencies.unitRegistry
+        .getByPlayer(city.player())
+        .filter((unit: Unit): boolean => landmass.has(unit.tile())),
+      dependencies.ruleRegistry
+    );
+
+  return (
+    attack *
+      product(
+        dependencies.ruleRegistry,
+        AttackConfidence,
+        player,
+        city.player()
+      ) >=
+    MUSTER * defence
+  );
 };
 
 // The passengers waiting in `port`.
@@ -384,7 +465,7 @@ const isInvader = (unit: Unit): boolean =>
   !isFounder(unit) &&
   unit.attack().value() > unit.defence().value();
 
-// The enemy cities `player` knows of, on another landmass than `unit`'s, where the city's owner is weaker than
+// The cities of `player`'s rival, one enemy at a time (`rivalOf`), on another landmass than `unit`'s, where it's weaker than
 //  `player`, its units there against all of `player`'s, as its leader sees it (`AttackConfidence`): an Aggressive leader
 //  takes on a stronger enemy than a Friendly one (civ-clone/web-renderer#374).
 export const invasionTargets = (
@@ -418,9 +499,12 @@ export const invasionTargets = (
       return byLandmass.get(landmass)!;
     };
 
+  const rival = rivalOf(dependencies, player);
+
   return knownEnemyCities(dependencies, player)
     .filter(
       (city: City): boolean =>
+        city.player() === rival &&
         !home.has(city.tile()) &&
         defenceOf(city.player(), landmassOf(dependencies, city.tile())) <
           confidentPower(dependencies, player, city.player(), power)

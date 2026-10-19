@@ -23,6 +23,7 @@ import { expect } from 'chai';
 import { ferryShipFor } from '../lib/City/explorerShip';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import {
+  INVADERS,
   isFerrying,
   overseasStateFor,
   planGarrison,
@@ -346,11 +347,12 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
       ).null;
     });
 
-    it('sends up to four invaders for the same city, and not a defender', async (): Promise<void> => {
+    it('sends up to INVADERS invaders for the same city, and not a defender', async (): Promise<void> => {
       const { dependencies, game, memory, player, world } = await withEnemy(),
-        invaders = [0, 1, 2, 3, 4].map(
-          (y: number): Unit =>
-            new Horseman(null, player, world.get(0, y), game.rules)
+        invaders = Array.from(
+          { length: INVADERS + 1 },
+          (value: unknown, i: number): Unit =>
+            new Horseman(null, player, world.get(i % 4, i % 5), game.rules)
         );
 
       expect(
@@ -358,7 +360,7 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
           (unit: Unit): boolean =>
             planInvasion(dependencies, player, memory, unit) !== null
         )
-      ).eql([true, true, true, true, false]);
+      ).eql([...Array(INVADERS).fill(true), false]);
       expect(
         planInvasion(
           dependencies,
