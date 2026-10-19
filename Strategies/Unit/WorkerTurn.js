@@ -18,6 +18,18 @@ class WorkerTurn extends AIStrategy_1.default {
     }
     async attempt(action) {
         const player = action.player(), unit = action.value(), memory = this.memoryFor(player), { actions, target, tile } = (0, unitTurnContextFor_1.default)(this.dependencies(), action), { buildIrrigation, buildMine, buildRoad, foundCity } = actions;
+        // One of the founders its leader sends overseas while there are still sites at home, with no site of its own yet:
+        //  it goes for one overseas, if there is one it could be ferried to (`lib/Unit/overseas`, civ-clone/web-renderer#374).
+        if (!memory.unitTargetData.has(unit) &&
+            (0, overseas_1.settlesOverseas)(this.dependencies(), player, unit)) {
+            const passenger = (0, overseas_1.planPassenger)(this.dependencies(), player, memory, unit, 'founder', memory.targets.goodSitesForCities);
+            if (passenger) {
+                if (!(0, overseas_1.travel)(this.dependencies(), player, memory, unit, passenger)) {
+                    await (0, moveUnit_1.default)(this.dependencies(), player, memory, this.knowledge(), unit);
+                }
+                return true;
+            }
+        }
         (0, settlerWork_1.default)(this.dependencies(), player, memory, this.knowledge(), unit, tile, target, {
             buildIrrigation,
             buildMine,

@@ -8,7 +8,11 @@ import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
 import { Worker } from '@civ-clone/library-unit/Types';
 import idleWorker from '../../lib/Unit/idleWorker';
-import { planPassenger, travel } from '../../lib/Unit/overseas';
+import {
+  planPassenger,
+  settlesOverseas,
+  travel,
+} from '../../lib/Unit/overseas';
 import settlerWork from '../../lib/Unit/settlerWork';
 import unitTurnContextFor from '@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor';
 
@@ -26,6 +30,36 @@ export class WorkerTurn extends AIStrategy {
         action
       ),
       { buildIrrigation, buildMine, buildRoad, foundCity } = actions;
+
+    // One of the founders its leader sends overseas while there are still sites at home, with no site of its own yet:
+    //  it goes for one overseas, if there is one it could be ferried to (`lib/Unit/overseas`, civ-clone/web-renderer#374).
+    if (
+      !memory.unitTargetData.has(unit) &&
+      settlesOverseas(this.dependencies(), player, unit)
+    ) {
+      const passenger = planPassenger(
+        this.dependencies(),
+        player,
+        memory,
+        unit,
+        'founder',
+        memory.targets.goodSitesForCities
+      );
+
+      if (passenger) {
+        if (!travel(this.dependencies(), player, memory, unit, passenger)) {
+          await moveUnit(
+            this.dependencies(),
+            player,
+            memory,
+            this.knowledge(),
+            unit
+          );
+        }
+
+        return true;
+      }
+    }
 
     settlerWork(
       this.dependencies(),

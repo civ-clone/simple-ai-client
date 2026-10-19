@@ -19,7 +19,8 @@ import {
 } from '../Player/rivals';
 import AttackConfidence from '@civ-clone/base-leader-personality/Rules/Player/AttackConfidence';
 import { militaryStrength } from '@civ-clone/core-power/lib/strength';
-import { product } from '@civ-clone/base-leader-personality/lib/combine';
+import { product, sum } from '@civ-clone/base-leader-personality/lib/combine';
+import OverseasSettlers from '@civ-clone/base-leader-personality/Rules/Player/OverseasSettlers';
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
@@ -379,6 +380,25 @@ export const mustered = (
     MUSTER * defence
   );
 };
+
+// A number from 0 to 99 for `unit`, the same every turn, to pick a share of a player's units by.
+const shareOf = (unit: Unit): number =>
+  [...unit.id()].reduce(
+    (hash: number, character: string): number =>
+      (hash * 31 + character.charCodeAt(0)) % 100,
+    7
+  );
+
+// Whether `unit`, a founder, is one of the share its leader sends overseas while there are still sites at home
+//  (`OverseasSettlers`, civ-clone/web-renderer#374).
+export const settlesOverseas = (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+): boolean =>
+  isFounder(unit) &&
+  shareOf(unit) <
+    100 * sum(dependencies.ruleRegistry, OverseasSettlers, player);
 
 // The passengers waiting in `port`.
 export const waitingAt = (memory: Memory, port: City): [Unit, Passenger][] =>

@@ -59,6 +59,11 @@ export declare const mustered: (
   memory: Memory,
   passenger: Passenger
 ) => boolean;
+export declare const settlesOverseas: (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+) => boolean;
 export declare const waitingAt: (
   memory: Memory,
   port: City
