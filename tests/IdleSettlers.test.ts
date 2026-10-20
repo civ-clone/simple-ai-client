@@ -7,9 +7,11 @@ import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import { Road } from '@civ-clone/civ1-world/TileImprovements';
 import { Settlers } from '@civ-clone/civ1-unit/Units';
 import TerrainWork from '@civ-clone/base-strategy-terrain-work/Strategies/Unit/TerrainWork';
+import { unitYield } from '@civ-clone/core-unit/Rules/Yield';
 import { travelToPathEnd } from '../lib/Unit/moveUnit';
 import Tile from '@civ-clone/core-world/Tile';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
+import { Worker } from '@civ-clone/library-unit/Types';
 import WorkerTurn from '../Strategies/Unit/WorkerTurn';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
@@ -17,6 +19,15 @@ import { couldJoin } from '../lib/Unit/idleWorker';
 import { expect } from 'chai';
 import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import { terrainJobs } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
+
+// A worker that's never offered `JoinCity`: Civ1's rule offers it to Settlers alone. It moves as Settlers do.
+class Labourer extends Worker {}
+
+const withLabourers = <T extends UnitGame>(setup: T): T => {
+  setup.game.rules.register(...unitYield(Labourer, 0, 1, 1, 1));
+
+  return setup;
+};
 
 const sizeOf = ({ game }: UnitGame, city: City): number =>
   game.cityGrowth.getByCity(city).size();
@@ -221,5 +232,35 @@ describe('where idle Settlers go', (): void => {
     expect(couldJoin(setup.dependencies, settlers, theirs)).false;
     expect(couldJoin(setup.dependencies, settlers, setup.far)).true;
     expect(couldJoin(setup.dependencies, settlers, setup.near)).false;
+  });
+
+  it('should not count a city as one to join for a kind of worker that is never offered the join', async (): Promise<void> => {
+    const setup = withLabourers(await setUp(10, 1)),
+      labourer = setup.addUnit(Labourer, 9, 1),
+      settlers = setup.addUnit(Settlers, 9, 1);
+
+    // With their moves, as on their turn.
+    [labourer, settlers].forEach((unit) =>
+      unit.moves().set(unit.movement().value())
+    );
+
+    expect(couldJoin(setup.dependencies, labourer, setup.far)).false;
+    expect(couldJoin(setup.dependencies, settlers, setup.far)).true;
+  });
+
+  it('should send a kind of worker that is never offered the join to the nearest city, not to one Settlers could join', async (): Promise<void> => {
+    const setup = withLabourers(await setUp(10, 1)),
+      labourer = setup.addUnit(Labourer, 8, 1);
+
+    labourer.moves().set(labourer.movement().value());
+    labourer.setActive(true);
+
+    await new WorkerTurn(setup.dependencies, civ1Knowledge).attempt(
+      new ActiveUnit(setup.player, labourer)
+    );
+
+    expect(labourer.destroyed()).false;
+    expect(at(labourer)).to.equal('5,1');
+    expect(sizeOf(setup, setup.far)).to.equal(1);
   });
 });
