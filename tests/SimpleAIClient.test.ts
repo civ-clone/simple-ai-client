@@ -284,7 +284,7 @@ import spaceshipFlightTime from '@civ-clone/civ1-spaceship/Rules/Spaceship/fligh
 import spaceshipLanded from '@civ-clone/civ1-spaceship/Rules/Spaceship/landed';
 import spaceshipLost from '@civ-clone/civ1-spaceship/Rules/Spaceship/lost';
 import spaceshipPlayerAction from '@civ-clone/civ1-spaceship/Rules/Player/action';
-import spaceshipTurnStart from '@civ-clone/civ1-spaceship/Rules/Turn/start';
+import spaceshipTurnEnd from '@civ-clone/civ1-spaceship/Rules/Turn/end';
 import spaceshipYield from '@civ-clone/civ1-spaceship/Rules/Spaceship/yield';
 import tradeRateCityYield from '@civ-clone/civ1-trade-rate/Rules/City/yield';
 import tradeRatePlayerAction from '@civ-clone/civ1-trade-rate/Rules/Player/action';
@@ -802,7 +802,7 @@ describe('SimpleAIClient', (): void => {
     ),
     ...spaceshipCityBuildCost(),
     ...spaceshipCityBuildingComplete(
-      currentPlayerRegistry,
+      playerRegistry,
       spaceshipRegistry,
       layoutRegistry,
       ruleRegistry,
@@ -820,7 +820,7 @@ describe('SimpleAIClient', (): void => {
       year
     ),
     ...spaceshipPlayerAction(spaceshipRegistry),
-    ...spaceshipTurnStart(spaceshipRegistry),
+    ...spaceshipTurnEnd(spaceshipRegistry, playerRegistry),
     ...spaceshipYield(),
     ...tradeRateCityYield(availableTradeRateRegistry, playerTradeRatesRegistry),
     ...tradeRatePlayerAction(playerTradeRatesRegistry),
