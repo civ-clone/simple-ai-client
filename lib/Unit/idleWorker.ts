@@ -19,7 +19,9 @@ import Unit from '@civ-clone/core-unit/Unit';
 import joinableCity from '@civ-clone/base-unit-action-join-city/joinableCity';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
-// Whether the ruleset would let `unit` join `city`, were it standing there.
+// Whether the ruleset would let `unit` join `city`, were it standing there: the city's `CanJoinCity` rules allow it,
+//  and the unit is a kind that's offered `JoinCity` there (civ-clone/web-renderer#254). Only a unit with moves left
+//  is offered anything but `NoOrders`, so for one without the city's rules alone decide.
 export const couldJoin = (
   dependencies: Dependencies,
   unit: Unit,
@@ -30,7 +32,10 @@ export const couldJoin = (
     city.tile(),
     dependencies.cityRegistry,
     dependencies.ruleRegistry
-  ) === city;
+  ) === city &&
+  (unit.moves().value() <= 0 ||
+    lookupActions(unit.actions(city.tile(), city.tile())).joinCity !==
+      undefined);
 
 // Joins the city it's standing in if it's offered the action, or else waits with no orders.
 const joinOrWait = (
