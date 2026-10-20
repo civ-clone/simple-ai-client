@@ -22,6 +22,7 @@ import Unit from '@civ-clone/core-unit/Unit';
 import canNegotiate from '../Diplomacy/negotiate';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import scoreUnitMove from './scoreUnitMove';
+import shuffle from '../shuffle';
 
 // Whether any step from where `unit` stands scores above nothing: a hut, an enemy, unknown tiles it could go on to, a
 //  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
@@ -96,6 +97,20 @@ export interface MoveOptions {
 
 const IDLE_CHECKS = 3;
 
+// Takes `action` for `unit`, and returns whether it did anything: moved the unit, spent some of its moves or ended its
+//  turn. A step that does none of those is chosen again each time round, until the loop check gives up
+//  (civ-clone/web-renderer#446).
+const takeAction = (unit: Unit, action: Action): boolean => {
+  const tile = unit.tile(),
+    moves = unit.moves().value();
+
+  unit.action(action);
+
+  return (
+    !unit.active() || unit.tile() !== tile || unit.moves().value() !== moves
+  );
+};
+
 export const moveUnit = async (
   dependencies: Dependencies,
   player: Player,
@@ -155,7 +170,12 @@ export const moveUnit = async (
       }
 
       if (move) {
-        unit.action(move as Action);
+        if (!takeAction(unit, move as Action)) {
+          memory.unitPathData.delete(unit);
+          noOrders(dependencies, unit);
+
+          return;
+        }
 
         if (path.length === 0) {
           memory.unitPathData.delete(unit);
@@ -174,21 +194,36 @@ export const moveUnit = async (
       memory.unitPathData.delete(unit);
     }
 
-    const [target] = unit
-      .tile()
-      .getNeighbours()
-      .map((tile: Tile): [Tile, number] => [
-        tile,
-        scoreUnitMove(dependencies, player, memory, knowledge, unit, tile),
-      ])
-      .filter(([, score]: [Tile, number]): boolean =>
-        wander ? score > -1 : score > 0
-      )
+    // The step straight on from the unit's last one. Among steps that score the same, a unit carries straight on, and
+    //  otherwise picks one at random: it used to drift north, the first step listed (civ-clone/web-renderer#284).
+    const lastSteps = memory.lastUnitMoves.get(unit) || [],
+      [from, to] = lastSteps.slice(-2),
+      heading =
+        from && to === unit.tile()
+          ? from
+              .getNeighbouringDirections()
+              .find((direction) => from.getNeighbour(direction) === to)
+          : undefined,
+      ahead = heading ? unit.tile().getNeighbour(heading) : null;
+
+    // Shuffled before sorting (which is stable), so that the other steps that score the same are equally likely to be
+    //  taken.
+    const [target] = shuffle(
+      unit
+        .tile()
+        .getNeighbours()
+        .map((tile: Tile): [Tile, number] => [
+          tile,
+          scoreUnitMove(dependencies, player, memory, knowledge, unit, tile),
+        ])
+        .filter(([, score]: [Tile, number]): boolean =>
+          wander ? score > -1 : score > 0
+        ),
+      (): number => dependencies.randomNumberGenerator()
+    )
       .sort(
-        ([, a]: [Tile, number], [, b]: [Tile, number]): number =>
-          b - a ||
-          // if there's no difference, sort randomly
-          Math.floor(dependencies.randomNumberGenerator() * 3) - 1
+        ([tileA, a]: [Tile, number], [tileB, b]: [Tile, number]): number =>
+          b - a || Number(tileB === ahead) - Number(tileA === ahead)
       )
       .map(([tile]: [Tile, number]): Tile => tile);
 
@@ -222,7 +257,11 @@ export const moveUnit = async (
 
     memory.lastUnitMoves.set(unit, lastMoves.slice(-50));
 
-    unit.action(action as Action);
+    if (!takeAction(unit, action as Action)) {
+      noOrders(dependencies, unit);
+
+      return;
+    }
   }
 
   await canNegotiate(dependencies, player, unit);
