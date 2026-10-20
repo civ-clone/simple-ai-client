@@ -74,8 +74,12 @@ const setUp = (
   } else if (wanted) {
     ruleRegistry.register(...personalityRules(traitRegistry));
   }
+  // Future Technology is left out: the player knows nearly everything, so the repeatable advance would always be on
+  //  offer beside the ones each test is about.
   advanceRegistry.register(
-    ...(Object.values(Advances) as unknown as (typeof Advance)[])
+    ...(Object.values(Advances) as unknown as (typeof Advance)[]).filter(
+      (AdvanceType) => AdvanceType !== Advances.FutureTechnology
+    )
   );
   civilization.setLeader(
     new (LeaderType as unknown as new (registry: TraitRegistry) => Leader)(
