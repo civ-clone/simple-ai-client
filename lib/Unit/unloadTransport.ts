@@ -10,6 +10,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import { Unload } from '@civ-clone/library-unit/Actions';
 import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
+import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
 // Whether `unit`, aboard a transport on `tile`, should go ashore here.
 const goesAshore = (
@@ -42,7 +43,14 @@ const goesAshore = (
   );
 };
 
-// Returns whether it unloaded, in which case the transport waits so the unloaded units can be moved first.
+// The turn each transport last unloaded.
+const unloaded = new WeakMap<object, number>();
+
+// Returns whether it unloaded, in which case the transport waits so the unloaded units can be moved first. Once a turn:
+//  in port, its cargo stays aboard as it takes up its own orders, and unloading again woke the units it had just
+//  unloaded, which fortified again, for as long as the turn's action limit allowed (civ-clone/web-renderer#377). Asked
+//  again with cargo still aboard, it stays where it is for the turn: sailing on would carry off the units that have just
+//  fortified in port.
 export const unloadTransport = (
   dependencies: Dependencies,
   memory: Memory,
@@ -50,11 +58,23 @@ export const unloadTransport = (
   tile: Tile,
   unload: Unload | undefined
 ): boolean => {
+  const turn = dependencies.turn.value();
+
   if (!(unit instanceof NavalTransport && unload && tile.isCoast())) {
     return false;
   }
 
   const cargo = (unit as unknown as { cargo(): Unit[] }).cargo();
+
+  if (unloaded.get(unit) === turn) {
+    if (cargo.length === 0) {
+      return false;
+    }
+
+    noOrders(dependencies, unit as Unit);
+
+    return true;
+  }
 
   if (
     !cargo.some((passenger: Unit): boolean =>
@@ -65,6 +85,7 @@ export const unloadTransport = (
   }
 
   unit.action(unload);
+  unloaded.set(unit, turn);
 
   // Ashore, or about to be: they're passengers no longer, and carry on with their own work from here.
   cargo.forEach((passenger: Unit): void => {
