@@ -134,4 +134,33 @@ describe('moveUnit', (): void => {
     expect(taken).to.deep.equal(['Move', 'NoOrders']);
     expect(warrior.moves().value()).to.equal(0);
   });
+
+  it('should stand a unit down after a few steps that cost it nothing, as along a railroad', async (): Promise<void> => {
+    const { addUnit, dependencies, player } = await unitGame(
+        '84G',
+        7,
+        12,
+        Monarchy
+      ),
+      warrior = addUnit(Warrior, 5, 3),
+      memory = dependencies.memoryRegistry.memoryFor(player),
+      action = warrior.action.bind(warrior),
+      taken: string[] = [];
+
+    // Each step moves the unit and gives it its move back, as a step along a railroad costs nothing: it stepped back and
+    //  forth for ever (civ-clone/web-renderer#377).
+    warrior.action = (step: Action, ...args: any[]): void => {
+      taken.push(step.constructor.name);
+      action(step, ...args);
+
+      if (step.constructor.name !== 'NoOrders') {
+        warrior.moves().set(1);
+        warrior.setActive(true);
+      }
+    };
+
+    await moveUnit(dependencies, player, memory, civ1Knowledge, warrior);
+
+    expect(taken).to.deep.equal(['Move', 'Move', 'Move', 'NoOrders']);
+  });
 });

@@ -97,6 +97,11 @@ export interface MoveOptions {
 
 const IDLE_CHECKS = 3;
 
+// The most steps a unit takes off its path in one call, for each move it has a turn: a step along a road costs a third
+//  of a move, so a unit with moves left never needs more. Along a railroad a step costs nothing, and a unit stepping
+//  back and forth there kept every move it had, and its player's turn never ended (civ-clone/web-renderer#377).
+const STEPS_PER_MOVE = 3;
+
 // Takes `action` for `unit`, and returns whether it did anything: moved the unit, spent some of its moves or ended its
 //  turn. A step that does none of those is chosen again each time round, until the loop check gives up
 //  (civ-clone/web-renderer#446).
@@ -120,7 +125,8 @@ export const moveUnit = async (
   { stopAtPathEnd = false, wander = true, onIdle }: MoveOptions = {}
 ): Promise<void> => {
   let loopCheck = 0,
-    idleChecks = 0;
+    idleChecks = 0,
+    steps = 0;
 
   while (unit.active() && unit.moves().value() >= 0.1) {
     if (loopCheck++ > 1e3) {
@@ -192,6 +198,12 @@ export const moveUnit = async (
       }
 
       memory.unitPathData.delete(unit);
+    }
+
+    if (steps++ >= Math.max(1, unit.movement().value()) * STEPS_PER_MOVE) {
+      noOrders(dependencies, unit);
+
+      return;
     }
 
     // The step straight on from the unit's last one. Among steps that score the same, a unit carries straight on, and
