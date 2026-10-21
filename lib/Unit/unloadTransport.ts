@@ -42,7 +42,12 @@ const goesAshore = (
   );
 };
 
-// Returns whether it unloaded, in which case the transport waits so the unloaded units can be moved first.
+// The turn each transport last unloaded.
+const unloaded = new WeakMap<object, number>();
+
+// Returns whether it unloaded, in which case the transport waits so the unloaded units can be moved first. Once a turn:
+//  in port, its cargo stays aboard as it takes up its own orders, and unloading again woke the units it had just
+//  unloaded, which fortified again, for as long as the turn's action limit allowed (civ-clone/web-renderer#377).
 export const unloadTransport = (
   dependencies: Dependencies,
   memory: Memory,
@@ -50,7 +55,12 @@ export const unloadTransport = (
   tile: Tile,
   unload: Unload | undefined
 ): boolean => {
-  if (!(unit instanceof NavalTransport && unload && tile.isCoast())) {
+  const turn = dependencies.turn.value();
+
+  if (
+    !(unit instanceof NavalTransport && unload && tile.isCoast()) ||
+    unloaded.get(unit) === turn
+  ) {
     return false;
   }
 
@@ -65,6 +75,7 @@ export const unloadTransport = (
   }
 
   unit.action(unload);
+  unloaded.set(unit, turn);
 
   // Ashore, or about to be: they're passengers no longer, and carry on with their own work from here.
   cargo.forEach((passenger: Unit): void => {

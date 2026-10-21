@@ -187,6 +187,36 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
     expect(overseasStateFor(memory).passengers.has(explorer)).false;
   });
 
+  it('unloads a transport once a turn, so cargo that stays aboard in port takes up its own orders', async (): Promise<void> => {
+    const { dependencies, game, memory, player, trireme, world } =
+        await setUp(),
+      explorer = new Warrior(null, player, world.get(3, 2), game.rules),
+      ship = trireme(5, 2) as Unit & { stow(unit: Unit): boolean },
+      unload = () => {
+        ship.moves().set(1);
+        ship.setActive(true);
+        ship.stow(explorer);
+
+        return unloadTransport(
+          dependencies,
+          memory,
+          ship,
+          ship.tile(),
+          ship.actions().find((action) => action instanceof Unload) as
+            | Unload
+            | undefined
+        );
+      };
+
+    // Cargo from before a load goes ashore anywhere it hasn't just come from.
+    expect(unload()).true;
+    expect(unload()).false;
+
+    game.turn.increment();
+
+    expect(unload()).true;
+  });
+
   it('builds a transport in a port where passengers have waited, unless one is free', async (): Promise<void> => {
     const { dependencies, game, memory, player, port, trireme, world } =
         await setUp(),
