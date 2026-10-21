@@ -11,9 +11,16 @@ import {
   createVictoryDependencies,
   victoryDependenciesFor,
 } from '@civ-clone/base-strategy-victory/lib/VictoryDependencies';
+import civ1ConquestPolicy, {
+  conquestProductionPolicy,
+} from './lib/Civ1/conquest';
 import civ1SpaceRacePolicy, {
   withSpaceshipDefence,
 } from './lib/Civ1/spaceRace';
+import Campaign from '@civ-clone/base-strategy-victory/Strategies/Unit/Campaign';
+import { conquestGoal } from '@civ-clone/base-strategy-victory/lib/Conquest/ConquestPolicy';
+import { defaultProductionPolicy } from './lib/Civ1/buildItemInCity';
+import { goalFor } from '@civ-clone/base-strategy-victory/lib/goal';
 import BuildSpaceship from '@civ-clone/base-strategy-victory/Strategies/City/BuildSpaceship';
 import Explore from '@civ-clone/base-strategy-explore/Strategies/Unit/Explore';
 import LaunchSpaceship from '@civ-clone/base-strategy-victory/Strategies/Turn/LaunchSpaceship';
@@ -54,8 +61,9 @@ import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
 //  order, so a strategy registered later (another plugin's) comes after all of these unless a `Priority` puts it
 //  first.
 //
-// The goals a player plays to win by (`base-strategy-victory`): the space race (civ-clone/web-renderer#376). A capital
-//  keeps a defender more while its player's ship is in flight.
+// The goals a player plays to win by (`base-strategy-victory`): the space race (civ-clone/web-renderer#376) and
+//  conquest (civ-clone/web-renderer#377). A capital keeps a defender more while its player's ship is in flight, and a
+//  player builds more attackers while it plays for conquest.
 export const createStrategies = (
   dependencies: Dependencies,
   civ1: Knowledge = civ1Knowledge,
@@ -63,7 +71,8 @@ export const createStrategies = (
 ): Strategy[] => {
   const knowledge = withSpaceshipDefence(civ1, victoryDependencies, isCapital),
     spaceRace = spaceRaceGoal(civ1SpaceRacePolicy),
-    goals = [spaceRace];
+    conquest = conquestGoal(civ1ConquestPolicy),
+    goals = [spaceRace, conquest];
 
   return [
     // `BeforeTurn`, all of them in turn.
@@ -86,6 +95,16 @@ export const createStrategies = (
     new WorkerTurn(dependencies, knowledge),
     new Garrison(dependencies, knowledge),
     new MissionAndMove(dependencies, knowledge),
+    // The attackers with nothing else to do gather for the campaign, if there is one.
+    new Campaign(
+      dependencies,
+      knowledge,
+      conquest,
+      goals,
+      civ1ConquestPolicy,
+      victoryDependencies,
+      travelToPathEnd
+    ),
     new StandDown(dependencies, knowledge, civ1StandDownPolicy),
     // The other mandatory choices.
     new BuildExplorerShip(dependencies, knowledge),
@@ -97,7 +116,11 @@ export const createStrategies = (
       civ1SpaceRacePolicy,
       victoryDependencies
     ),
-    new ChooseProduction(dependencies, knowledge),
+    new ChooseProduction(dependencies, knowledge, (player) =>
+      goalFor(goals, dependencies, victoryDependencies, player) === conquest
+        ? conquestProductionPolicy
+        : defaultProductionPolicy
+    ),
     new ResearchForGoal(dependencies, knowledge, goals, victoryDependencies),
     new ChooseResearch(dependencies, knowledge),
     new ChooseGovernment(dependencies, knowledge),

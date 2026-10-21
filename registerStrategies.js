@@ -8,7 +8,12 @@ const TravelOverseas_1 = require("./Strategies/Unit/TravelOverseas");
 const core_game_1 = require("@civ-clone/core-game");
 const Dependencies_1 = require("@civ-clone/base-strategy-ai/lib/Dependencies");
 const VictoryDependencies_1 = require("@civ-clone/base-strategy-victory/lib/VictoryDependencies");
+const conquest_1 = require("./lib/Civ1/conquest");
 const spaceRace_1 = require("./lib/Civ1/spaceRace");
+const Campaign_1 = require("@civ-clone/base-strategy-victory/Strategies/Unit/Campaign");
+const ConquestPolicy_1 = require("@civ-clone/base-strategy-victory/lib/Conquest/ConquestPolicy");
+const buildItemInCity_1 = require("./lib/Civ1/buildItemInCity");
+const goal_1 = require("@civ-clone/base-strategy-victory/lib/goal");
 const BuildSpaceship_1 = require("@civ-clone/base-strategy-victory/Strategies/City/BuildSpaceship");
 const Explore_1 = require("@civ-clone/base-strategy-explore/Strategies/Unit/Explore");
 const LaunchSpaceship_1 = require("@civ-clone/base-strategy-victory/Strategies/Turn/LaunchSpaceship");
@@ -46,10 +51,11 @@ const tradeRates_1 = require("./lib/Civ1/tradeRates");
 //  order, so a strategy registered later (another plugin's) comes after all of these unless a `Priority` puts it
 //  first.
 //
-// The goals a player plays to win by (`base-strategy-victory`): the space race (civ-clone/web-renderer#376). A capital
-//  keeps a defender more while its player's ship is in flight.
+// The goals a player plays to win by (`base-strategy-victory`): the space race (civ-clone/web-renderer#376) and
+//  conquest (civ-clone/web-renderer#377). A capital keeps a defender more while its player's ship is in flight, and a
+//  player builds more attackers while it plays for conquest.
 const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDependencies = (0, VictoryDependencies_1.createVictoryDependencies)()) => {
-    const knowledge = (0, spaceRace_1.withSpaceshipDefence)(civ1, victoryDependencies, defence_1.isCapital), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(spaceRace_1.default), goals = [spaceRace];
+    const knowledge = (0, spaceRace_1.withSpaceshipDefence)(civ1, victoryDependencies, defence_1.isCapital), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(spaceRace_1.default), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
     return [
         // `BeforeTurn`, all of them in turn.
         new SurveyTargets_1.default(dependencies, knowledge),
@@ -66,11 +72,15 @@ const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDepen
         new WorkerTurn_1.default(dependencies, knowledge),
         new Garrison_1.default(dependencies, knowledge),
         new MissionAndMove_1.default(dependencies, knowledge),
+        // The attackers with nothing else to do gather for the campaign, if there is one.
+        new Campaign_1.default(dependencies, knowledge, conquest, goals, conquest_1.default, victoryDependencies, moveUnit_1.travelToPathEnd),
         new StandDown_1.default(dependencies, knowledge, standDown_1.default),
         // The other mandatory choices.
         new BuildExplorerShip_1.default(dependencies, knowledge),
         new BuildSpaceship_1.default(dependencies, knowledge, spaceRace, goals, spaceRace_1.default, victoryDependencies),
-        new ChooseProduction_1.default(dependencies, knowledge),
+        new ChooseProduction_1.default(dependencies, knowledge, (player) => (0, goal_1.goalFor)(goals, dependencies, victoryDependencies, player) === conquest
+            ? conquest_1.conquestProductionPolicy
+            : buildItemInCity_1.defaultProductionPolicy),
         new ResearchForGoal_1.default(dependencies, knowledge, goals, victoryDependencies),
         new ChooseResearch_1.default(dependencies, knowledge),
         new ChooseGovernment_1.default(dependencies, knowledge),

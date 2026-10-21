@@ -1,0 +1,13 @@
+import { ConquestPolicy } from '@civ-clone/base-strategy-victory/lib/Conquest/ConquestPolicy';
+import { ProductionPolicy } from './buildItemInCity';
+export declare const CONQUEST_FROM = 0.5;
+export declare const CONQUEST_AT = 0.75;
+export declare const CONQUEST_WEIGHT = 2;
+export declare const WALLS_DISTANCE = 8;
+export declare const MUSTER_ATTACKERS = 3;
+export declare const MUSTER_ADVANTAGE = 2;
+export declare const MUSTER_WAIT = 10;
+export declare const MARCH_TURNS = 10;
+export declare const civ1ConquestPolicy: ConquestPolicy;
+export default civ1ConquestPolicy;
+export declare const conquestProductionPolicy: ProductionPolicy;
