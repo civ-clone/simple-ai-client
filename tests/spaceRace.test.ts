@@ -42,6 +42,11 @@ const ship = (
   ({
     activeParts: () => active.map(part),
     inactiveParts: () => inactive.map(part),
+    // Room for 20 more Structurals unless said otherwise.
+    layout: () => ({
+      slots: () =>
+        new Array(20).fill({ accepts: () => true, empty: () => true }),
+    }),
     ...extras,
   } as unknown as Spaceship);
 
@@ -81,6 +86,19 @@ describe('Civ1 space race', (): void => {
     expect(
       wantedPart(ship([Structural, Habitation, LifeSupport]), [Power])
     ).to.equal(Fuel);
+    // A Propulsion waits for its Fuel, not for the frame.
+    expect(
+      wantedPart(ship([Structural, Habitation], [Propulsion]), [])
+    ).to.equal(LifeSupport);
+    // With no room left in the frame, no more Structurals.
+    expect(
+      wantedPart(
+        ship([Structural], [Habitation], {
+          layout: () => ({ slots: () => [] }),
+        } as any),
+        []
+      )
+    ).to.equal(LifeSupport);
 
     const firstStep = [
       Structural,

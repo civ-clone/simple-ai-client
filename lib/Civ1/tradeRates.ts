@@ -6,7 +6,9 @@ import {
 } from '@civ-clone/civ1-city-happiness/lib/calculateCitizenState';
 import { TradeRatePolicy } from '../Turn/adjustTradeRates';
 import civ1DisorderPolicy from './disorder';
+import { createVictoryDependencies } from '@civ-clone/base-strategy-victory/lib/VictoryDependencies';
 import { scienceStopped } from '../Science/wantedAdvances';
+import { spaceAdvancesWanted } from './spaceRace';
 
 export const civ1TradeRatePolicy: TradeRatePolicy = {
   // `civ1-city-happiness` records the disorder it finds at the player's turn start until order is restored.
@@ -30,8 +32,10 @@ export const civ1TradeRatePolicy: TradeRatePolicy = {
     return happy === unhappy;
   },
   // Once the player has every advance its leader wants (`civ1-civilization`'s `WantedAdvances` rules), where v474.05
-  //  stops at Robotics.
-  scienceStopped,
+  //  stops at Robotics, unless it plays for space and lacks an advance its ship needs (#376).
+  scienceStopped: (dependencies, player) =>
+    scienceStopped(dependencies, player) &&
+    !spaceAdvancesWanted(dependencies, createVictoryDependencies(), player),
 };
 
 export default civ1TradeRatePolicy;

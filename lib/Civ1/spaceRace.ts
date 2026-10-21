@@ -37,13 +37,16 @@ import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Part from '@civ-clone/core-spaceship/Part';
 import Player from '@civ-clone/core-player/Player';
 import { SpaceRacePolicy } from '@civ-clone/base-strategy-victory/lib/Space/SpaceRacePolicy';
+import Slot from '@civ-clone/core-spaceship/Slot';
 import Spaceship from '@civ-clone/core-spaceship/Spaceship';
 import VictoryDependencies from '@civ-clone/base-strategy-victory/lib/VictoryDependencies';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import { rankings } from '@civ-clone/core-power/lib/rank';
 import { endYear } from '@civ-clone/civ1-game-end/lib/scoring';
 import { levelOf } from '@civ-clone/civ1-difficulty/level';
+import civ1Knowledge from './knowledge';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
+import { wantsDefender } from '../City/defence';
 
 // v474.05's launch thresholds.
 export const MINIMUM_LAUNCH_CHANCE = 0.4;
@@ -137,17 +140,31 @@ export const wantedModule = (
   return null;
 };
 
+// A Structural to ask the layout about: only its type matters.
+const structuralProbe = Object.create(Structural.prototype) as Part;
+
 // The part the ship wants next, of any, ignoring what can be built: a Structural to start the frame, or one for each
-//  part not yet joined to it, before more modules and components; `null` once it has every step.
+//  part waiting to be joined to it while the frame has room, before more modules and components; `null` once it has
+//  every step. A Propulsion waits for a Fuel next to it, not for the frame, so it isn't counted.
 export const wantedPart = (
   spaceship: Spaceship,
   building: (typeof Part)[]
 ): typeof Part | null => {
-  const structuralsBuilding = countOf(Structural, [], building);
+  const structuralsBuilding = countOf(Structural, [], building),
+    unjoined = spaceship
+      .inactiveParts()
+      .filter((part: Part): boolean => !(part instanceof Propulsion)).length,
+    room = spaceship
+      .layout()
+      .slots()
+      .filter(
+        (slot: Slot): boolean => slot.empty() && slot.accepts(structuralProbe)
+      ).length;
 
   if (
-    (partsOf(spaceship).length === 0 && structuralsBuilding === 0) ||
-    spaceship.inactiveParts().length > structuralsBuilding
+    room > structuralsBuilding &&
+    ((partsOf(spaceship).length === 0 && structuralsBuilding === 0) ||
+      unjoined > structuralsBuilding)
   ) {
     return Structural;
   }
@@ -189,10 +206,11 @@ export const civ1SpaceRacePolicy: SpaceRacePolicy = {
 
   enablers: [ApolloProgram],
 
-  // The player's most productive city that isn't already building a Wonder.
+  // The player's most productive city that isn't already building a Wonder, and has the defenders it wants first.
   enablerCity: (dependencies, victoryDependencies, player) =>
     citiesByProduction(dependencies, player).find(
       (city: City): boolean =>
+        !wantsDefender(dependencies, civ1Knowledge, city) &&
         !(
           dependencies.cityBuildRegistry.getByCity(city).building()?.item()
             .prototype instanceof Wonder
@@ -200,7 +218,7 @@ export const civ1SpaceRacePolicy: SpaceRacePolicy = {
     ) ?? null,
 
   // The most productive third of the player's cities (at least one), each making at least 5 shields: parts cost 80 to
-  //  320, too much for a small city.
+  //  320, too much for a small city. A city still wanting defenders builds those first.
   buildsParts: (dependencies, victoryDependencies, city) => {
     const cities = citiesByProduction(dependencies, city.player()),
       index = cities.indexOf(city);
@@ -208,7 +226,8 @@ export const civ1SpaceRacePolicy: SpaceRacePolicy = {
     return (
       index !== -1 &&
       index < Math.max(1, Math.ceil(cities.length / 3)) &&
-      productionOf(city) >= 5
+      productionOf(city) >= 5 &&
+      !wantsDefender(dependencies, civ1Knowledge, city)
     );
   },
 
@@ -311,3 +330,18 @@ export const withSpaceshipDefence = (
 };
 
 export default civ1SpaceRacePolicy;
+
+// Whether `player` plays for space and still lacks an advance the ship needs: its science mustn't stop yet, even once
+//  it has everything its leader wants (it might have been given Robotics before Space Flight).
+export const spaceAdvancesWanted = (
+  dependencies: Dependencies,
+  victoryDependencies: VictoryDependencies,
+  player: Player
+): boolean =>
+  civ1SpaceRacePolicy.weight(dependencies, victoryDependencies, player) > 0 &&
+  civ1SpaceRacePolicy
+    .advances(dependencies, victoryDependencies, player)
+    .some(
+      (AdvanceType: typeof Advance): boolean =>
+        !knows(dependencies, player, AdvanceType)
+    );

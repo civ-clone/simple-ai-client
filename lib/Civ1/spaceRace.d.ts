@@ -2,6 +2,7 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Part from '@civ-clone/core-spaceship/Part';
+import Player from '@civ-clone/core-player/Player';
 import { SpaceRacePolicy } from '@civ-clone/base-strategy-victory/lib/Space/SpaceRacePolicy';
 import Spaceship from '@civ-clone/core-spaceship/Spaceship';
 import VictoryDependencies from '@civ-clone/base-strategy-victory/lib/VictoryDependencies';
@@ -24,3 +25,8 @@ export declare const withSpaceshipDefence: (
   isCapital: (dependencies: Dependencies, city: City) => boolean
 ) => Knowledge;
 export default civ1SpaceRacePolicy;
+export declare const spaceAdvancesWanted: (
+  dependencies: Dependencies,
+  victoryDependencies: VictoryDependencies,
+  player: Player
+) => boolean;
