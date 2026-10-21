@@ -10,6 +10,7 @@ import { Fortified } from '@civ-clone/library-unit/UnitImprovements';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
+import activate from '../Unit/activate';
 
 // A stable number for `city`, to stagger the turns it considers letting a defender go.
 const staggerOf = (city: City): number =>
@@ -46,7 +47,9 @@ export const releaseDefenders = (
       )
       .sort((a, b) => a.defence().value() - b.defence().value());
 
-    released?.activate();
+    if (released) {
+      activate(released);
+    }
   });
 };
 
