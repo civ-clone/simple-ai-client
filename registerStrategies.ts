@@ -6,7 +6,20 @@ import { Game, defaultGame } from '@civ-clone/core-game';
 import Dependencies, {
   dependenciesFor as gameDependencies,
 } from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import {
+  VictoryDependencies,
+  createVictoryDependencies,
+  victoryDependenciesFor,
+} from '@civ-clone/base-strategy-victory/lib/VictoryDependencies';
+import civ1SpaceRacePolicy, {
+  withSpaceshipDefence,
+} from './lib/Civ1/spaceRace';
+import BuildSpaceship from '@civ-clone/base-strategy-victory/Strategies/City/BuildSpaceship';
 import Explore from '@civ-clone/base-strategy-explore/Strategies/Unit/Explore';
+import LaunchSpaceship from '@civ-clone/base-strategy-victory/Strategies/Turn/LaunchSpaceship';
+import ResearchForGoal from '@civ-clone/base-strategy-victory/Strategies/Science/ResearchForGoal';
+import { isCapital } from './lib/Civ1/defence';
+import { spaceRaceGoal } from '@civ-clone/base-strategy-victory/lib/Space/SpaceRacePolicy';
 import BuildExplorerShip from './Strategies/City/BuildExplorerShip';
 import ChooseGovernment from './Strategies/Civ1/ChooseGovernment';
 import ChooseProduction from './Strategies/Civ1/ChooseProduction';
@@ -40,56 +53,93 @@ import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
 // In the order `SimpleAIClient` has always made its decisions. With no `Priority` rules, the registry keeps this
 //  order, so a strategy registered later (another plugin's) comes after all of these unless a `Priority` puts it
 //  first.
+//
+// The goals a player plays to win by (`base-strategy-victory`): the space race (civ-clone/web-renderer#376). A capital
+//  keeps a defender more while its player's ship is in flight.
 export const createStrategies = (
   dependencies: Dependencies,
-  knowledge: Knowledge = civ1Knowledge
-): Strategy[] => [
-  // `BeforeTurn`, all of them in turn.
-  new SurveyTargets(dependencies, knowledge),
-  new ReviewCities(dependencies, knowledge),
-  new WakeCarrierAircraft(dependencies, knowledge),
-  new StartRevolution(dependencies, knowledge),
-  // A unit's turn: the first that handles it wins.
-  new WaitForCarrier(dependencies, knowledge),
-  new UnloadTransport(dependencies, knowledge),
-  new Ferry(dependencies, knowledge),
-  new TravelOverseas(dependencies, knowledge),
-  new FoundCapital(dependencies, knowledge),
-  new TerrainWork(dependencies, knowledge, civ1TerrainPolicy, travelToPathEnd),
-  new WorkerTurn(dependencies, knowledge),
-  new Garrison(dependencies, knowledge),
-  new MissionAndMove(dependencies, knowledge),
-  new StandDown(dependencies, knowledge, civ1StandDownPolicy),
-  // The other mandatory choices.
-  new BuildExplorerShip(dependencies, knowledge),
-  new ChooseProduction(dependencies, knowledge),
-  new ChooseResearch(dependencies, knowledge),
-  new ChooseGovernment(dependencies, knowledge),
-  // `chooseFromList`.
-  new NegotiationAnswers(dependencies, knowledge),
-  // `AfterTurn`, once the player's units have moved. The rates after the Entertainers, so that luxuries can make up
-  //  for the cities they couldn't calm.
-  new PreventDisorder(dependencies, knowledge, civ1DisorderPolicy),
-  new TradeRates(
-    dependencies,
-    knowledge,
-    civ1DisorderPolicy,
-    civ1TradeRatePolicy
-  ),
-  // Last: what's left of the treasury once disorder has had its share, and with the rates for the turn ahead set from
-  //  the treasury the player earned.
-  new SpendTreasury(dependencies, knowledge, civ1SpendingPolicy),
-  // Standing orders for a player's units (`UnitOrder`): it handles none of the computer players' actions, so it
-  //  changes nothing they do.
-  new Explore(dependencies, knowledge),
-];
+  civ1: Knowledge = civ1Knowledge,
+  victoryDependencies: VictoryDependencies = createVictoryDependencies()
+): Strategy[] => {
+  const knowledge = withSpaceshipDefence(civ1, victoryDependencies, isCapital),
+    spaceRace = spaceRaceGoal(civ1SpaceRacePolicy),
+    goals = [spaceRace];
+
+  return [
+    // `BeforeTurn`, all of them in turn.
+    new SurveyTargets(dependencies, knowledge),
+    new ReviewCities(dependencies, knowledge),
+    new WakeCarrierAircraft(dependencies, knowledge),
+    new StartRevolution(dependencies, knowledge),
+    // A unit's turn: the first that handles it wins.
+    new WaitForCarrier(dependencies, knowledge),
+    new UnloadTransport(dependencies, knowledge),
+    new Ferry(dependencies, knowledge),
+    new TravelOverseas(dependencies, knowledge),
+    new FoundCapital(dependencies, knowledge),
+    new TerrainWork(
+      dependencies,
+      knowledge,
+      civ1TerrainPolicy,
+      travelToPathEnd
+    ),
+    new WorkerTurn(dependencies, knowledge),
+    new Garrison(dependencies, knowledge),
+    new MissionAndMove(dependencies, knowledge),
+    new StandDown(dependencies, knowledge, civ1StandDownPolicy),
+    // The other mandatory choices.
+    new BuildExplorerShip(dependencies, knowledge),
+    new BuildSpaceship(
+      dependencies,
+      knowledge,
+      spaceRace,
+      goals,
+      civ1SpaceRacePolicy,
+      victoryDependencies
+    ),
+    new ChooseProduction(dependencies, knowledge),
+    new ResearchForGoal(dependencies, knowledge, goals, victoryDependencies),
+    new ChooseResearch(dependencies, knowledge),
+    new ChooseGovernment(dependencies, knowledge),
+    // `chooseFromList`.
+    new NegotiationAnswers(dependencies, knowledge),
+    // `AfterTurn`, once the player's units have moved. The rates after the Entertainers, so that luxuries can make up
+    //  for the cities they couldn't calm.
+    new PreventDisorder(dependencies, knowledge, civ1DisorderPolicy),
+    new TradeRates(
+      dependencies,
+      knowledge,
+      civ1DisorderPolicy,
+      civ1TradeRatePolicy
+    ),
+    // Last: what's left of the treasury once disorder has had its share, and with the rates for the turn ahead set from
+    //  the treasury the player earned.
+    new SpendTreasury(dependencies, knowledge, civ1SpendingPolicy),
+    // Once the turn's parts are on the ship.
+    new LaunchSpaceship(
+      dependencies,
+      knowledge,
+      civ1SpaceRacePolicy,
+      victoryDependencies
+    ),
+    // Standing orders for a player's units (`UnitOrder`): it handles none of the computer players' actions, so it
+    //  changes nothing they do.
+    new Explore(dependencies, knowledge),
+  ];
+};
 
 // The game's registries, as the strategies take them: `base-strategy-ai`'s, exported from here as it always was, for
 //  the callers that import it from here (the arena among them).
 export const dependenciesFor = gameDependencies;
 
 export const register = (game: Game): void =>
-  game.strategies.register(...createStrategies(dependenciesFor(game)));
+  game.strategies.register(
+    ...createStrategies(
+      dependenciesFor(game),
+      civ1Knowledge,
+      victoryDependenciesFor(game)
+    )
+  );
 
 // The plugin loader imports each package for this side effect, as it does `registerRules`.
 register(defaultGame);
