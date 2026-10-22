@@ -18,9 +18,10 @@ export type Step = {
   to: Tile;
 };
 /**
- * The best step from where `unit` stands, scored as v474.05 does: 0–5 at random, +6 onto irrigation or a mine, +99
- * to attack a unit that isn't a Diplomat, +2 for each axis towards `target`; an enemy city next door is always
- * entered. `null` when no neighbour can be stepped onto or attacked.
+ * The best step from where `unit` stands, scored as v474.05 does (`AIEngine.cs` L2412-2440): 0–5 at random, +6 onto
+ * irrigation or a mine, +4 onto any square but the unit's own city, +99 to attack a unit that isn't a Diplomat, +2 for
+ * each axis on which the step agrees with the way to `target` (straight on scores +4, a diagonal +2). An enemy city
+ * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked.
  */
 export declare const bestStep: (
   dependencies: Dependencies,
@@ -29,8 +30,9 @@ export declare const bestStep: (
   target: Tile | null
 ) => Step | null;
 /**
- * The leader (the group's Diplomat): he stays with a stack, and otherwise walks to a friendly unit within 4 squares.
- * What becomes of him when he's stranded, and when he enters a city, is civ-clone/web-renderer#171.
+ * The leader (the group's Diplomat): he stays with a stack, and otherwise walks to a friendly unit within 4 squares,
+ * stopping when he reaches it. What becomes of him when he's stranded, and when he enters a city, is
+ * civ-clone/web-renderer#171.
  */
 export declare const leader: (
   dependencies: Dependencies,
@@ -38,9 +40,9 @@ export declare const leader: (
   unit: Unit
 ) => void;
 /**
- * A raider's turn: off the map near the poles; every fourth turn, gone if stranded; in a city, fortified when alone or
- * a defender; otherwise marching on the nearest city of a civilization worth raiding on its continent, attacking
- * what it meets.
+ * A raider's turn: off the map near the poles; every fourth turn, gone if stranded; in a city of its own, held when
+ * alone or a defender; otherwise marching on the nearest city of a civilization worth raiding on its continent,
+ * attacking what it meets, and holding a city it takes.
  */
 export declare const raid: (
   dependencies: Dependencies,
@@ -48,9 +50,9 @@ export declare const raid: (
   unit: Unit
 ) => void;
 /**
- * A raiding ship's turn: gone once empty; within 8 of a city, lands everyone on an empty square next to the ship on
- * that city's continent (`barbarians:landed`); otherwise sails for the city with the best gold for the distance, or
- * is gone when none scores.
+ * A raiding ship's turn: off the map near the poles; gone once empty; lands its raiders beside it when a city is
+ * within 8 (`tryLanding`), before and after sailing; otherwise sails for the city with the best gold for the distance
+ * that it can reach a sea square beside, or is gone when there is none.
  */
 export declare const sail: (
   dependencies: Dependencies,

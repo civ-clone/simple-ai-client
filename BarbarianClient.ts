@@ -25,12 +25,16 @@ export const createBarbarianStrategies = (
  * for a civilization. A host gives it to the player `civ1-barbarians` spawns, when `player:spawned` names a barbarian.
  */
 export class BarbarianClient extends StrategyAIClient {
+  private _dependencies: Dependencies;
+
   constructor(
     player: Player,
     dependencies: Dependencies = dependenciesFor(defaultGame),
     strategyRegistry: StrategyRegistry = new StrategyRegistry()
   ) {
     super(player, strategyRegistry, dependencies.randomNumberGenerator);
+
+    this._dependencies = dependencies;
 
     if (strategyRegistry.length === 0) {
       strategyRegistry.register(...createBarbarianStrategies(dependencies));
@@ -54,7 +58,7 @@ export class BarbarianClient extends StrategyAIClient {
       }`
     );
 
-    skipUnit(dependenciesFor(defaultGame), item);
+    skipUnit(this._dependencies, item);
 
     return true;
   }
