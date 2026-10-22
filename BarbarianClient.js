@@ -22,6 +22,7 @@ exports.createBarbarianStrategies = createBarbarianStrategies;
 class BarbarianClient extends StrategyAIClient_1.default {
     constructor(player, dependencies = (0, Dependencies_1.dependenciesFor)(core_game_1.defaultGame), strategyRegistry = new StrategyRegistry_1.StrategyRegistry()) {
         super(player, strategyRegistry, dependencies.randomNumberGenerator);
+        this._dependencies = dependencies;
         if (strategyRegistry.length === 0) {
             strategyRegistry.register(...(0, exports.createBarbarianStrategies)(dependencies));
         }
@@ -33,7 +34,7 @@ class BarbarianClient extends StrategyAIClient_1.default {
             throw error;
         }
         console.error(`BarbarianClient: ${item.constructor.name} could not act: ${error instanceof Error ? error.message : String(error)}`);
-        (0, orders_1.skipUnit)((0, Dependencies_1.dependenciesFor)(core_game_1.defaultGame), item);
+        (0, orders_1.skipUnit)(this._dependencies, item);
         return true;
     }
     // The turn ends at the first action no strategy handles, which should be `EndTurn`.

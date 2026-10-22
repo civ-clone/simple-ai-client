@@ -86,28 +86,28 @@ const standDown = (dependencies: Dependencies, unit: Unit): void => {
   }
 };
 
-// The player's own units beside `tile`, other than `unit`.
-const friendsBeside = (
+// The plain step onto a square: not an `Embark` or `Disembark`, which extend `Move` and would put a raider back on its
+//  ship.
+const plainMove = (actions: Action[]): Action | undefined =>
+  actions.find((action: Action): boolean => action.constructor === Move);
+
+const ownCityAt = (
   dependencies: Dependencies,
   player: Player,
-  unit: Unit,
   tile: Tile
-): Unit[] =>
-  tile
-    .getNeighbours()
-    .flatMap((neighbour: Tile): Unit[] =>
-      dependencies.unitRegistry.getByTile(neighbour)
-    )
-    .filter(
-      (other: Unit): boolean => other !== unit && other.player() === player
-    );
+): City | null => {
+  const city = dependencies.cityRegistry.getByTile(tile);
+
+  return city !== null && city.player() === player ? city : null;
+};
 
 export type Step = { action: Action; score: number; to: Tile };
 
 /**
- * The best step from where `unit` stands, scored as v474.05 does: 0–5 at random, +6 onto irrigation or a mine, +99
- * to attack a unit that isn't a Diplomat, +2 for each axis towards `target`; an enemy city next door is always
- * entered. `null` when no neighbour can be stepped onto or attacked.
+ * The best step from where `unit` stands, scored as v474.05 does (`AIEngine.cs` L2412-2440): 0–5 at random, +6 onto
+ * irrigation or a mine, +4 onto any square but the unit's own city, +99 to attack a unit that isn't a Diplomat, +2 for
+ * each axis on which the step agrees with the way to `target` (straight on scores +4, a diagonal +2). An enemy city
+ * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked.
  */
 export const bestStep = (
   dependencies: Dependencies,
@@ -122,7 +122,7 @@ export const bestStep = (
           Math.sign(wrappedDelta(from.x(), target.x(), world.width())),
           Math.sign(wrappedDelta(from.y(), target.y(), world.height())),
         ]
-      : [0, 0];
+      : null;
 
   let best: Step | null = null;
 
@@ -131,6 +131,7 @@ export const bestStep = (
       enemy = dependencies.unitRegistry
         .getByTile(to)
         .find((other: Unit): boolean => other.player() !== player),
+      city = dependencies.cityRegistry.getByTile(to),
       capture = actions.find(
         (action: Action): boolean =>
           action instanceof CaptureCity || action instanceof SneakCaptureCity
@@ -139,17 +140,14 @@ export const bestStep = (
         (action: Action): boolean =>
           action instanceof Attack || action instanceof SneakAttack
       ),
-      move =
-        actions.find(
-          (action: Action): boolean => action.constructor === Move
-        ) ?? actions.find((action: Action): boolean => action instanceof Move),
-      action = capture ?? attack ?? (enemy ? null : move);
+      fight = capture ?? attack,
+      action = fight ?? (enemy ? null : plainMove(actions));
 
     if (!action) {
       continue;
     }
 
-    if (capture) {
+    if (fight && city !== null && city.player() !== player) {
       return { action, score: Infinity, to };
     }
 
@@ -166,20 +164,26 @@ export const bestStep = (
       score += 6;
     }
 
+    if (ownCityAt(dependencies, player, to) === null) {
+      score += 4;
+    }
+
     if (attack && enemy && !(enemy instanceof Diplomat)) {
       score += 99;
     }
 
-    const direction = [
-      Math.sign(wrappedDelta(from.x(), to.x(), world.width())),
-      Math.sign(wrappedDelta(from.y(), to.y(), world.height())),
-    ];
+    if (towards !== null) {
+      const direction = [
+        Math.sign(wrappedDelta(from.x(), to.x(), world.width())),
+        Math.sign(wrappedDelta(from.y(), to.y(), world.height())),
+      ];
 
-    [0, 1].forEach((axis: number): void => {
-      if (towards[axis] !== 0 && direction[axis] === towards[axis]) {
-        score += 2;
-      }
-    });
+      [0, 1].forEach((axis: number): void => {
+        if (direction[axis] === towards[axis]) {
+          score += 2;
+        }
+      });
+    }
 
     if (best === null || score > best.score) {
       best = { action, score, to };
@@ -189,13 +193,17 @@ export const bestStep = (
   return best;
 };
 
-// Steps `unit` towards `target` (or wherever scores best) until its moves are spent, then stands it down.
+// Steps `unit` towards `target` (or wherever scores best) until its moves are spent, it reaches `stopAt`, or it enters
+//  a city of its own (a capture), then stands it down. Returns whether it stopped for one of the last two.
 const march = (
   dependencies: Dependencies,
   player: Player,
   unit: Unit,
-  target: Tile | null
-): void => {
+  target: Tile | null,
+  stopAt: Tile | null = null
+): boolean => {
+  let stopped = false;
+
   for (
     let steps = 0;
     unit.active() &&
@@ -209,9 +217,23 @@ const march = (
     if (step === null || !takeAction(unit, step.action)) {
       break;
     }
+
+    if (
+      unit.destroyed() ||
+      unit.tile() === stopAt ||
+      ownCityAt(dependencies, player, unit.tile()) !== null
+    ) {
+      stopped = true;
+
+      break;
+    }
   }
 
-  standDown(dependencies, unit);
+  if (!stopped) {
+    standDown(dependencies, unit);
+  }
+
+  return stopped;
 };
 
 // Whether `city`'s owner is worth raiding: not the barbarians themselves, and not a civilization with fewer than 2
@@ -231,9 +253,42 @@ const worthRaiding = (dependencies: Dependencies, city: City): boolean => {
   );
 };
 
+// In one of its own cities, a raider holds it when it is alone there or a defender (`AIEngine.cs` L2280): fortified
+//  if it can be, standing down otherwise. Returns whether it stayed.
+const holdCity = (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+): boolean => {
+  const tile = unit.tile();
+
+  if (
+    ownCityAt(dependencies, player, tile) === null ||
+    (dependencies.unitRegistry
+      .getByTile(tile)
+      .filter((other: Unit): boolean => other !== unit).length > 0 &&
+      unit.defence().value() < unit.attack().value())
+  ) {
+    return false;
+  }
+
+  const fortify = unit
+    .actions()
+    .find((action: Action): boolean => action instanceof Fortify);
+
+  if (fortify) {
+    unit.action(fortify);
+  }
+
+  standDown(dependencies, unit);
+
+  return true;
+};
+
 /**
- * The leader (the group's Diplomat): he stays with a stack, and otherwise walks to a friendly unit within 4 squares.
- * What becomes of him when he's stranded, and when he enters a city, is civ-clone/web-renderer#171.
+ * The leader (the group's Diplomat): he stays with a stack, and otherwise walks to a friendly unit within 4 squares,
+ * stopping when he reaches it. What becomes of him when he's stranded, and when he enters a city, is
+ * civ-clone/web-renderer#171.
  */
 export const leader = (
   dependencies: Dependencies,
@@ -275,13 +330,14 @@ export const leader = (
     return;
   }
 
-  march(dependencies, player, unit, friend.tile());
+  march(dependencies, player, unit, friend.tile(), friend.tile());
+  standDown(dependencies, unit);
 };
 
 /**
- * A raider's turn: off the map near the poles; every fourth turn, gone if stranded; in a city, fortified when alone or
- * a defender; otherwise marching on the nearest city of a civilization worth raiding on its continent, attacking
- * what it meets.
+ * A raider's turn: off the map near the poles; every fourth turn, gone if stranded; in a city of its own, held when
+ * alone or a defender; otherwise marching on the nearest city of a civilization worth raiding on its continent,
+ * attacking what it meets, and holding a city it takes.
  */
 export const raid = (
   dependencies: Dependencies,
@@ -317,26 +373,7 @@ export const raid = (
     return;
   }
 
-  const here = dependencies.cityRegistry.getByTile(tile);
-
-  if (
-    here !== null &&
-    here.player() === player &&
-    (dependencies.unitRegistry
-      .getByTile(tile)
-      .filter((other: Unit): boolean => other !== unit).length === 0 ||
-      unit.defence().value() >= unit.attack().value())
-  ) {
-    const fortify = unit
-      .actions()
-      .find((action: Action): boolean => action instanceof Fortify);
-
-    if (fortify) {
-      unit.action(fortify);
-    }
-
-    standDown(dependencies, unit);
-
+  if (holdCity(dependencies, player, unit)) {
     return;
   }
 
@@ -347,13 +384,105 @@ export const raid = (
       ? nearest.tile()
       : null;
 
-  march(dependencies, player, unit, target);
+  if (march(dependencies, player, unit, target) && !unit.destroyed()) {
+    // It took a city: hold it.
+    if (!holdCity(dependencies, player, unit)) {
+      standDown(dependencies, unit);
+    }
+  }
 };
 
+// Lands `ship`'s cargo on an empty square beside it, on the continent of the nearest city if that city is within
+//  reach: each unit is woken (it was stowed asleep) and disembarks, which ends its moves for the turn. Returns whether
+//  it landed anyone.
+const tryLanding = (
+  dependencies: Dependencies,
+  player: Player,
+  ship: NavalTransport
+): boolean => {
+  const tile = ship.tile(),
+    cargo = ship.cargo(),
+    nearest = nearestCity(tile, liveCities(dependencies));
+
+  if (
+    cargo.length === 0 ||
+    nearest === null ||
+    tile.distanceFrom(nearest.tile()) > LANDING_DISTANCE
+  ) {
+    return false;
+  }
+
+  const landMass = landMassOf(nearest.tile()),
+    landing = tile
+      .getNeighbours()
+      .find(
+        (neighbour: Tile): boolean =>
+          neighbour.isLand() &&
+          !nearPole(neighbour, POLAR_ROWS) &&
+          dependencies.cityRegistry.getByTile(neighbour) === null &&
+          dependencies.unitRegistry.getByTile(neighbour).length === 0 &&
+          landMassOf(neighbour) === landMass
+      );
+
+  if (!landing) {
+    return false;
+  }
+
+  const landed = cargo.filter((unit: Unit): boolean => {
+    // Woken first: `Disembark` leaves a stowed unit's `Stowed` busy state alone, and a busy unit is never active again.
+    unit.activate();
+
+    const disembark = unit
+      .actions(landing)
+      .find((action: Action): boolean => action instanceof Disembark);
+
+    if (!disembark) {
+      return false;
+    }
+
+    unit.action(disembark);
+
+    return unit.tile() === landing;
+  });
+
+  if (landed.length === 0) {
+    return false;
+  }
+
+  dependencies.engine.emit('barbarians:landed', player, nearest, landing);
+
+  return true;
+};
+
+// The water squares beside `city`, nearest to `from` first, that `ship` can sail to from `from` (its own square left
+//  out: being there already is no way forward), each with its path.
+const approaches = (
+  dependencies: Dependencies,
+  ship: Unit,
+  from: Tile,
+  city: City
+): Path[] =>
+  city
+    .tile()
+    .getNeighbours()
+    .filter(
+      (neighbour: Tile): boolean => neighbour.isWater() && neighbour !== from
+    )
+    .sort(
+      (a: Tile, b: Tile): number => from.distanceFrom(a) - from.distanceFrom(b)
+    )
+    .map(
+      (end: Tile): Path | null =>
+        (Path.for(ship, from, end, dependencies.pathFinderRegistry) as
+          | Path
+          | undefined) ?? null
+    )
+    .filter((path: Path | null): path is Path => path !== null);
+
 /**
- * A raiding ship's turn: gone once empty; within 8 of a city, lands everyone on an empty square next to the ship on
- * that city's continent (`barbarians:landed`); otherwise sails for the city with the best gold for the distance, or
- * is gone when none scores.
+ * A raiding ship's turn: off the map near the poles; gone once empty; lands its raiders beside it when a city is
+ * within 8 (`tryLanding`), before and after sailing; otherwise sails for the city with the best gold for the distance
+ * that it can reach a sea square beside, or is gone when there is none.
  */
 export const sail = (
   dependencies: Dependencies,
@@ -370,106 +499,53 @@ export const sail = (
     return;
   }
 
-  const cargo = ship.cargo();
-
-  if (cargo.length === 0) {
+  if (ship.cargo().length === 0) {
     ship.destroy();
 
     return;
   }
 
-  const cities = liveCities(dependencies),
-    nearest = nearestCity(tile, cities);
+  if (tryLanding(dependencies, player, ship)) {
+    standDown(dependencies, asUnit);
 
-  if (
-    nearest !== null &&
-    tile.distanceFrom(nearest.tile()) <= LANDING_DISTANCE
-  ) {
-    const landMass = landMassOf(nearest.tile()),
-      landing = tile
-        .getNeighbours()
-        .find(
-          (neighbour: Tile): boolean =>
-            neighbour.isLand() &&
-            !nearPole(neighbour, POLAR_ROWS) &&
-            dependencies.cityRegistry.getByTile(neighbour) === null &&
-            dependencies.unitRegistry.getByTile(neighbour).length === 0 &&
-            landMassOf(neighbour) === landMass
-        );
+    return;
+  }
 
-    if (landing) {
-      cargo.forEach((unit: Unit): void => {
-        const disembark = unit
-          .actions(landing)
-          .find((action: Action): boolean => action instanceof Disembark);
+  const gold = (city: City): number =>
+      cityGold(city, {
+        cities: dependencies.cityRegistry,
+        cityGrowth: dependencies.cityGrowthRegistry,
+        playerTreasuries: dependencies.playerTreasuryRegistry,
+      }),
+    targets = liveCities(dependencies)
+      .filter((city: City): boolean => !isBarbarian(city.player()))
+      .map((city: City): [City, number] => [
+        city,
+        Math.floor((gold(city) + 50) / (tile.distanceFrom(city.tile()) + 1)),
+      ])
+      .filter(([, score]: [City, number]): boolean => score > 0)
+      .sort(([, a]: [City, number], [, b]: [City, number]): number => b - a);
 
-        if (disembark) {
-          unit.action(disembark);
-        }
-      });
+  let path: Path | null = null;
 
-      dependencies.engine.emit('barbarians:landed', player, nearest, landing);
+  for (const [city] of targets) {
+    [path] = approaches(dependencies, asUnit, tile, city);
 
-      standDown(dependencies, asUnit);
-
-      return;
+    if (path) {
+      break;
     }
   }
 
-  const target = cities
-    .filter((city: City): boolean => !isBarbarian(city.player()))
-    .map((city: City): [City, number] => [
-      city,
-      Math.floor(
-        (cityGold(city, {
-          cities: dependencies.cityRegistry,
-          cityGrowth: dependencies.cityGrowthRegistry,
-          playerTreasuries: dependencies.playerTreasuryRegistry,
-        }) +
-          50) /
-          (tile.distanceFrom(city.tile()) + 1)
-      ),
-    ])
-    .reduce(
-      (best: [City, number] | null, candidate: [City, number]) =>
-        candidate[1] > (best?.[1] ?? 0) ? candidate : best,
-      null
-    );
-
-  if (target === null) {
-    ship.destroy();
-
-    return;
-  }
-
-  // To a sea square beside the city, the nearest first: the path finder won't take a ship into a city it can't enter.
-  const path = target[0]
-    .tile()
-    .getNeighbours()
-    .filter((neighbour: Tile): boolean => neighbour.isWater())
-    .sort(
-      (a: Tile, b: Tile): number => tile.distanceFrom(a) - tile.distanceFrom(b)
-    )
-    .reduce(
-      (found: Path | null, end: Tile): Path | null =>
-        found ??
-        (Path.for(asUnit, tile, end, dependencies.pathFinderRegistry) as
-          | Path
-          | undefined) ??
-        null,
-      null
-    );
-
   if (path === null) {
-    standDown(dependencies, asUnit);
+    ship.destroy();
 
     return;
   }
 
   for (
     let steps = 0;
-    ship.active() &&
-    ship.moves().value() > 0 &&
+    asUnit.active() &&
+    asUnit.moves().value() > 0 &&
     path.length > 0 &&
     steps < STEP_LIMIT;
     steps++
@@ -480,15 +556,16 @@ export const sail = (
       break;
     }
 
-    const actions = asUnit.actions(next),
-      move =
-        actions.find(
-          (action: Action): boolean => action.constructor === Move
-        ) ?? actions.find((action: Action): boolean => action instanceof Move);
+    const move = plainMove(asUnit.actions(next));
 
     if (!move || !takeAction(asUnit, move)) {
       break;
     }
+  }
+
+  // Arrived with moves to spare: land now rather than next turn.
+  if (asUnit.active() && asUnit.moves().value() > 0) {
+    tryLanding(dependencies, player, ship);
   }
 
   standDown(dependencies, asUnit);

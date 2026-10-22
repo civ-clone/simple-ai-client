@@ -1,11 +1,13 @@
-// Civ1: what a barbarian city builds (civ-clone/web-renderer#27, decision 3): of the units the `Build` rules allow it
-//  (`civ1-barbarians` allows attacking units at least two civilizations can build), the strongest attacker, by its
-//  attack and then its cost; without one, the strongest defender. Never an improvement or a Wonder.
+// Civ1: what a barbarian city builds (civ-clone/web-renderer#27, decision 3): of the land units the `Build` rules allow
+//  it (`civ1-barbarians` allows attacking land units at least two civilizations can build), the newest attacker, by its
+//  cost and then its attack; without one, the strongest defender. Never a ship, an aircraft, a missile, an improvement
+//  or a Wonder: `Raid` moves nothing but land units and transports.
 import Attack from '@civ-clone/core-unit/Yields/Attack';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import Defence from '@civ-clone/core-unit/Yields/Defence';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import { Land } from '@civ-clone/library-unit/Types';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Strategy from '@civ-clone/core-strategy/Strategy';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -47,7 +49,7 @@ export class BuildRaiders extends Strategy {
   choose(available: BuildItem[]): BuildItem | null {
     const units = available
         .filter((buildItem: BuildItem): boolean =>
-          Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
+          Object.prototype.isPrototypeOf.call(Land, buildItem.item())
         )
         .map(
           (item: BuildItem): Candidate => ({
@@ -60,14 +62,17 @@ export class BuildRaiders extends Strategy {
       attackers = units.filter(
         (candidate: Candidate): boolean => candidate.attack > candidate.defence
       ),
-      byStrength =
-        (key: 'attack' | 'defence') =>
-        (a: Candidate, b: Candidate): number =>
-          b[key] - a[key] || b.cost - a.cost,
+      // The newest attacker: by cost, which rises with the advances (civ-clone/web-renderer#27, decision 3).
       [best] =
         attackers.length > 0
-          ? attackers.sort(byStrength('attack'))
-          : units.sort(byStrength('defence'));
+          ? attackers.sort(
+              (a: Candidate, b: Candidate): number =>
+                b.cost - a.cost || b.attack - a.attack
+            )
+          : units.sort(
+              (a: Candidate, b: Candidate): number =>
+                b.defence - a.defence || b.cost - a.cost
+            );
 
     return best?.item ?? null;
   }

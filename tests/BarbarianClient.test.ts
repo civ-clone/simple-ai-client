@@ -1,7 +1,9 @@
 import {
+  Battleship,
   Cannon,
   Horseman,
   Musketman,
+  Nuclear,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
 import BarbarianClient, { createBarbarianStrategies } from '../BarbarianClient';
@@ -47,12 +49,19 @@ describe('BuildRaiders', (): void => {
       } as unknown as BuildItem),
     chosen = (items: BuildItem[]) => strategy.choose(items)?.item();
 
-  it('builds the strongest attacker, the dearest when they tie', (): void => {
-    // Horseman 2/1 at 20, Cannon 8/1 at 40, Musketman 2/3 at 30: Cannon.
+  it('builds the dearest attacker, the strongest at a price', (): void => {
+    // Horseman 2/1 at 20, Cannon 8/1 at 40, Musketman 2/3 at 30: the Cannon.
     expect(
       chosen([item(Horseman, 20), item(Cannon, 40), item(Musketman, 30)])
     ).to.equal(Cannon);
     expect(chosen([item(Horseman, 20), item(Warrior, 10)])).to.equal(Horseman);
+    expect(chosen([item(Horseman, 20), item(Cannon, 20)])).to.equal(Cannon);
+  });
+
+  it('builds land units only: no ship, no missile', (): void => {
+    expect(
+      chosen([item(Battleship, 160), item(Nuclear, 160), item(Horseman, 20)])
+    ).to.equal(Horseman);
   });
 
   it('builds the strongest defender when no attacker is on offer', (): void => {

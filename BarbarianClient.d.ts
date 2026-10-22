@@ -13,6 +13,7 @@ export declare const createBarbarianStrategies: (
  * for a civilization. A host gives it to the player `civ1-barbarians` spawns, when `player:spawned` names a barbarian.
  */
 export declare class BarbarianClient extends StrategyAIClient {
+  private _dependencies;
   constructor(
     player: Player,
     dependencies?: Dependencies,
