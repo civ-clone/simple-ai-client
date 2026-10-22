@@ -13,6 +13,21 @@ The client itself keeps only two things:
 - Civ1's handling of failed, unhandled and runaway actions;
 - the `cityLost` and `unitDestroyed` hooks that `Rules/` call during other players' turns.
 
+## `BarbarianClient`
+
+The barbarians' client (civ-clone/web-renderer#169), also a `StrategyAIClient`, with a pack of its own in a registry
+of its own rather than `SimpleAIClient`'s: `Strategies/Barbarian/Raid` for its units and
+`Strategies/Barbarian/BuildRaiders` for its cities. A host gives it to the player `civ1-barbarians` spawns when
+`player:spawned` names a barbarian (`isBarbarian` from `base-civilization-barbarian`). It is an `AIClient`, so the
+hooks that tell a computer player from a person treat it as one, and `SimpleAIClient`'s `Rules/` leave it alone.
+
+`lib/Barbarian/raid.ts` follows v474.05's `MoveBarbarianUnit`: a raiding ship sails for the city with the best gold
+for the distance and lands everyone on an empty square beside it on that city's continent (`barbarians:landed`); a
+raider marches on the nearest city of a civilization worth raiding on its continent, scoring each step as Civ1 does
+and always entering an enemy city next door; the leader (the Diplomat) keeps to the stack or walks to a friend within
+4 squares; raiders near the poles leave the map, and stranded ones give up every fourth turn. What a barbarian city
+builds is the strongest attacker the `Build` rules allow it, or the strongest defender.
+
 ## The strategy pack
 
 Importing the package (`index.ts`) registers the pack into the game's `StrategyRegistry`, as `registerRules` does for
