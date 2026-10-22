@@ -6,6 +6,7 @@ import { Fortified } from '@civ-clone/library-unit/UnitImprovements';
 import { Fortify } from '@civ-clone/library-unit/Actions';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { SetHomeCity } from '@civ-clone/library-unit/Actions';
+import activate from './activate';
 import takeUpStation from './homeCity';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -47,7 +48,7 @@ export const garrison = (
     unit.action(fortify);
 
     if (cityUnitWithLowerDefence) {
-      cityUnitWithLowerDefence.activate();
+      activate(cityUnitWithLowerDefence);
     }
 
     return true;
