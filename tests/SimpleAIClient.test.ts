@@ -146,6 +146,7 @@ import CurrentPlayerRegistry from '@civ-clone/core-player/CurrentPlayerRegistry'
 import { Fortified } from '@civ-clone/civ1-unit/UnitImprovements';
 import GoodyHutRegistry from '@civ-clone/core-goody-hut/GoodyHutRegistry';
 import InteractionRegistry from '@civ-clone/core-diplomacy/InteractionRegistry';
+import LandMassRegistry from '@civ-clone/core-world/LandMassRegistry';
 import LayoutRegistry from '@civ-clone/core-spaceship/LayoutRegistry';
 import LeaderRegistry from '@civ-clone/core-civilization/LeaderRegistry';
 import PathFinderRegistry from '@civ-clone/core-world-path/PathFinderRegistry';
@@ -221,12 +222,13 @@ import cityUnitDefeated from '@civ-clone/civ1-city/Rules/Unit/defeated';
 import cityUnitMoved from '@civ-clone/civ1-city/Rules/Unit/moved';
 import cityUnitUnsupported from '@civ-clone/civ1-city/Rules/Unit/unsupported';
 import cityYield from '@civ-clone/civ1-city/Rules/City/yield';
+import DiplomacyDependencies from '@civ-clone/civ1-diplomacy/lib/Dependencies';
 import diplomacyDeclarationExpired from '@civ-clone/civ1-diplomacy/Rules/Declaration/expired';
 import diplomacyNegotiationInteraction from '@civ-clone/civ1-diplomacy/Rules/Negotiation/interaction';
 import diplomacyNegotiationStep from '@civ-clone/civ1-diplomacy/Rules/Negotiation/step';
 import diplomacyProposalResolved from '@civ-clone/civ1-diplomacy/Rules/Proposal/resolved';
 import diplomacyUnitMoved from '@civ-clone/civ1-diplomacy/Rules/Unit/moved';
-import { expect } from 'chai';
+import { config as chaiConfig, expect } from 'chai';
 import gameYearTurnYear from '@civ-clone/civ1-game-year/Rules/Turn/year';
 import goodyHutAction from '@civ-clone/civ1-goody-hut/Rules/GoodyHut/action';
 import goodyHutActionPerformed from '@civ-clone/civ1-goody-hut/Rules/GoodyHut/action-performed';
@@ -361,6 +363,13 @@ import { createMemory } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { Colossus, Lighthouse, Pyramids } from '@civ-clone/civ1-wonder/Wonders';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import { Production as ProductionYield } from '@civ-clone/civ1-world/Yields';
+import { instance as rngInstance } from '@civ-clone/core-random';
+
+// A failed comparison of two game objects, such as a unit's tile and a city's, had mocha's reporter write out a diff of
+//  everything the two reach, the whole game, and run out of memory rather than report the failure
+//  (civ-clone/web-renderer#614). chai's message still names both sides. chai's config is the run's, so this holds for
+//  the other test files too.
+chaiConfig.showDiff = false;
 
 describe('SimpleAIClient', (): void => {
   const advanceRegistry = new AdvanceRegistry(),
@@ -478,18 +487,6 @@ describe('SimpleAIClient', (): void => {
           return client;
         })
       );
-
-  // Building a world gives each registered client's player a Settlers at a start tile (`civ1-player`'s `Spawn`), once
-  //  the promise chain it starts has run. This lets that run, then removes them.
-  const removeSpawnedSettlers = async (player: Player): Promise<void> => {
-    await new Promise((resolve) => setImmediate(resolve));
-
-    unitRegistry.unregister(
-      ...unitRegistry
-        .getByPlayer(player)
-        .filter((unit: Unit): boolean => unit instanceof Settlers)
-    );
-  };
 
   availableGovernmentRegistry.register(
     AnarchyGovernment,
@@ -633,6 +630,28 @@ describe('SimpleAIClient', (): void => {
   registerLeaders(leaderRegistry);
   registerTraits(traitRegistry);
 
+  // civ1-diplomacy's negotiation rules take the game's registries in one object. Given the interaction registry
+  //  alone, the first negotiation two players' units started threw, and the unit that started it was skipped
+  //  (civ-clone/web-renderer#614).
+  const diplomacyDependencies: DiplomacyDependencies = {
+    cityRegistry,
+    clientRegistry,
+    // No difficulty is chosen here, so the meetings play at King's, as a game without one does.
+    gameDifficultyRegistry: {
+      get: (): null => null,
+    } as unknown as DiplomacyDependencies['gameDifficultyRegistry'],
+    interactionRegistry,
+    landMassRegistry: new LandMassRegistry(),
+    playerGovernmentRegistry,
+    playerRegistry,
+    playerResearchRegistry,
+    playerTreasuryRegistry,
+    ruleRegistry,
+    traitRegistry,
+    turn,
+    unitRegistry,
+  };
+
   ruleRegistry.register(
     ...cityBuildingComplete(),
     ...cityCanBeWorked(cityRegistry, unitRegistry, workedTileRegistry),
@@ -725,18 +744,9 @@ describe('SimpleAIClient', (): void => {
     ...cityUnitUnsupported(),
     ...cityYield(cityImprovementRegistry, playerGovernmentRegistry),
     ...diplomacyDeclarationExpired(),
-    ...diplomacyNegotiationInteraction(interactionRegistry),
-    ...diplomacyNegotiationStep(
-      ruleRegistry,
-      interactionRegistry,
-      playerResearchRegistry
-    ),
-    ...diplomacyProposalResolved(
-      ruleRegistry,
-      interactionRegistry,
-      playerResearchRegistry,
-      clientRegistry
-    ),
+    ...diplomacyNegotiationInteraction(diplomacyDependencies),
+    ...diplomacyNegotiationStep(diplomacyDependencies, rngInstance),
+    ...diplomacyProposalResolved(diplomacyDependencies, rngInstance),
     ...diplomacyUnitMoved(interactionRegistry, unitRegistry),
     ...gameYearTurnYear(),
     ...goodyHutAction(playerResearchRegistry, cityRegistry),
@@ -771,6 +781,11 @@ describe('SimpleAIClient', (): void => {
     ...playerUnitDestroyed(cityRegistry, ruleRegistry),
     ...playerUnitVisibility(playerWorldRegistry),
     ...playerVisibilityChanged(),
+    // The players' views of a world as it's built, but not the Settlers it gives every registered client at a start
+    //  tile: each test places the units it's about. Since civ1-player 0.1.9 keeps the civilization a client has already
+    //  chosen, those Settlers are there as soon as the world is, seeing the land around them and standing among the
+    //  test's own units, and a client a failed test leaves registered gets more in every later test
+    //  (civ-clone/web-renderer#614).
     ...playerWorldBuilt(
       civilizationRegistry,
       clientRegistry,
@@ -782,6 +797,9 @@ describe('SimpleAIClient', (): void => {
       undefined,
       cityNameRegistry,
       traitRegistry
+    ).filter(
+      (rule): boolean =>
+        rule.id() !== 'civ1-player:world/built/choose-start-tiles'
     ),
     ...scienceCityCaptured(playerResearchRegistry, undefined, clientRegistry),
     ...scienceCityProcessYield(playerResearchRegistry, ruleRegistry),
@@ -1154,10 +1172,6 @@ describe('SimpleAIClient', (): void => {
     );
 
     playerWorld.register(...world.entries());
-
-    // With no city of its own, the player would found one with its spawned Settlers from turn 5, and the Warrior would
-    //  go to defend that city rather than take this one.
-    await removeSpawnedSettlers(player);
 
     await takeTurns(client, 12);
 
@@ -1636,8 +1650,6 @@ describe('SimpleAIClient', (): void => {
           .filter((tile: Tile): boolean => tile.x() <= knownUpTo)
       );
 
-    await removeSpawnedSettlers(player);
-
     if (advance) {
       playerResearchRegistry.getByPlayer(player).addAdvance(advance);
     }
@@ -1792,8 +1804,6 @@ describe('SimpleAIClient', (): void => {
       player = client.player();
 
     playerWorldRegistry.getByPlayer(player).register(...world.entries());
-
-    await removeSpawnedSettlers(player);
 
     const existing = withCity
         ? new City(
@@ -2245,8 +2255,6 @@ describe('SimpleAIClient', (): void => {
       player = client.player();
 
     playerWorldRegistry.getByPlayer(player).register(...world.entries());
-
-    await removeSpawnedSettlers(player);
 
     const city = new City(
       player,
