@@ -314,6 +314,8 @@ import unitUnsupported from '@civ-clone/civ1-unit/Rules/Unit/unsupported';
 import unitValidateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
 import unitStrength from '@civ-clone/civ1-unit/Rules/Unit/strength';
 import unitYield from '@civ-clone/civ1-unit/Rules/Unit/yield';
+import { RequirementRegistry } from '@civ-clone/core-requirement/RequirementRegistry';
+import { obsoletedBy as wonderObsoletedBy } from '@civ-clone/civ1-wonder/Requirements';
 import wonderCityBuild from '@civ-clone/civ1-wonder/Rules/City/build';
 import wonderCityBuildCost from '@civ-clone/civ1-wonder/Rules/City/build-cost';
 import wonderCityBuildingComplete from '@civ-clone/civ1-wonder/Rules/City/building-complete';
@@ -386,6 +388,9 @@ describe('SimpleAIClient', (): void => {
     playerTreasuryRegistry = new PlayerTreasuryRegistry(),
     playerWorldRegistry = new PlayerWorldRegistry(),
     ruleRegistry = new RuleRegistry(),
+    // What makes a Wonder obsolete is in the game's requirements (civ-clone/web-renderer#37): civ1-wonder's entries,
+    //  describing only, as its rules are built from the factories below.
+    requirementRegistry = new RequirementRegistry(ruleRegistry),
     spaceshipRegistry = new SpaceshipRegistry(),
     strategyNoteRegistry = new StrategyNoteRegistry(),
     terrainFeatureRegistry = new TerrainFeatureRegistry(),
@@ -902,7 +907,12 @@ describe('SimpleAIClient', (): void => {
       unitImprovementRegistry
     ),
     ...unitYield(unitImprovementRegistry, ruleRegistry, transportRegistry),
-    ...wonderCityBuild(playerResearchRegistry, wonderRegistry),
+    ...wonderCityBuild(
+      playerResearchRegistry,
+      wonderRegistry,
+      undefined,
+      requirementRegistry
+    ),
     ...wonderCityBuildCost(),
     ...wonderCityBuildingComplete(
       cityBuildRegistry,
@@ -915,18 +925,35 @@ describe('SimpleAIClient', (): void => {
       playerGovernmentRegistry,
       playerResearchRegistry,
       unitRegistry,
-      wonderRegistry
+      wonderRegistry,
+      undefined,
+      requirementRegistry
     ),
     ...wonderCityDestroyed(wonderRegistry),
-    ...wonderCityYield(playerResearchRegistry, wonderRegistry),
-    ...wonderCityYieldModifier(playerResearchRegistry, wonderRegistry),
+    ...wonderCityYield(
+      playerResearchRegistry,
+      wonderRegistry,
+      requirementRegistry
+    ),
+    ...wonderCityYieldModifier(
+      playerResearchRegistry,
+      wonderRegistry,
+      cityImprovementRegistry,
+      undefined,
+      requirementRegistry
+    ),
     ...wonderObsolete(),
     ...wonderPlayerResearchComplete(
       playerResearchRegistry,
       ruleRegistry,
-      wonderRegistry
+      wonderRegistry,
+      requirementRegistry
     ),
-    ...wonderUnitYield(wonderRegistry, playerResearchRegistry),
+    ...wonderUnitYield(
+      wonderRegistry,
+      playerResearchRegistry,
+      requirementRegistry
+    ),
     ...worldEngineStart(ruleRegistry),
     ...worldGeneratorPickGenerator(),
     ...worldPlayerPickStartTile(),
@@ -950,6 +977,8 @@ describe('SimpleAIClient', (): void => {
 
   registerCityNames(cityNameRegistry);
 
+  requirementRegistry.add(null, ...wonderObsoletedBy);
+
   const dependencies = createDependencies({
     cityBuildRegistry,
     cityGrowthRegistry,
@@ -963,6 +992,7 @@ describe('SimpleAIClient', (): void => {
     playerResearchRegistry,
     playerTreasuryRegistry,
     playerWorldRegistry,
+    requirementRegistry,
     ruleRegistry,
     strategyNoteRegistry,
     terrainFeatureRegistry,

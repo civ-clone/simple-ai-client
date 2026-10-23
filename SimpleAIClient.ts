@@ -1,3 +1,4 @@
+import { instance as requirementRegistryInstance } from '@civ-clone/core-requirement/RequirementRegistry';
 import {
   AvailableSpecialistRegistry,
   instance as availableSpecialistRegistryInstance,
@@ -212,9 +213,9 @@ export class SimpleAIClient extends StrategyAIClient {
 
     this._strategies = strategyRegistry;
 
-    // The city improvement, specialist, trade rate and trait registries aren't arguments, so that callers passing the
-    //  others by position (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and
-    //  those are given the game's own (`dependenciesFor`).
+    // The city improvement, requirement, specialist, trade rate and trait registries aren't arguments, so that callers
+    //  passing the others by position (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use
+    //  them, and those are given the game's own (`dependenciesFor`).
     this._dependencies = {
       availableSpecialistRegistry: availableSpecialistRegistryInstance,
       cityBuildRegistry,
@@ -234,6 +235,7 @@ export class SimpleAIClient extends StrategyAIClient {
       playerTreasuryRegistry,
       playerWorldRegistry,
       randomNumberGenerator,
+      requirementRegistry: requirementRegistryInstance,
       ruleRegistry,
       specialistRegistry: specialistRegistryInstance,
       strategyNoteRegistry,
