@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SimpleAIClient = void 0;
+const RequirementRegistry_1 = require("@civ-clone/core-requirement/RequirementRegistry");
 const AvailableSpecialistRegistry_1 = require("@civ-clone/core-city/AvailableSpecialistRegistry");
 const CityBuildRegistry_1 = require("@civ-clone/core-city-build/CityBuildRegistry");
 const CityGrowthRegistry_1 = require("@civ-clone/core-city-growth/CityGrowthRegistry");
@@ -97,9 +98,9 @@ class SimpleAIClient extends StrategyAIClient_1.default {
         super(player, strategyRegistry, randomNumberGenerator);
         this._knowledge = knowledge_1.default;
         this._strategies = strategyRegistry;
-        // The city improvement, specialist, trade rate and trait registries aren't arguments, so that callers passing the
-        //  others by position (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use them, and
-        //  those are given the game's own (`dependenciesFor`).
+        // The city improvement, requirement, specialist, trade rate and trait registries aren't arguments, so that callers
+        //  passing the others by position (the arena looks for `strategyRegistry`'s) are unaffected. Only the strategies use
+        //  them, and those are given the game's own (`dependenciesFor`).
         this._dependencies = {
             availableSpecialistRegistry: AvailableSpecialistRegistry_1.instance,
             cityBuildRegistry,
@@ -119,6 +120,7 @@ class SimpleAIClient extends StrategyAIClient_1.default {
             playerTreasuryRegistry,
             playerWorldRegistry,
             randomNumberGenerator,
+            requirementRegistry: RequirementRegistry_1.instance,
             ruleRegistry,
             specialistRegistry: SpecialistRegistry_1.instance,
             strategyNoteRegistry,

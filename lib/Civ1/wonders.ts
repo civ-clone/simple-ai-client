@@ -19,7 +19,11 @@ export const isUsefulWonder = (
   player: Player,
   WonderType: typeof Wonder
 ): boolean =>
-  !isObsolete(WonderType, dependencies.playerResearchRegistry) &&
+  !isObsolete(
+    WonderType,
+    dependencies.playerResearchRegistry,
+    dependencies.requirementRegistry
+  ) &&
   (!forShips.includes(WonderType) ||
     dependencies.unitRegistry
       .getByPlayer(player)
