@@ -1,6 +1,7 @@
 // Generic: the move executor. Follows the unit's path while it has one, otherwise takes the best-scored neighbouring
 //  step, until the unit has no moves left, negotiating with any neighbours it meets on the way.
 import {
+  AbortMove,
   BribeUnit,
   EstablishEmbassy,
   IndustrialSabotage,
@@ -8,9 +9,7 @@ import {
   InvestigateCity,
   MeetWithKing,
   Move,
-  SneakAttack,
-  SneakCaptureCity,
-  SneakStealTechnology,
+  Overruled,
 } from '@civ-clone/library-unit/Actions';
 import Action from '@civ-clone/core-unit/Action';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
@@ -28,7 +27,8 @@ import shuffle from '../shuffle';
 //  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
 // The actions on a tile the AI will take. A Diplomat only steals: v474.05's computer players never sabotage, incite
 //  or subvert a city (Rome on 640K a Day, p353), or establish embassies, investigate cities or meet kings, and buying
-//  units isn't something this AI plans for yet (civ-clone/web-renderer#58).
+//  units isn't something this AI plans for yet (civ-clone/web-renderer#58). Nor does it call off a move onto a treaty
+//  partner's land, or choose what a Senate overrules: both only spend its moves (civ-clone/web-renderer#287).
 export const actionsToTake = (actions: Action[]): Action[] =>
   actions.filter(
     (action: Action): boolean =>
@@ -38,17 +38,18 @@ export const actionsToTake = (actions: Action[]): Action[] =>
         action instanceof IndustrialSabotage ||
         action instanceof InciteRevolt ||
         action instanceof MeetWithKing ||
-        action instanceof BribeUnit
+        action instanceof BribeUnit ||
+        action instanceof AbortMove ||
+        action instanceof Overruled
       )
   );
 
 // Whether `action` would break a peace treaty. A computer player keeps its treaties: it ends one only by declaring war
 //  when it meets the other player, or by quietly dropping a peace it never meant (civ-clone/web-renderer#427), so
-//  nothing it does on the map breaks one.
+//  nothing it does on the map breaks one. An action breaks one when it has an `enemy()`, which is what civ1-unit's
+//  `moved/break-peace-treaty` rule ends the peace with: a sneak attack, capture, move or pillage, or a Diplomat's.
 export const breaksTreaty = (action: unknown): boolean =>
-  action instanceof SneakAttack ||
-  action instanceof SneakCaptureCity ||
-  action instanceof SneakStealTechnology;
+  typeof (action as { enemy?: unknown } | undefined)?.enemy === 'function';
 
 // The action the AI takes on a tile, of `actions`, or none: the first it will take, unless that would break a peace
 //  treaty (`breaksTreaty`).

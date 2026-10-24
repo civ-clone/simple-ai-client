@@ -1,6 +1,12 @@
 import {
+  AbortMove,
+  Overruled,
   SneakAttack,
   SneakCaptureCity,
+  SneakInciteRevolt,
+  SneakMove,
+  SneakNuclearAttack,
+  SneakPillage,
   SneakStealTechnology,
 } from '@civ-clone/library-unit/Actions';
 import Action from '@civ-clone/core-unit/Action';
@@ -8,7 +14,7 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import MemoryRegistry from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import Player from '@civ-clone/core-player/Player';
 import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
-import { actionToTake } from '../lib/Unit/moveUnit';
+import { actionToTake, breaksTreaty } from '../lib/Unit/moveUnit';
 import { expect } from 'chai';
 
 // A computer player ends a treaty only by declaring war when it meets the other player, or by quietly dropping a peace
@@ -31,14 +37,37 @@ describe('treaties', (): void => {
         },
       } as unknown as Dependencies;
 
-    [SneakAttack, SneakCaptureCity, SneakStealTechnology].forEach(
-      (SneakAction): void => {
-        const sneak = Object.assign(Object.create(SneakAction.prototype), {
-          _enemy: rival,
-        }) as Action;
+    [
+      SneakAttack,
+      SneakCaptureCity,
+      SneakInciteRevolt,
+      SneakMove,
+      SneakNuclearAttack,
+      SneakPillage,
+      SneakStealTechnology,
+    ].forEach((SneakAction): void => {
+      const sneak = Object.assign(Object.create(SneakAction.prototype), {
+        _enemy: rival,
+      }) as Action;
 
-        expect(actionToTake(dependencies, player, [sneak])).null;
-      }
-    );
+      expect(actionToTake(dependencies, player, [sneak])).null;
+    });
+  });
+
+  // Calling off a move onto a treaty partner's land, or what a Senate overrules, only spends moves
+  //  (civ-clone/web-renderer#287, #133).
+  it("should neither call off a move onto a partner's land nor take what a Senate overrules", (): void => {
+    const player = new Player(),
+      rival = new Player();
+
+    [AbortMove, Overruled].forEach((ActionType): void => {
+      const action = Object.assign(Object.create(ActionType.prototype), {
+        _partner: rival,
+      }) as Action;
+
+      expect(breaksTreaty(action)).false;
+      expect(actionToTake({} as unknown as Dependencies, player, [action]))
+        .null;
+    });
   });
 });

@@ -14,7 +14,12 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
-import { SneakAttack } from '@civ-clone/library-unit/Actions';
+import {
+  AbortMove,
+  Overruled,
+  SneakAttack,
+  SneakMove,
+} from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
@@ -40,10 +45,14 @@ export const scoreUnitMove = (
       embark,
       foundCity,
     } = lookup,
-    sneakAttack = lookup.sneakAttack as SneakAttack | undefined;
+    sneakAttack = lookup.sneakAttack as SneakAttack | undefined,
+    sneakMove = lookup.sneakMove as SneakMove | undefined,
+    abortMove = lookup.abortMove as AbortMove | undefined,
+    overruled = lookup.overruled as Overruled | undefined;
 
-  // A computer player keeps its treaties (`breaksTreaty`).
-  if (sneakAttack) {
+  // A computer player keeps its treaties (`breaksTreaty`), and doesn't walk onto a treaty partner's land
+  //  (civ-clone/web-renderer#287) or try what a Senate would overrule.
+  if (sneakAttack || sneakMove || abortMove || overruled) {
     return -10;
   }
 
