@@ -109,7 +109,7 @@ export const explorerShipFor = (
     // A player bound to its land explores from its only city (civ-clone/web-renderer#632): otherwise it never sees
     //  land to settle overseas.
     (dependencies.cityRegistry.getByPlayer(player).length < 2 &&
-      !islandBound(dependencies, player, memory)) ||
+      !islandBound(dependencies, knowledge, player, memory)) ||
     dependencies.unitRegistry
       .getByPlayer(player)
       .some(

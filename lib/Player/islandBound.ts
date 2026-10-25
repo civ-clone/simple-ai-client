@@ -7,79 +7,118 @@
 //  (`lib/Unit/overseas`). A landmass shared with rivals counts the same once it's full (Dom, on #632).
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
+import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
+import { overseasStateFor } from '../Unit/overseas';
 
-// Whether the player has explored `landmass`: it knows every tile of it, or the survey has no land tile left to explore
-//  on it. The survey counts a coastal tile beside unseen sea as land to explore, so a small island the player has seen
-//  all of would never be explored by that alone.
+// Where the player's units are going: each one's target and the end of its path, and each passenger's target. The
+//  survey leaves these off its board while they're claimed, so a site its Settlers are walking to, or the last land
+//  its explorer is heading for, would otherwise look gone.
+const claimed = (memory: Memory): Tile[] => [
+  ...memory.unitTargetData.values(),
+  ...[...memory.unitPathData.values()]
+    .map((path): Tile | undefined => path.end())
+    .filter((tile): tile is Tile => tile !== undefined),
+  ...[...overseasStateFor(memory).passengers.entries()]
+    .filter(([unit]: [Unit, unknown]): boolean => !unit.destroyed())
+    .map(([, passenger]): Tile => passenger.target),
+];
+
+// Whether `tile`, a land tile the player knows, has a neighbour it doesn't: land still to explore.
+const unexplored = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): boolean => {
+  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player);
+
+  return tile
+    .getNeighbours()
+    .some((neighbour: Tile): boolean => !playerWorld.includes(neighbour));
+};
+
+// Whether the player has explored `landmass`: it knows every tile of it, or there's no land tile left to explore on it,
+//  on the survey's board or claimed by one of its units. The survey counts a coastal tile beside unseen sea as land to
+//  explore, so a small island the player has seen all of would never be explored by that alone.
 const explored = (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
-  landmass: Set<Tile>
+  landmass: Set<Tile>,
+  heading: Tile[]
 ): boolean => {
+  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player);
+
   if (
-    !memory.targets.landTilesToExplore.some((tile: Tile): boolean =>
-      landmass.has(tile)
-    )
+    [...landmass].every((tile: Tile): boolean => playerWorld.includes(tile))
   ) {
     return true;
   }
 
-  const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player);
-
-  return [...landmass].every((tile: Tile): boolean =>
-    playerWorld.includes(tile)
+  return (
+    !memory.targets.landTilesToExplore.some((tile: Tile): boolean =>
+      landmass.has(tile)
+    ) &&
+    !heading.some(
+      (tile: Tile): boolean =>
+        landmass.has(tile) && unexplored(dependencies, player, tile)
+    )
   );
 };
 
-// Worked out once for each survey of the player's: every city asks as it chooses what to build.
-const known = new WeakMap<
-  Memory,
-  { turn: number; surveyed: number; bound: boolean }
->();
-
-// Whether `player` has cities, every one of them on a landmass it has explored with no site for a city left on it, by
-//  the survey's board. False before it has a city or has surveyed, and false again as soon as it has a city on land
-//  with room, so its usual priorities come back by themselves.
+// Whether `player` has cities, every one of them on a landmass it has explored with no site for a city left on it: none
+//  on the survey's board, and none its units are heading for. False before it has a city or has surveyed, and false
+//  again as soon as it has a city on land with room, so its usual priorities come back by themselves. Worked out afresh
+//  each time: the board, its cities and what it knows all change during a turn.
 export const islandBound = (
   dependencies: Dependencies,
+  knowledge: Knowledge,
   player: Player,
   memory: Memory
 ): boolean => {
-  const turn = dependencies.turn.value(),
-    surveyed = memory.surveyedTurn,
-    cached = known.get(memory);
-
-  if (surveyed === null) {
+  if (memory.surveyedTurn === null) {
     return false;
   }
 
-  if (cached && cached.turn === turn && cached.surveyed === surveyed) {
-    return cached.bound;
+  const turn = dependencies.turn.value(),
+    cities = dependencies.cityRegistry.getByPlayer(player);
+
+  if (cities.length === 0) {
+    return false;
   }
 
-  const cities = dependencies.cityRegistry.getByPlayer(player),
-    landmasses = new Set<Set<Tile>>(
-      cities.map((city: City): Set<Tile> => continentOf(turn, city.tile()))
-    ),
-    onLandmasses = (tile: Tile): boolean =>
-      [...landmasses].some((landmass: Set<Tile>): boolean =>
-        landmass.has(tile)
+  const landmasses = [
+      ...new Set<Set<Tile>>(
+        cities.map((city: City): Set<Tile> => continentOf(turn, city.tile()))
       ),
-    bound =
-      cities.length > 0 &&
-      !memory.targets.goodSitesForCities.some(onLandmasses) &&
-      [...landmasses].every((landmass: Set<Tile>): boolean =>
-        explored(dependencies, player, memory, landmass)
-      );
+    ],
+    onLandmasses = (tile: Tile): boolean =>
+      landmasses.some((landmass: Set<Tile>): boolean => landmass.has(tile));
 
-  known.set(memory, { turn, surveyed, bound });
+  if (memory.targets.goodSitesForCities.some(onLandmasses)) {
+    return false;
+  }
 
-  return bound;
+  const heading = claimed(memory);
+
+  if (
+    heading.some(
+      (tile: Tile): boolean =>
+        onLandmasses(tile) &&
+        dependencies.cityRegistry.getByTile(tile) === null &&
+        knowledge.shouldBuildCity(dependencies, player, tile)
+    )
+  ) {
+    return false;
+  }
+
+  return landmasses.every((landmass: Set<Tile>): boolean =>
+    explored(dependencies, player, memory, landmass, heading)
+  );
 };
 
 export default islandBound;

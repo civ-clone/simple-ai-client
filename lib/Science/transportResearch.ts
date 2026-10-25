@@ -12,41 +12,119 @@ const isAdvance = (target: unknown): target is typeof Advance =>
   typeof target === 'function' &&
   (target === Advance || Object.prototype.isPrototypeOf.call(Advance, target));
 
-// The advances an entry about `Subject` with `relation` names.
-const advancesFor = (
-  dependencies: Dependencies,
-  Subject: IConstructor,
-  relation: 'requires' | 'obsoletedBy'
-): (typeof Advance)[] =>
-  dependencies.requirementRegistry
-    .for(Subject, relation)
-    .flatMap((entry: Requirement): unknown[] => [...entry.targets])
-    .filter(isAdvance);
+// The advances an entry names, of its targets.
+const advancesIn = (entry: Requirement): (typeof Advance)[] =>
+  entry.targets.filter(isAdvance);
 
-// The advances `player` still needs for all of `goals`, prerequisites included, each before the ones that need it.
-const missing = (
+// Each item of `more` not in `list` yet, added to its end.
+const merge = (
+  list: (typeof Advance)[],
+  more: (typeof Advance)[]
+): (typeof Advance)[] => [
+  ...list,
+  ...more.filter((AdvanceType) => !list.includes(AdvanceType)),
+];
+
+// The advances `playerResearch`'s player still needs to meet `entries`, prerequisites included, each before the ones
+//  that need it: every advance of an all-of entry, and the one of an any-of entry that needs fewest. `null` when one
+//  can't be met, which a requirement that leads back to itself (`visiting`) can't be.
+const toMeet = (
   dependencies: Dependencies,
   playerResearch: PlayerResearch,
-  goals: (typeof Advance)[]
-): (typeof Advance)[] => {
-  const found: (typeof Advance)[] = [],
-    visit = (AdvanceType: typeof Advance): void => {
-      if (
-        found.includes(AdvanceType) ||
-        playerResearch.completed(AdvanceType)
-      ) {
-        return;
+  entries: Requirement[],
+  visiting: Set<typeof Advance> = new Set()
+): (typeof Advance)[] | null => {
+  let found: (typeof Advance)[] = [];
+
+  for (const entry of entries) {
+    const options = advancesIn(entry).map(
+      (AdvanceType: typeof Advance): (typeof Advance)[] | null =>
+        toResearch(dependencies, playerResearch, AdvanceType, visiting)
+    );
+
+    if (options.length === 0) {
+      // Only conditions (a coastal city), which research can't meet.
+      continue;
+    }
+
+    if (entry.mode === 'any') {
+      const [fewest] = options
+        .filter((option): option is (typeof Advance)[] => option !== null)
+        .sort((a, b): number => a.length - b.length);
+
+      if (!fewest) {
+        return null;
       }
 
-      advancesFor(dependencies, AdvanceType, 'requires').forEach(visit);
+      found = merge(found, fewest);
 
-      found.push(AdvanceType);
-    };
+      continue;
+    }
 
-  goals.forEach(visit);
+    if (options.some((option): boolean => option === null)) {
+      return null;
+    }
+
+    options.forEach((option): void => {
+      found = merge(found, option!);
+    });
+  }
 
   return found;
 };
+
+// `AdvanceType` and the advances it needs that `playerResearch`'s player hasn't got, prerequisites first, or `null`.
+const toResearch = (
+  dependencies: Dependencies,
+  playerResearch: PlayerResearch,
+  AdvanceType: typeof Advance,
+  visiting: Set<typeof Advance>
+): (typeof Advance)[] | null => {
+  if (playerResearch.completed(AdvanceType)) {
+    return [];
+  }
+
+  if (visiting.has(AdvanceType)) {
+    return null;
+  }
+
+  visiting.add(AdvanceType);
+
+  const before = toMeet(
+    dependencies,
+    playerResearch,
+    dependencies.requirementRegistry.for(AdvanceType, 'requires'),
+    visiting
+  );
+
+  visiting.delete(AdvanceType);
+
+  return before === null ? null : merge(before, [AdvanceType]);
+};
+
+// Whether `playerResearch`'s player has made `TransportType` obsolete: it has the advances of an entry saying so, all
+//  of them or any one, as the entry says.
+const obsolete = (
+  dependencies: Dependencies,
+  playerResearch: PlayerResearch,
+  TransportType: IConstructor
+): boolean =>
+  dependencies.requirementRegistry
+    .for(TransportType, 'obsoletedBy')
+    .some((entry: Requirement): boolean => {
+      const advances = advancesIn(entry);
+
+      return (
+        advances.length > 0 &&
+        (entry.mode === 'any'
+          ? advances.some((AdvanceType) =>
+              playerResearch.completed(AdvanceType)
+            )
+          : advances.every((AdvanceType) =>
+              playerResearch.completed(AdvanceType)
+            ))
+      );
+    });
 
 // The transports the ruleset has: the subjects of its requirements that carry land units.
 const transportTypes = (dependencies: Dependencies): IConstructor[] => [
@@ -68,18 +146,16 @@ export const transportResearch = (
   const paths = transportTypes(dependencies)
     .filter(
       (TransportType: IConstructor): boolean =>
-        !advancesFor(dependencies, TransportType, 'obsoletedBy').some(
-          (AdvanceType: typeof Advance): boolean =>
-            playerResearch.completed(AdvanceType)
-        )
+        !obsolete(dependencies, playerResearch, TransportType)
     )
-    .map((TransportType: IConstructor): (typeof Advance)[] =>
-      missing(
+    .map((TransportType: IConstructor): (typeof Advance)[] | null =>
+      toMeet(
         dependencies,
         playerResearch,
-        advancesFor(dependencies, TransportType, 'requires')
+        dependencies.requirementRegistry.for(TransportType, 'requires')
       )
     )
+    .filter((path): path is (typeof Advance)[] => path !== null)
     .sort((a, b): number => a.length - b.length);
 
   if (paths.length === 0 || paths[0].length === 0) {

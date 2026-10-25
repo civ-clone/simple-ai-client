@@ -183,7 +183,13 @@ export const moveUnit = async (
         // A ship the ruleset keeps near the coast takes the way along it to the same place, if there is one
         //  (civ-clone/web-renderer#632). Without one, the path goes, and a new mission (`onIdle`) can send it
         //  somewhere else: each place is tried once a turn.
-        const coastal = coastalPath(unit, destination);
+        const playerWorld =
+            dependencies.playerWorldRegistry.getByPlayer(player),
+          coastal = coastalPath(unit, destination, {
+            known: (tile: Tile): boolean => playerWorld.includes(tile),
+            canEnter: (tile: Tile): boolean =>
+              dependencies.cityRegistry.getByTile(tile)?.player() === player,
+          });
 
         alongCoast.add(destination);
 
