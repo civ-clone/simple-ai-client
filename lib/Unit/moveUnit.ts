@@ -18,7 +18,9 @@ import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import { Naval } from '@civ-clone/library-unit/Types';
 import canNegotiate from '../Diplomacy/negotiate';
+import coastalPath from './coastalPath';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import scoreUnitMove from './scoreUnitMove';
 import shuffle from '../shuffle';
@@ -127,7 +129,9 @@ export const moveUnit = async (
 ): Promise<void> => {
   let loopCheck = 0,
     idleChecks = 0,
-    freeSteps = 0;
+    freeSteps = 0,
+    // The places a ship has looked for a way along the coast to (`coastalPath`), once each.
+    alongCoast = new Set<Tile>();
 
   while (unit.active() && unit.moves().value() >= 0.1) {
     if (loopCheck++ > 1e3) {
@@ -165,6 +169,30 @@ export const moveUnit = async (
                 ...moves,
               ]
             : moves;
+
+      const destination = path.end() ?? target;
+
+      if (
+        move &&
+        destination &&
+        !breaksTreaty(move) &&
+        !knowledge.canReturnAfter(dependencies, player, unit, move as Action) &&
+        unit instanceof Naval &&
+        !alongCoast.has(destination)
+      ) {
+        // A ship the ruleset keeps near the coast takes the way along it to the same place, if there is one
+        //  (civ-clone/web-renderer#632). Without one, the path goes, and a new mission (`onIdle`) can send it
+        //  somewhere else: each place is tried once a turn.
+        const coastal = coastalPath(unit, destination);
+
+        alongCoast.add(destination);
+
+        if (coastal !== null) {
+          memory.unitPathData.set(unit, coastal);
+
+          continue;
+        }
+      }
 
       if (
         breaksTreaty(move) ||

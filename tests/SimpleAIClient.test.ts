@@ -1634,7 +1634,8 @@ describe('SimpleAIClient', (): void => {
     inland: boolean = true,
     map: string = '5G5O5G5O5G5O5G5O5G5O',
     knownUpTo: number = 6,
-    shields: number = 2
+    shields: number = 2,
+    knownFrom: number = 0
   ): Promise<unknown> => {
     withCivilizations();
 
@@ -1647,7 +1648,10 @@ describe('SimpleAIClient', (): void => {
       .register(
         ...world
           .entries()
-          .filter((tile: Tile): boolean => tile.x() <= knownUpTo)
+          .filter(
+            (tile: Tile): boolean =>
+              tile.x() >= knownFrom && tile.x() <= knownUpTo
+          )
       );
 
     if (advance) {
@@ -1708,8 +1712,17 @@ describe('SimpleAIClient', (): void => {
     expect(await shipTest(0, null)).not.equal(Trireme);
   });
 
-  it('should not build a ship in its only city', async (): Promise<void> => {
-    expect(await shipTest(0, MapMaking, false)).not.equal(Trireme);
+  // A player bound to its island explores from its only city (civ-clone/web-renderer#632): here it knows the whole of
+  //  it, and it has no room for another city.
+  it('should build a ship in its only city once bound to its island', async (): Promise<void> => {
+    expect(await shipTest(0, MapMaking, false)).equal(Trireme);
+  });
+
+  // Its island's west end is unknown, so it may yet have room there.
+  it('should not build a ship in its only city while it has land to explore', async (): Promise<void> => {
+    expect(
+      await shipTest(0, MapMaking, false, '5G5O5G5O5G5O5G5O5G5O', 6, 2, 1)
+    ).not.equal(Trireme);
   });
 
   // civ-clone/web-renderer#212: 40 turns at 1 net shield.

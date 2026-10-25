@@ -11,6 +11,7 @@ import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { Naval, NavalTransport } from '@civ-clone/library-unit/Types';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import { canBerthAt, isFerrying, waitingAt } from '../Unit/overseas';
+import islandBound from '../Player/islandBound';
 import Player from '@civ-clone/core-player/Player';
 import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Tile from '@civ-clone/core-world/Tile';
@@ -79,7 +80,7 @@ export const reachesSeaToExplore = (
 // How many turns, at its net shields, a city spends on a ship to explore with (civ-clone/web-renderer#212).
 export const explorerShipTurns = 20;
 
-// The cheapest ship `city` can build, if the player has another city, no ship free to explore (one that's ferrying
+// The cheapest ship `city` can build, if the player has another city (or is bound to its land), no ship free to explore (one that's ferrying
 //  isn't, civ-clone/web-renderer#440) and none on order, the city has its
 //  defenders, it's on a sea it can explore, it can finish the ship within `turns`, and it would still have shields to
 //  spare once it supported the ship (civ-clone/web-renderer#229). Otherwise `null`. A player's only city has better
@@ -105,7 +106,10 @@ export const explorerShipFor = (
 
   if (
     !ship ||
-    dependencies.cityRegistry.getByPlayer(player).length < 2 ||
+    // A player bound to its land explores from its only city (civ-clone/web-renderer#632): otherwise it never sees
+    //  land to settle overseas.
+    (dependencies.cityRegistry.getByPlayer(player).length < 2 &&
+      !islandBound(dependencies, player, memory)) ||
     dependencies.unitRegistry
       .getByPlayer(player)
       .some(
