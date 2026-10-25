@@ -16,7 +16,7 @@ class ChooseResearch extends AIStrategy_1.default {
     }
     attempt(action) {
         var _a;
-        const playerResearch = action.value(), player = playerResearch.player(), toTransport = (0, islandBound_1.default)(this.dependencies(), player, this.memoryFor(player))
+        const playerResearch = action.value(), player = playerResearch.player(), toTransport = (0, islandBound_1.default)(this.dependencies(), this.knowledge(), player, this.memoryFor(player))
             ? (0, transportResearch_1.default)(this.dependencies(), playerResearch)
             : null;
         if (toTransport !== null) {

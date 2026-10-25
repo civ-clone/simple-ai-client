@@ -19,6 +19,7 @@ export class ChooseResearch extends AIStrategy {
       player = playerResearch.player(),
       toTransport = islandBound(
         this.dependencies(),
+        this.knowledge(),
         player,
         this.memoryFor(player)
       )
