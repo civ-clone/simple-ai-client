@@ -1,7 +1,7 @@
 // Civ1: which tiles are worth a city, irrigation, a mine or a road, judged by Civ1's terrain and yields, and what
 //  each terrain job is worth (`civ1TerrainPolicy`, civ-clone/web-renderer#234), railroads included
 //  (civ-clone/web-renderer#349), and clearing or planting terrain and carrying water to a dry tile
-//  (civ-clone/web-renderer#353, #383, #386, #426).
+//  (civ-clone/web-renderer#353, #383, #386, #426, #428).
 import {
   Desert,
   Forest,
@@ -56,6 +56,7 @@ import {
   ClearJungle,
   ClearSwamp,
   CleanPollution,
+  PlantForest,
 } from '@civ-clone/civ1-unit/Actions';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
@@ -291,7 +292,7 @@ const workActions: { [K in Improvement]: typeof UnitAction } = {
 
 // Civ1's terrain changes a worker makes (civ-clone/web-renderer#353, #386): the job, its action, the terrain it's done
 //  on and the terrain it leaves. Civ1's own AI never makes them (v474.05's `TerrainModifications` table); this improves
-//  on it. Planting Forest isn't one: in the arena it cost more than it gave.
+//  on it. Planting Forest has its own conditions (`plantingJobs`, civ-clone/web-renderer#428).
 type Conversion = 'clearForest' | 'clearJungle' | 'clearSwamp';
 
 const conversions: [
@@ -343,7 +344,31 @@ const CHAIN = 0.5;
 
 type Weights = { food: number; shields: number; trade: number };
 
+type Surplus = { food: number; shields: number };
+
 // Worked out once a turn for each city: `city.yields()` isn't cheap.
+const surplusCache: WeakMap<City, [number, Surplus]> = new WeakMap();
+
+// The food and shields `city` has to spare this turn.
+const surplusFor = (dependencies: Dependencies, city: City): Surplus => {
+  const turn = dependencies.turn.value(),
+    cached = surplusCache.get(city);
+
+  if (cached && cached[0] === turn) {
+    return cached[1];
+  }
+
+  const yields = city.yields(),
+    surplus = {
+      food: reduceYield(yields, CityFood),
+      shields: reduceYield(yields, CityProduction),
+    };
+
+  surplusCache.set(city, [turn, surplus]);
+
+  return surplus;
+};
+
 const weightsCache: WeakMap<City, [number, Weights]> = new WeakMap();
 
 const weightsFor = (dependencies: Dependencies, city: City): Weights => {
@@ -354,9 +379,10 @@ const weightsFor = (dependencies: Dependencies, city: City): Weights => {
     return cached[1];
   }
 
-  const yields = city.yields(),
-    foodSurplus = reduceYield(yields, CityFood),
-    shieldSurplus = reduceYield(yields, CityProduction),
+  const { food: foodSurplus, shields: shieldSurplus } = surplusFor(
+      dependencies,
+      city
+    ),
     weights = {
       food:
         FOOD *
@@ -489,12 +515,16 @@ const irrigable = (TerrainType: typeof Terrain): boolean =>
   );
 
 // Whether `tile` could carry water to a neighbour, once irrigated: it has water beside it and is irrigable, or a Forest
-//  with no feature that would be Plains once cleared (civ-clone/web-renderer#426). Not Hills: irrigating them to carry
-//  water took workers from their mines, and the arena had fewer mines and no more food for it.
+//  with no feature that would be Plains once cleared (civ-clone/web-renderer#426). Hills only while they have no mine:
+//  they're irrigated to carry the water and mined once the neighbour has it (`onlyWaterFor`), but a mine already there
+//  isn't given up for it (civ-clone/web-renderer#428).
 const couldCarryWater = (dependencies: Dependencies, tile: Tile): boolean =>
   tile.isLand() &&
   !isCityTile(dependencies, tile) &&
-  !(tile.terrain() instanceof Hills) &&
+  !(
+    tile.terrain() instanceof Hills &&
+    hasImprovement(dependencies, tile, 'mine')
+  ) &&
   waterBeside(dependencies, tile) &&
   (irrigable(terrainTypeOf(tile)) ||
     (tile.terrain() instanceof Forest && !hasFeature(dependencies, tile)));
@@ -684,6 +714,55 @@ const conversionJobs = (
         },
       ];
     });
+};
+
+// Planting Forest (civ-clone/web-renderer#428): Grassland or Plains with no feature, no irrigation and no mine, that
+//  could never have water for irrigation, worked by a city with at least `PLANT_FOOD` food to spare and at most
+//  `PLANT_SHIELDS` shields. It trades a point of food for shields, which only pays a city with food to spare and few
+//  shields; and as a tile that can't be irrigated, it's never one a Forest would be cleared from again. A Road's trade
+//  is lost with it.
+const PLANT_FOOD = 3;
+const PLANT_SHIELDS = 2;
+
+const plantingJobs = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile,
+  city: City,
+  weights: Weights
+): TerrainJobValue[] => {
+  const surplus = surplusFor(dependencies, city);
+
+  if (
+    !(
+      tile.terrain() instanceof Grassland || tile.terrain() instanceof Plains
+    ) ||
+    surplus.food < PLANT_FOOD ||
+    surplus.shields > PLANT_SHIELDS ||
+    hasFeature(dependencies, tile) ||
+    hasImprovement(dependencies, tile, 'irrigation') ||
+    hasImprovement(dependencies, tile, 'mine') ||
+    couldHaveWater(dependencies, tile)
+  ) {
+    return [];
+  }
+
+  const gain = add(
+    add(baseYieldsOf(Forest), baseYieldsOf(terrainTypeOf(tile)), -1),
+    hasImprovement(dependencies, tile, 'road')
+      ? gainOf(dependencies, player, tile, 'road')
+      : {},
+    -1
+  );
+
+  return [
+    {
+      improvement: 'plantForest',
+      action: 'plantForest',
+      value: worth(gain, weights),
+      turns: terrainJobTurns(PlantForest, tile.terrain()) ?? 1,
+    },
+  ];
 };
 
 // Routes between the player's cities (civ-clone/web-renderer#384): each city is joined to its `ROUTE_LINKS` nearest
@@ -953,8 +1032,9 @@ const tilesCache: WeakMap<Player, [number, Tile[]]> = new WeakMap();
 //  Railroad advance, where they add food, shields or trade, weighed by what the city that works (or could work) the
 //  tile is short of, for a worker's turns of work. Irrigation comes first, the more so for a city short of food
 //  (civ-clone/web-renderer#383); Jungle, Swamp and Forest are cleared where that pays (civ-clone/web-renderer#353,
-//  #386); a tile that could carry water to a neighbour worth irrigating is worth part of that irrigation too
-//  (civ-clone/web-renderer#426); a square on a route between cities is worth a Road and a Railroad
+//  #386), and Forest planted where a city has food to spare and no water could reach (civ-clone/web-renderer#428); a
+//  tile that could carry water to a neighbour worth irrigating is worth part of that irrigation too, Hills with no mine
+//  among them (civ-clone/web-renderer#426, #428); a square on a route between cities is worth a Road and a Railroad
 //  (civ-clone/web-renderer#384), and once the player knows Railroad a Road is worth the Railroad it allows
 //  (civ-clone/web-renderer#385); and pollution is cleaned up (civ-clone/web-renderer#366).
 export const civ1TerrainPolicy: TerrainPolicy = {
@@ -1060,6 +1140,9 @@ export const civ1TerrainPolicy: TerrainPolicy = {
           };
         }),
       ...conversionJobs(dependencies, player, tile, weights, worked),
+      ...(worked
+        ? plantingJobs(dependencies, player, tile, city, weights)
+        : []),
       ...pollutionJobs(dependencies, player, tile, weights, factor),
     ].filter(({ value }: TerrainJobValue): boolean => value > 0);
   },

@@ -3,7 +3,12 @@ import {
   Monarchy,
   Republic,
 } from '@civ-clone/civ1-government/Governments';
-import { Forest, Grassland, Plains } from '@civ-clone/civ1-world/Terrains';
+import {
+  Forest,
+  Grassland,
+  Plains,
+  River,
+} from '@civ-clone/civ1-world/Terrains';
 import {
   Irrigation,
   Mine,
@@ -23,6 +28,7 @@ import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
 import Effect from '@civ-clone/core-rule/Effect';
 import PollutionConcern from '@civ-clone/base-leader-personality/Rules/Player/PollutionConcern';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
+import City from '@civ-clone/core-city/City';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
 import unitGame, { UnitGame, at } from './lib/unitGame';
 import Tile from '@civ-clone/core-world/Tile';
@@ -155,13 +161,14 @@ describe('TerrainWork', (): void => {
       'road:1/1',
     ]);
     // Hills: a mine adds two shields under Despotism, three under Monarchy. Irrigating or mining Hills takes 10 turns
-    //  in Civ1, counting the turn of the order, so 9 more.
+    //  in Civ1, counting the turn of the order, so 9 more. Irrigated, the Hills beside the sea would carry water on to
+    //  the dry Plains at 2,1, worth half what irrigating those is worth (civ-clone/web-renderer#428).
     expect(jobsAt(despotism, 3, 1)).to.deep.equal([
-      'irrigation:1.875/9',
+      'irrigation:2.8125/9',
       'mine:2.25/9',
     ]);
     expect(jobsAt(monarchy, 3, 1)).to.deep.equal([
-      'irrigation:1.5625/9',
+      'irrigation:2.34375/9',
       'mine:3.375/9',
     ]);
 
@@ -747,5 +754,94 @@ describe('TerrainWork', (): void => {
     expect(done.indexOf('mine@2,5')).to.be.above(
       done.indexOf('irrigation@2,1')
     );
+  });
+  it('should plant Forest on dry Grassland a city works, when the city has food to spare and few shields', async (): Promise<void> => {
+    // No water anywhere. Under Monarchy, a city at 3,2 has 3 food to spare and 1 shield; under Despotism, 2 food.
+    const rich = await unitGame('35G', 5, 7, Monarchy),
+      poor = await unitGame('35G', 5, 7, Despotism),
+      workedBy = (setup: UnitGame, city: City): Tile =>
+        setup.game.workedTiles
+          .getByCity(city)
+          .map((workedTile: WorkedTile): Tile => workedTile.tile())
+          .find((tile: Tile): boolean => tile !== city.tile())!;
+
+    keepFeatures(rich);
+    keepFeatures(poor);
+
+    const richCity = rich.addCity(3, 2, 1),
+      poorCity = poor.addCity(3, 2, 1),
+      worked = workedBy(rich, richCity),
+      unworked = rich.world
+        .entries()
+        .find(
+          (tile: Tile): boolean =>
+            tile !== worked &&
+            tile !== richCity.tile() &&
+            richCity.tiles().includes(tile)
+        )!;
+
+    // A point of food, worth 2 to a city with 3 to spare, for two shields, worth 2.25 each to a city with 1. Planting
+    //  Forest on Grassland takes 10 turns in Civ1, so 9 more.
+    expect(jobsAt(rich, worked.x(), worked.y())).to.include(
+      'plantForest:2.5/9'
+    );
+    // Not on a tile the city doesn't work, nor for a city with less food to spare.
+    expect(jobNamesAt(rich, unworked.x(), unworked.y())).not.to.include(
+      'plantForest'
+    );
+
+    const poorWorked = workedBy(poor, poorCity);
+
+    expect(jobNamesAt(poor, poorWorked.x(), poorWorked.y())).not.to.include(
+      'plantForest'
+    );
+
+    // Nor where water could reach: a River beside the tile.
+    const beside = worked
+      .getAdjacent()
+      .find((tile: Tile): boolean => tile !== richCity.tile())!;
+
+    beside.setTerrain(new River());
+    beside.clearYieldCache(rich.player);
+
+    expect(jobNamesAt(rich, worked.x(), worked.y())).not.to.include(
+      'plantForest'
+    );
+  });
+
+  it('should irrigate Hills beside the sea to carry water to dry tiles, and mine them once those are irrigated', async (): Promise<void> => {
+    // The only water any tile worth irrigating could have comes through the Hills at 1,1, beside the sea.
+    //   0123456
+    // 0 OMMMMMO
+    // 1 OHPPGMO
+    // 2 OMGGGMO
+    // 3 OMGGGMO
+    // 4 OMMMMMO
+    const map = ['O5MO', 'OHPPGMO', 'OM3GMO', 'OM3GMO', 'O5MO'].join(''),
+      setup = await unitGame(map, 5, 7, Monarchy);
+
+    keepFeatures(setup);
+
+    const city = setup.addCity(3, 2, 1),
+      done = doEveryJob(setup, setup.addUnit(Settlers, 3, 2, city));
+
+    expect(done.length).to.be.below(100);
+    expect(improvements(setup, setup.world.get(2, 1))).to.include('Irrigation');
+    expect(done.indexOf('irrigation@1,1')).to.be.above(-1);
+    expect(done.indexOf('irrigation@2,1')).to.be.above(
+      done.indexOf('irrigation@1,1')
+    );
+    expect(done.indexOf('mine@1,1')).to.be.above(
+      done.indexOf('irrigation@2,1')
+    );
+
+    // Hills already mined aren't irrigated to carry the water: the mine is worth more to the city.
+    const mined = await unitGame(map, 5, 7, Monarchy);
+
+    keepFeatures(mined);
+    mined.addCity(3, 2, 1);
+    build(mined, new Mine(mined.world.get(1, 1)));
+
+    expect(jobNamesAt(mined, 1, 1)).not.to.include('irrigation');
   });
 });
