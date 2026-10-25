@@ -3,12 +3,7 @@ import {
   Monarchy,
   Republic,
 } from '@civ-clone/civ1-government/Governments';
-import {
-  Forest,
-  Grassland,
-  Plains,
-  River,
-} from '@civ-clone/civ1-world/Terrains';
+import { Forest, Grassland, Plains } from '@civ-clone/civ1-world/Terrains';
 import {
   Irrigation,
   Mine,
@@ -28,7 +23,6 @@ import TerrainFeature from '@civ-clone/core-terrain-feature/TerrainFeature';
 import Effect from '@civ-clone/core-rule/Effect';
 import PollutionConcern from '@civ-clone/base-leader-personality/Rules/Player/PollutionConcern';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
-import City from '@civ-clone/core-city/City';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
 import unitGame, { UnitGame, at } from './lib/unitGame';
 import Tile from '@civ-clone/core-world/Tile';
@@ -755,58 +749,149 @@ describe('TerrainWork', (): void => {
       done.indexOf('irrigation@2,1')
     );
   });
+  // A city at 3,3 of `size` working only `worked` (as `x,y`) besides its own tile, on a 7×7 `map`, its features taken
+  //  away but those at `keep`. Under Monarchy, a city of 1 working plain Grassland has 3 food to spare and no shields.
+  const plantingGame = async (
+    map: string,
+    worked: string[],
+    keep: string[] = [],
+    size: number = 1
+  ): Promise<UnitGame> => {
+    const setup = await unitGame(map, 7, 7, Monarchy);
+
+    keepFeatures(setup, ...keep);
+
+    const city = setup.addCity(3, 3, size);
+
+    setup.game.workedTiles.unregister(
+      ...setup.game.workedTiles
+        .getByCity(city)
+        .filter(
+          (workedTile: WorkedTile): boolean => workedTile.tile() !== city.tile()
+        )
+    );
+    worked.forEach((xy: string): void => {
+      const [x, y] = xy.split(',').map(Number);
+
+      setup.game.workedTiles.register(
+        new WorkedTile(setup.world.get(x, y), city)
+      );
+    });
+
+    return setup;
+  };
+
+  // The Forest planting job on the tile at 1,3, if any.
+  const plantingAt = (setup: UnitGame): string | undefined =>
+    jobsAt(setup, 1, 3).find((job: string): boolean =>
+      job.startsWith('plantForest')
+    );
+
   it('should plant Forest on dry Grassland a city works, when the city has food to spare and few shields', async (): Promise<void> => {
-    // No water anywhere. Under Monarchy, a city at 3,2 has 3 food to spare and 1 shield; under Despotism, 2 food.
-    const rich = await unitGame('35G', 5, 7, Monarchy),
-      poor = await unitGame('35G', 5, 7, Despotism),
-      workedBy = (setup: UnitGame, city: City): Tile =>
-        setup.game.workedTiles
-          .getByCity(city)
-          .map((workedTile: WorkedTile): Tile => workedTile.tile())
-          .find((tile: Tile): boolean => tile !== city.tile())!;
-
-    keepFeatures(rich);
-    keepFeatures(poor);
-
-    const richCity = rich.addCity(3, 2, 1),
-      poorCity = poor.addCity(3, 2, 1),
-      worked = workedBy(rich, richCity),
-      unworked = rich.world
-        .entries()
-        .find(
-          (tile: Tile): boolean =>
-            tile !== worked &&
-            tile !== richCity.tile() &&
-            richCity.tiles().includes(tile)
-        )!;
-
-    // A point of food, worth 2 to a city with 3 to spare, for two shields, worth 2.25 each to a city with 1. Planting
+    // A point of food, worth 2 to a city with 3 to spare, for two shields, worth 2.25 each to a city with at most 1. Planting
     //  Forest on Grassland takes 10 turns in Civ1, so 9 more.
-    expect(jobsAt(rich, worked.x(), worked.y())).to.include(
+    expect(plantingAt(await plantingGame('49G', ['1,3']))).to.equal(
       'plantForest:2.5/9'
     );
-    // Not on a tile the city doesn't work, nor for a city with less food to spare.
-    expect(jobNamesAt(rich, unworked.x(), unworked.y())).not.to.include(
+
+    // Not on a tile the city doesn't work.
+    expect(plantingAt(await plantingGame('49G', ['5,3']))).to.be.undefined;
+
+    // Nor for a city with less food to spare: Despotism gives the city's own Grassland no more food for its irrigation.
+    const despotism = await unitGame('49G', 7, 7, Despotism);
+
+    keepFeatures(despotism);
+
+    const city = despotism.addCity(3, 3, 1),
+      [worked] = despotism.game.workedTiles
+        .getByCity(city)
+        .map((workedTile: WorkedTile): Tile => workedTile.tile())
+        .filter((tile: Tile): boolean => tile !== city.tile());
+
+    expect(jobNamesAt(despotism, worked.x(), worked.y())).not.to.include(
       'plantForest'
     );
 
-    const poorWorked = workedBy(poor, poorCity);
+    // Nor for a city with more than 2 shields: a city of 3 working Forest with Game and Grassland with a Shield as well
+    //  has 4 food to spare and 3 shields. With plain Grassland instead, 3 food and none.
+    expect(
+      plantingAt(
+        await plantingGame(
+          '25GFaGd22G',
+          ['1,3', '4,3', '5,3'],
+          ['4,3', '5,3'],
+          3
+        )
+      )
+    ).to.be.undefined;
+    expect(
+      plantingAt(await plantingGame('49G', ['1,3', '4,3', '5,3'], [], 3))
+    ).to.equal('plantForest:2.5/9');
 
-    expect(jobNamesAt(poor, poorWorked.x(), poorWorked.y())).not.to.include(
-      'plantForest'
+    // Nor on a square with a feature, irrigation or a mine.
+    expect(plantingAt(await plantingGame('22GGd26G', ['1,3'], ['1,3']))).to.be
+      .undefined;
+
+    for (const Improvement of [Irrigation, Mine]) {
+      const setup = await plantingGame('49G', ['1,3']);
+
+      build(setup, new (Improvement as any)(setup.world.get(1, 3)));
+
+      expect(plantingAt(setup)).to.be.undefined;
+    }
+  });
+
+  it("should count a Road's trade, and a Railroad's share, against planting Forest", async (): Promise<void> => {
+    // The Road's point of trade is lost: 2.5 - 1.
+    const road = await plantingGame('49G', ['1,3']);
+
+    build(road, new Road(road.world.get(1, 3)));
+
+    expect(plantingAt(road)).to.equal('plantForest:1.5/9');
+
+    // With a Railroad too, the square gives 3 food and 1 trade, the city 4 food to spare (each point worth 1.5): the
+    //  Forest would give 1 food and 3 shields. 2 food and the trade lost, 3 shields gained at 2.25: 2.75.
+    const railroad = await plantingGame('49G', ['1,3']);
+
+    build(
+      railroad,
+      new Road(railroad.world.get(1, 3)),
+      new Railroad(railroad.world.get(1, 3))
     );
 
-    // Nor where water could reach: a River beside the tile.
-    const beside = worked
-      .getAdjacent()
-      .find((tile: Tile): boolean => tile !== richCity.tile())!;
+    expect(plantingAt(railroad)).to.equal('plantForest:2.75/9');
+  });
 
-    beside.setTerrain(new River());
-    beside.clearYieldCache(rich.player);
+  it('should not plant Forest where the sea three squares off could be carried to the square', async (): Promise<void> => {
+    // The sea three squares north, past two squares of Grassland that could be irrigated in turn.
+    expect(plantingAt(await plantingGame('1G1O47G', ['1,3']))).to.be.undefined;
+  });
 
-    expect(jobNamesAt(rich, worked.x(), worked.y())).not.to.include(
-      'plantForest'
+  it('should not plant Forest beside a Jungle that could be cleared to carry water to it', async (): Promise<void> => {
+    // A Jungle north of the square with the sea north of it: cleared, it could be irrigated and carry the water on.
+    expect(plantingAt(await plantingGame('8G1O6G1J33G', ['1,3']))).to.be
+      .undefined;
+  });
+
+  it('should leave a point of food for each Forest already being planted for the city', async (): Promise<void> => {
+    // A city of 2 working two plain Grasslands: 3 food to spare.
+    const setup = await plantingGame('49G', ['1,3', '5,3'], [], 2);
+
+    expect(plantingAt(setup)).to.equal('plantForest:2.5/9');
+
+    // Another worker is planting Forest at 5,3: the city will have 2 food to spare once it's done.
+    const setupPlanting = await plantingGame('49G', ['1,3', '5,3'], [], 2);
+
+    terrainJobs(memoryRegistryInstance.memoryFor(setupPlanting.player)).set(
+      setupPlanting.addUnit(Settlers, 5, 3),
+      {
+        improvement: 'plantForest',
+        action: 'plantForest',
+        tile: setupPlanting.world.get(5, 3),
+      }
     );
+
+    expect(plantingAt(setupPlanting)).to.be.undefined;
   });
 
   it('should irrigate Hills beside the sea to carry water to dry tiles, and mine them once those are irrigated', async (): Promise<void> => {
@@ -835,13 +920,30 @@ describe('TerrainWork', (): void => {
       done.indexOf('irrigation@2,1')
     );
 
-    // Hills already mined aren't irrigated to carry the water: the mine is worth more to the city.
-    const mined = await unitGame(map, 5, 7, Monarchy);
+    // Hills outside the city's tiles, which only carrying the water would make worth irrigating, are sent a worker for
+    //  it while they have no mine, and not once they have one.
+    const outside = async (mine: boolean): Promise<UnitGame> => {
+      const setup = await unitGame(map, 5, 7, Monarchy);
 
-    keepFeatures(mined);
-    mined.addCity(3, 2, 1);
-    build(mined, new Mine(mined.world.get(1, 1)));
+      keepFeatures(setup);
+      setup.addCity(4, 2, 1);
 
-    expect(jobNamesAt(mined, 1, 1)).not.to.include('irrigation');
+      if (mine) {
+        build(setup, new Mine(setup.world.get(1, 1)));
+      }
+
+      return setup;
+    };
+    const unmined = await outside(false),
+      mined = await outside(true),
+      offered = (setup: UnitGame): boolean =>
+        civ1TerrainPolicy.tiles!(setup.dependencies, setup.player).includes(
+          setup.world.get(1, 1)
+        );
+
+    expect(offered(unmined)).true;
+    expect(jobNamesAt(unmined, 1, 1)).to.include('irrigation');
+    expect(offered(mined)).false;
+    expect(jobsAt(mined, 1, 1)).to.deep.equal([]);
   });
 });

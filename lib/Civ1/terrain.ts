@@ -21,8 +21,10 @@ import {
 } from '@civ-clone/civ1-government/Governments';
 import { Food, Production, Trade } from '@civ-clone/civ1-world/Yields';
 import {
+  TerrainJob,
   TerrainJobValue,
   TerrainPolicy,
+  terrainJobs,
 } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import { Game, Oasis } from '@civ-clone/civ1-world/TerrainFeatures';
 import {
@@ -716,13 +718,45 @@ const conversionJobs = (
     });
 };
 
-// Planting Forest (civ-clone/web-renderer#428): Grassland or Plains with no feature, no irrigation and no mine, that
-//  could never have water for irrigation, worked by a city with at least `PLANT_FOOD` food to spare and at most
-//  `PLANT_SHIELDS` shields. It trades a point of food for shields, which only pays a city with food to spare and few
-//  shields; and as a tile that can't be irrigated, it's never one a Forest would be cleared from again. A Road's trade
-//  is lost with it.
+// Planting Forest (civ-clone/web-renderer#428): Grassland or Plains with no feature, no irrigation and no mine, and no
+//  water near it (`waterNear`), worked by a city with at least `PLANT_FOOD` food to spare and at most `PLANT_SHIELDS`
+//  shields. It trades a point of food for shields, which only pays a city with food to spare and few shields.
 const PLANT_FOOD = 3;
 const PLANT_SHIELDS = 2;
+
+// Whether a source of water for irrigation (a River, the sea, or irrigation on a square with no city) is within
+//  `WATER_NEAR` squares of `tile`. Water that close could reach the square later, through one or two squares between
+//  irrigated (or a Jungle or Swamp cleared and irrigated), and a Forest with water beside it is one `clearForest` could
+//  clear again. Water further off would need three or more squares irrigated for their own worth first, which is rare
+//  enough to leave.
+const WATER_NEAR = 3;
+
+const waterNear = (dependencies: Dependencies, tile: Tile): boolean =>
+  surroundingArea(tile, WATER_NEAR).some(
+    (near: Tile): boolean =>
+      near.terrain() instanceof River ||
+      near.isWater() ||
+      (hasImprovement(dependencies, near, 'irrigation') &&
+        !isCityTile(dependencies, near))
+  );
+
+// How many of the player's workers are planting Forest, or are on their way to, on `city`'s worked tiles other than
+//  `tile`: each will take a point of food from the city and add a shield or more, which this turn's surplus doesn't
+//  show yet.
+const plantingsFor = (
+  dependencies: Dependencies,
+  player: Player,
+  city: City,
+  tile: Tile
+): number =>
+  [
+    ...terrainJobs(dependencies.memoryRegistry.memoryFor(player)).values(),
+  ].filter(
+    (job: TerrainJob): boolean =>
+      job.improvement === 'plantForest' &&
+      job.tile !== tile &&
+      dependencies.workedTileRegistry.getByTile(job.tile)?.city() === city
+  ).length;
 
 const plantingJobs = (
   dependencies: Dependencies,
@@ -731,29 +765,46 @@ const plantingJobs = (
   city: City,
   weights: Weights
 ): TerrainJobValue[] => {
-  const surplus = surplusFor(dependencies, city);
-
   if (
     !(
       tile.terrain() instanceof Grassland || tile.terrain() instanceof Plains
     ) ||
-    surplus.food < PLANT_FOOD ||
-    surplus.shields > PLANT_SHIELDS ||
+    isCityTile(dependencies, tile) ||
     hasFeature(dependencies, tile) ||
     hasImprovement(dependencies, tile, 'irrigation') ||
     hasImprovement(dependencies, tile, 'mine') ||
-    couldHaveWater(dependencies, tile)
+    waterNear(dependencies, tile)
   ) {
     return [];
   }
 
-  const gain = add(
-    add(baseYieldsOf(Forest), baseYieldsOf(terrainTypeOf(tile)), -1),
-    hasImprovement(dependencies, tile, 'road')
-      ? gainOf(dependencies, player, tile, 'road')
-      : {},
-    -1
-  );
+  const surplus = surplusFor(dependencies, city),
+    planting = plantingsFor(dependencies, player, city, tile);
+
+  if (
+    surplus.food - planting < PLANT_FOOD ||
+    surplus.shields + planting > PLANT_SHIELDS
+  ) {
+    return [];
+  }
+
+  // What the square yields now, against what the Forest would: its own yields, and half of each again with a Railroad
+  //  (as `railroadGain`). A Road's trade is lost, as Forest has none to add to.
+  const [food, shields, trade] = reduceYields(
+      tile.yields(player),
+      Food,
+      Production,
+      Trade
+    ),
+    forest = baseYieldsOf(Forest),
+    railroad = hasImprovement(dependencies, tile, 'railroad'),
+    withRailroad = (value: number = 0): number =>
+      value + (railroad ? Math.floor(value / 2) : 0),
+    gain = {
+      food: withRailroad(forest.food) - food,
+      shields: withRailroad(forest.shields) - shields,
+      trade: withRailroad(forest.trade) - trade,
+    };
 
   return [
     {
@@ -1032,7 +1083,7 @@ const tilesCache: WeakMap<Player, [number, Tile[]]> = new WeakMap();
 //  Railroad advance, where they add food, shields or trade, weighed by what the city that works (or could work) the
 //  tile is short of, for a worker's turns of work. Irrigation comes first, the more so for a city short of food
 //  (civ-clone/web-renderer#383); Jungle, Swamp and Forest are cleared where that pays (civ-clone/web-renderer#353,
-//  #386), and Forest planted where a city has food to spare and no water could reach (civ-clone/web-renderer#428); a
+//  #386), and Forest planted where a city has food to spare and no water is near (civ-clone/web-renderer#428); a
 //  tile that could carry water to a neighbour worth irrigating is worth part of that irrigation too, Hills with no mine
 //  among them (civ-clone/web-renderer#426, #428); a square on a route between cities is worth a Road and a Railroad
 //  (civ-clone/web-renderer#384), and once the player knows Railroad a Road is worth the Railroad it allows
