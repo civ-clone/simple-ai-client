@@ -36,6 +36,14 @@ export const TOO_FAR = 8;
 export const LANDING_DISTANCE = 8;
 // How near a friendly unit the leader walks to.
 export const LEADER_FOLLOWS = 4;
+// A leader with nobody to follow gives up once he is `(turn % LEADER_GIVES_UP_EVERY) + LEADER_GIVES_UP_FROM` or more
+//  from the nearest city (v474.05 `AIEngine.cs`, civ-clone/web-renderer#171): further from cities, the sooner.
+export const LEADER_GIVES_UP_EVERY = 8;
+export const LEADER_GIVES_UP_FROM = 4;
+
+export const leaderGivesUp = (turn: number, fromCity: number | null): boolean =>
+  fromCity === null ||
+  (turn % LEADER_GIVES_UP_EVERY) + LEADER_GIVES_UP_FROM <= fromCity;
 
 const STEP_LIMIT = 50;
 
@@ -287,8 +295,8 @@ const holdCity = (
 
 /**
  * The leader (the group's Diplomat): he stays with a stack, and otherwise walks to a friendly unit within 4 squares,
- * stopping when he reaches it. What becomes of him when he's stranded, and when he enters a city, is
- * civ-clone/web-renderer#171.
+ * stopping when he reaches it. With nobody to walk to he waits, until he is far enough from any city to give up
+ * (civ-clone/web-renderer#171). He never enters a city.
  */
 export const leader = (
   dependencies: Dependencies,
@@ -325,6 +333,20 @@ export const leader = (
     )[0];
 
   if (!friend) {
+    const city = nearestCity(unit.tile(), liveCities(dependencies));
+
+    // Stranded: disbanded, so no ransom is paid for him.
+    if (
+      leaderGivesUp(
+        dependencies.turn.value(),
+        city === null ? null : unit.tile().distanceFrom(city.tile())
+      )
+    ) {
+      unit.destroy();
+
+      return;
+    }
+
     standDown(dependencies, unit);
 
     return;
