@@ -14,6 +14,7 @@ import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
 import { StrategyRegistry } from '@civ-clone/core-strategy/StrategyRegistry';
 import { dependenciesFor } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { expect } from 'chai';
+import { leaderGivesUp } from '../lib/Barbarian/raid';
 import unitYields from '@civ-clone/civ1-unit/Rules/Unit/yield';
 import Player from '@civ-clone/core-player/Player';
 
@@ -73,5 +74,23 @@ describe('BuildRaiders', (): void => {
 
   it('leaves improvements alone', (): void => {
     expect(chosen([item(class Granary {}, 60)])).to.be.undefined;
+  });
+});
+
+describe('a stranded leader', (): void => {
+  it('gives up (turn % 8) + 4 or more from the nearest city', (): void => {
+    expect([0, 3, 4, 7, 8].map((turn) => leaderGivesUp(turn, 6))).to.eql([
+      true,
+      false,
+      false,
+      false,
+      true,
+    ]);
+    expect(leaderGivesUp(7, 11)).to.be.true;
+    expect(leaderGivesUp(7, 10.9)).to.be.false;
+  });
+
+  it('gives up with no city left to go to', (): void => {
+    expect(leaderGivesUp(0, null)).to.be.true;
   });
 });

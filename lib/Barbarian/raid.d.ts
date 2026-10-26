@@ -10,6 +10,12 @@ export declare const STRANDED_EVERY = 4;
 export declare const TOO_FAR = 8;
 export declare const LANDING_DISTANCE = 8;
 export declare const LEADER_FOLLOWS = 4;
+export declare const LEADER_GIVES_UP_EVERY = 8;
+export declare const LEADER_GIVES_UP_FROM = 4;
+export declare const leaderGivesUp: (
+  turn: number,
+  fromCity: number | null
+) => boolean;
 export declare const liveCities: (dependencies: Dependencies) => City[];
 export declare const nearestCity: (tile: Tile, cities: City[]) => City | null;
 export type Step = {
@@ -31,8 +37,8 @@ export declare const bestStep: (
 ) => Step | null;
 /**
  * The leader (the group's Diplomat): he stays with a stack, and otherwise walks to a friendly unit within 4 squares,
- * stopping when he reaches it. What becomes of him when he's stranded, and when he enters a city, is
- * civ-clone/web-renderer#171.
+ * stopping when he reaches it. With nobody to walk to he waits, until he is far enough from any city to give up
+ * (civ-clone/web-renderer#171). He never enters a city.
  */
 export declare const leader: (
   dependencies: Dependencies,
