@@ -985,12 +985,8 @@ describe('SimpleAIClient', (): void => {
     ),
     ...worldTileImprovementBuilt(tileImprovementRegistry),
     ...worldTileImprovementPillaged(tileImprovementRegistry),
-    ...worldTileYield(
-      tileImprovementRegistry,
-      terrainFeatureRegistry,
-      playerGovernmentRegistry
-    ),
-    ...worldTileYieldModifier(tileImprovementRegistry)
+    ...worldTileYield(tileImprovementRegistry, terrainFeatureRegistry),
+    ...worldTileYieldModifier(tileImprovementRegistry, playerGovernmentRegistry)
   );
 
   registerCityNames(cityNameRegistry);

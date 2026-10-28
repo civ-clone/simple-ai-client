@@ -182,7 +182,7 @@ describe('TerrainWork', (): void => {
     expect(jobsAt(despotism, 3, 1)).to.deep.equal(['mine:0.75/9']);
   });
 
-  it('should value a railroad on a road once the player has the Railroad advance, by half of each yield', async (): Promise<void> => {
+  it('should value a railroad on a road once the player has the Railroad advance, by half of each yield before Despotism takes its 1', async (): Promise<void> => {
     const setup = await unitGame(MAP, 3, 5, Despotism);
 
     setup.addCity(1, 1, 1);
@@ -199,17 +199,17 @@ describe('TerrainWork', (): void => {
       .getByPlayer(setup.player)
       .addAdvance(RailroadAdvance);
 
-    // Grassland with a road: 2 food, 1 trade, so a railroad adds 1 food, to a city with at most 1 to spare. Unworked:
-    //  worth half. A railroad takes 4 turns on Grassland in Civ1, counting the turn of the order, so 3 more.
-    expect(jobsAt(setup, 0, 1)).to.deep.equal(['railroad:1.5/3']);
+    // Grassland with a road: 2 food, 1 trade. A railroad makes the food 3, which Despotism takes back to 2
+    //  (civ-clone/web-renderer#401), so it adds nothing.
+    expect(jobsAt(setup, 0, 1)).to.deep.equal([]);
     // The worked Plains with a road: 1 food, 1 shield, 1 trade, so a railroad adds nothing.
     expect(jobsAt(setup, 2, 0)).to.deep.equal(['irrigation:3.75/4']);
-    // No road, no railroad yet: but a road is now worth the railroad it allows (civ-clone/web-renderer#385), 1 food
-    //  more on Grassland, for the turns of both.
-    expect(jobsAt(setup, 1, 0)).to.deep.equal(['road:2/4']);
+    // No road, no railroad yet: a road is worth the railroad it allows too (civ-clone/web-renderer#385), but on
+    //  Grassland under Despotism that's nothing, so only its trade, unworked: worth half.
+    expect(jobsAt(setup, 1, 0)).to.deep.equal(['road:0.5/1']);
 
-    // Hills with a mine and a road: 1 food, 2 shields, so a railroad adds 1 shield, to a city with at most 1 to
-    //  spare. A railroad takes 8 turns on Hills in Civ1, so 7 more.
+    // Hills with a mine and a road: 1 food, 3 shields, 2 under Despotism. A railroad makes them 4, 3 under Despotism,
+    //  so it adds 1 shield, to a city with at most 1 to spare. A railroad takes 8 turns on Hills in Civ1, so 7 more.
     build(
       setup,
       new Mine(setup.world.get(3, 1)),
@@ -219,7 +219,7 @@ describe('TerrainWork', (): void => {
     expect(jobsAt(setup, 3, 1)).to.deep.equal(['railroad:1.125/7']);
   });
 
-  it('should value the trade a railroad adds', async (): Promise<void> => {
+  it("should value a railroad by the trade it adds before the Republic's bonus", async (): Promise<void> => {
     const setup = await unitGame(MAP, 3, 5, Republic);
 
     setup.addCity(1, 1, 1);
@@ -228,15 +228,18 @@ describe('TerrainWork', (): void => {
       .getByPlayer(setup.player)
       .addAdvance(RailroadAdvance);
 
-    // Grassland with a road under the Republic: 2 food, 2 trade, so a railroad adds 1 food and 1 trade.
+    // Grassland with a road under the Republic: 2 food, 1 trade and the Republic's 1. A railroad adds half of each
+    //  before that bonus (civ-clone/web-renderer#401): 1 food, and no trade, as half of 1 rounds down.
     expect(jobsAt(setup, 0, 1)).to.deep.equal([
       'irrigation:1.5625/4',
-      'railroad:1.75/3',
+      'railroad:1.25/3',
     ]);
   });
 
   it('should have Settlers build a railroad on a road once the player has the Railroad advance', async (): Promise<void> => {
-    // Grassland everywhere, roads already built, and no water for irrigation: a railroad is the only job left.
+    // Grassland everywhere, irrigated and with roads already: a railroad is the only job left.
+    // Irrigated: under Despotism, a railroad would give plain Grassland's 2 food a third that it loses again
+    //  (civ-clone/web-renderer#401), but irrigated Grassland's 3 (2 under Despotism) becomes 4 (3).
     const setup = await unitGame('15G', 3, 5, Despotism),
       city = setup.addCity(2, 1, 1),
       settlers = setup.addUnit(Settlers, 0, 0, city);
@@ -244,9 +247,13 @@ describe('TerrainWork', (): void => {
     setup.world
       .entries()
       .filter((tile: Tile): boolean => tile !== city.tile())
-      .forEach((tile: Tile): void =>
-        setup.game.tileImprovements.register(new Road(tile))
-      );
+      .forEach((tile: Tile): void => {
+        setup.game.tileImprovements.register(
+          new Irrigation(tile),
+          new Road(tile)
+        );
+        tile.clearYieldCache(setup.player);
+      });
 
     setup.game.playerResearch
       .getByPlayer(setup.player)
