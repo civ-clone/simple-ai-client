@@ -695,7 +695,7 @@ describe('TerrainWork', (): void => {
     expect(done).not.to.include('plantForest@1,1');
   });
 
-  it('should carry water to the Desert Oasis on the map from #426, irrigating Hills for a while', async (): Promise<void> => {
+  it('should carry water to the Desert Oasis on the map from #426, from the Forest it clears beside the sea', async (): Promise<void> => {
     // The map from civ-clone/web-renderer#426, with its city at 3,3. The Desert Oasis at 2,1 has no water beside it.
     //   0123456
     // 0 OOTTTOO
@@ -739,14 +739,17 @@ describe('TerrainWork', (): void => {
 
     expect(done.length).to.be.below(100);
     expect(improvements(setup, setup.world.get(2, 1))).to.include('Irrigation');
-    // The Hills at 2,5 beside the sea are irrigated for their own food, the water is carried on from them, and they're
-    //  mined once nothing needs it.
-    expect(done.indexOf('irrigation@2,5')).to.be.above(-1);
-    expect(done.indexOf('irrigation@2,1')).to.be.above(
-      done.indexOf('irrigation@2,5')
+    // The city works the Oasis (3 food) rather than the Coal Hills at 2,5 (2 shields, as v474.05 has them,
+    //  civ-clone/web-renderer#401), so it's short of shields and the Hills are mined first. The water comes from the
+    //  Forest at 1,1 beside the sea, cleared and irrigated. 'should irrigate Hills beside the sea…' covers carrying
+    //  water on through Hills.
+    expect(done.indexOf('mine@2,5')).to.be.above(-1);
+    expect(done.indexOf('irrigation@2,5')).to.equal(-1);
+    expect(done.indexOf('irrigation@1,1')).to.be.above(
+      done.indexOf('clearForest@1,1')
     );
-    expect(done.indexOf('mine@2,5')).to.be.above(
-      done.indexOf('irrigation@2,1')
+    expect(done.indexOf('irrigation@2,1')).to.be.above(
+      done.indexOf('irrigation@1,1')
     );
   });
   // A city at 3,3 of `size` working only `worked` (as `x,y`) besides its own tile, on a 7×7 `map`, its features taken
