@@ -63,7 +63,13 @@ import {
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import { Railroad as RailroadAdvance } from '@civ-clone/civ1-science/Advances';
 import UnitAction from '@civ-clone/core-unit/Action';
-import Yield from '@civ-clone/core-yield/Yield';
+import Yield, { YieldValue } from '@civ-clone/core-yield/Yield';
+import {
+  DESPOTISM_PENALTY,
+  TRADE_BONUS,
+  governmentTileYield,
+} from '@civ-clone/civ1-world/lib/governmentTileYield';
+import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
 import {
   terrainJobTurns,
   terrainMovementCost,
@@ -415,20 +421,56 @@ const worth = (gain: Gain, weights: Weights): number =>
   (gain.shields ?? 0) * weights.shields +
   (gain.trade ?? 0) * weights.trade;
 
-// What a railroad adds to `tile` for `player`: half of each of its yields, rounded down, as `civ1-world`'s
-//  `YieldModifier` rules and v474.05 have it.
-const railroadGain = (player: Player, tile: Tile): Gain => {
-  const [food, shields, trade] = reduceYields(
-    tile.yields(player),
-    Food,
-    Production,
-    Trade
-  );
+// The providers of what the government and pollution did to a square (`civ1-world`), left out to find what it
+//  yielded before them.
+const governmentSteps = [DESPOTISM_PENALTY, TRADE_BONUS, Pollution.name];
+
+// What a railroad adds to `tile` for `player`, as `civ1-world`'s `YieldModifier` rules and v474.05 have it: half of
+//  each yield as it is before the government's steps, rounded down, then those steps and pollution again
+//  (civ-clone/web-renderer#401). Under Despotism, a square of 2 gains nothing: its 3 loses 1.
+const railroadGain = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile
+): Gain => {
+  let government: PlayerGovernment | null = null;
+
+  try {
+    government = dependencies.playerGovernmentRegistry.getByPlayer(player);
+  } catch (e) {
+    government = null;
+  }
+
+  const tileYields = tile.yields(player),
+    polluted = isPolluted(dependencies, tile),
+    gainOfType = (YieldType: typeof Yield): number => {
+      const ofType = tileYields.filter(
+          (tileYield: Yield): boolean => tileYield instanceof YieldType
+        ),
+        current = reduceYield(ofType, YieldType),
+        before = ofType
+          .flatMap((tileYield: Yield) => tileYield.values())
+          .filter(
+            ([, provider]: YieldValue): boolean =>
+              !governmentSteps.includes(provider)
+          )
+          .reduce(
+            (total: number, [value]: YieldValue): number => total + value,
+            0
+          ),
+        withRailroad = governmentTileYield(
+          YieldType,
+          before + Math.floor(before / 2),
+          government
+        );
+
+      return (polluted ? Math.ceil(withRailroad / 2) : withRailroad) - current;
+    };
 
   return {
-    food: Math.floor(food / 2),
-    shields: Math.floor(shields / 2),
-    trade: Math.floor(trade / 2),
+    food: gainOfType(Food),
+    shields: gainOfType(Production),
+    trade: gainOfType(Trade),
   };
 };
 
@@ -470,7 +512,7 @@ const gainOf = (
   improvement: Improvement
 ): Gain =>
   improvement === 'railroad'
-    ? railroadGain(player, tile)
+    ? railroadGain(dependencies, player, tile)
     : gainOn(dependencies, player, terrainTypeOf(tile), improvement);
 
 // Whether the player has the Railroad advance.
@@ -1173,7 +1215,8 @@ export const civ1TerrainPolicy: TerrainPolicy = {
             // A Road is worth the Railroad it allows, once the player knows how, for the turns of both.
             railroad =
               improvement === 'road' && knowsRailroad(dependencies, player)
-                ? factor * worth(railroadGain(player, tile), weights)
+                ? factor *
+                  worth(railroadGain(dependencies, player, tile), weights)
                 : 0;
 
           return {
