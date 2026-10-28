@@ -247,9 +247,13 @@ export const shouldRoad = (
   );
 };
 
-// What each improvement adds to a tile's yields in Civ1, by terrain, as `civ1-world`'s `Yield` rules have it: under any
-//  government, and the extra under Monarchy, Communism, the Republic or Democracy (`advanced`), or under the Republic
-//  or Democracy only (`republic`). Under Despotism, an irrigated Grassland or River tile gives no more food.
+// What each improvement adds to a tile's yields in Civ1, by terrain, under any government, and the extra under
+//  Monarchy, Communism, the Republic or Democracy (`advanced`), or under the Republic or Democracy only (`republic`).
+//  v474.05 adds the same to a tile under every government, then takes 1 off a yield of more than 2 under Anarchy and
+//  Despotism and adds 1 to any trade under the Republic and Democracy (`civ1-world`'s `lib/governmentTileYield`,
+//  civ-clone/web-renderer#401). On a tile without a special resource that comes to this: irrigated Grassland or River
+//  gives no more food under Despotism, a mined Hills 2 shields more rather than 3, and a road 2 trade under the
+//  Republic.
 type Gain = { food?: number; shields?: number; trade?: number };
 
 type Improvement = 'irrigation' | 'mine' | 'railroad' | 'road';
@@ -261,9 +265,9 @@ const gains: [Improvement, typeof Terrain, Gain, Gain, Gain][] = [
   ['irrigation', Hills, { food: 1 }, {}, {}],
   ['irrigation', Plains, { food: 1 }, {}, {}],
   ['irrigation', River, {}, { food: 1 }, {}],
-  ['mine', Desert, { shields: 1 }, { shields: 1 }, {}],
+  ['mine', Desert, { shields: 1 }, {}, {}],
   ['mine', Hills, { shields: 2 }, { shields: 1 }, {}],
-  ['mine', Mountains, { shields: 1 }, { shields: 1 }, {}],
+  ['mine', Mountains, { shields: 1 }, {}, {}],
   ['road', Desert, { trade: 1 }, {}, { trade: 1 }],
   ['road', Grassland, { trade: 1 }, {}, { trade: 1 }],
   ['road', Plains, { trade: 1 }, {}, { trade: 1 }],
