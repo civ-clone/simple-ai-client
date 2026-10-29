@@ -281,7 +281,6 @@ import spaceshipChooseSlot from '@civ-clone/civ1-spaceship/Rules/Spaceship/choos
 import spaceshipCityBuild from '@civ-clone/civ1-spaceship/Rules/City/build';
 import spaceshipCityBuildCost from '@civ-clone/civ1-spaceship/Rules/City/build-cost';
 import spaceshipCityBuildingComplete from '@civ-clone/civ1-spaceship/Rules/City/building-complete';
-import spaceshipCitySpend from '@civ-clone/civ1-spaceship/Rules/City/spend';
 import spaceshipFlightTime from '@civ-clone/civ1-spaceship/Rules/Spaceship/flight-time';
 import spaceshipLanded from '@civ-clone/civ1-spaceship/Rules/Spaceship/landed';
 import spaceshipLost from '@civ-clone/civ1-spaceship/Rules/Spaceship/lost';
@@ -832,7 +831,6 @@ describe('SimpleAIClient', (): void => {
       turn,
       year
     ),
-    ...spaceshipCitySpend(),
     ...spaceshipFlightTime(),
     ...spaceshipLanded(),
     ...spaceshipLost(
