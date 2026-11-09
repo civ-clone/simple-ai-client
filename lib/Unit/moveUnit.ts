@@ -7,7 +7,7 @@ import {
   IndustrialSabotage,
   InciteRevolt,
   InvestigateCity,
-  MeetWithKing,
+  MeetWithLeader,
   Move,
   Overruled,
 } from '@civ-clone/library-unit/Actions';
@@ -39,7 +39,7 @@ export const actionsToTake = (actions: Action[]): Action[] =>
         action instanceof InvestigateCity ||
         action instanceof IndustrialSabotage ||
         action instanceof InciteRevolt ||
-        action instanceof MeetWithKing ||
+        action instanceof MeetWithLeader ||
         action instanceof BribeUnit ||
         action instanceof AbortMove ||
         action instanceof Overruled
