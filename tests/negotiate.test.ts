@@ -1,8 +1,15 @@
+import { ChoiceMeta } from '@civ-clone/core-client/ChoiceMeta';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { IAction } from '@civ-clone/core-diplomacy/Negotiation/Action';
 import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
 import Player from '@civ-clone/core-player/Player';
 import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
-import { choosers } from '../lib/Diplomacy/negotiate';
+import Terminate from '@civ-clone/core-diplomacy/Negotiation/Terminate';
+import {
+  MOST_UNANSWERED,
+  choosers,
+  handleNegotiation,
+} from '../lib/Diplomacy/negotiate';
 import { expect } from 'chai';
 
 // By identity: a failed deep comparison of two players would print the whole game.
@@ -46,5 +53,58 @@ describe('choosers (civ-clone/web-renderer#450)', (): void => {
     const { human, negotiation, steps } = setUp(null);
 
     expect(only(choosers(negotiation, steps('computer', 'human')), human)).true;
+  });
+});
+
+describe('handleNegotiation (civ-clone/web-renderer#877)', (): void => {
+  // A meeting under no rules at all, so the only step ever on offer is leaving, with a client for both players that
+  //  answers the `answers`th time it's asked and with nothing before that.
+  const meet = async (answers: number) => {
+    const ruleRegistry = new RuleRegistry(),
+      player = new Player(ruleRegistry),
+      other = new Player(ruleRegistry),
+      registered: unknown[] = [];
+
+    let asked = 0;
+
+    const negotiation = await handleNegotiation(
+      {
+        ruleRegistry,
+        clientRegistry: {
+          getByPlayer: () => ({
+            chooseFromList: async (
+              meta: ChoiceMeta<'negotiation.next-step'>
+            ): Promise<IAction | undefined> =>
+              ++asked >= answers ? meta.choices()[0].value() : undefined,
+          }),
+        },
+        interactionRegistry: {
+          register: (interaction: unknown) => registered.push(interaction),
+        },
+      } as unknown as Dependencies,
+      player,
+      other
+    );
+
+    return { asked, negotiation, player, registered };
+  };
+
+  it('ends a negotiation no one answers, rather than asking for ever', async (): Promise<void> => {
+    const { asked, negotiation, player, registered } = await meet(Infinity);
+
+    expect(asked).equal(MOST_UNANSWERED);
+    expect(negotiation.terminated()).true;
+    expect(negotiation.lastInteraction()).instanceof(Terminate);
+    expect(negotiation.lastInteraction()!.by() === player).true;
+    expect(registered.length).equal(1);
+  });
+
+  it('goes on asking a player who has only been slow, and takes the answer', async (): Promise<void> => {
+    const { asked, negotiation } = await meet(MOST_UNANSWERED - 1);
+
+    expect(asked).equal(MOST_UNANSWERED - 1);
+    expect(negotiation.terminated()).true;
+    // Initiate, then the one answer: nothing was ended for them.
+    expect(negotiation.interactions().length).equal(2);
   });
 });

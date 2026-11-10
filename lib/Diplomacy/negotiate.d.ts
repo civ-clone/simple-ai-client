@@ -8,6 +8,8 @@ declare global {
     'negotiation.next-step': IAction;
   }
 }
+export declare const ANSWER_TIMEOUT = 500;
+export declare const MOST_UNANSWERED = 5;
 export declare const choosers: (
   negotiation: Negotiation,
   offered: IAction[]
