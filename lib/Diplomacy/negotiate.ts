@@ -128,9 +128,19 @@ export const handleNegotiation = async (
       negotiation.interactions().length === said ? unanswered + 1 : 0;
 
     if (unanswered >= MOST_UNANSWERED) {
-      negotiation.proceed(
-        new Terminate(player, negotiation, dependencies.ruleRegistry) as IAction
-      );
+      // A rule that throws on the ending is reported as one that throws on an answer is: the negotiation has ended
+      //  by then, as the step is recorded before the rules hear of it.
+      try {
+        negotiation.proceed(
+          new Terminate(
+            player,
+            negotiation,
+            dependencies.ruleRegistry
+          ) as IAction
+        );
+      } catch (reason) {
+        console.error(reason);
+      }
     }
   }
 
