@@ -4,6 +4,7 @@ import {
 } from '@civ-clone/core-client/ChoiceMeta';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
+export declare const MOST_NEGOTIATION_STEPS = 100;
 export declare const chooseNegotiationStep: <
   Name extends keyof ChoiceMetaDataMap
 >(
