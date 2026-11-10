@@ -8,6 +8,7 @@ import Initiate from '@civ-clone/core-diplomacy/Negotiation/Initiate';
 import Negotiation from '@civ-clone/core-diplomacy/Negotiation';
 import Player from '@civ-clone/core-player/Player';
 import Resolution from '@civ-clone/core-diplomacy/Proposal/Resolution';
+import Terminate from '@civ-clone/core-diplomacy/Negotiation/Terminate';
 import Unit from '@civ-clone/core-unit/Unit';
 import mayNegotiate from '@civ-clone/library-diplomacy/lib/mayNegotiate';
 
@@ -21,6 +22,15 @@ const awaitTimeout = (delay: number, reason?: any) =>
   new Promise<void>((resolve, reject) =>
     setTimeout(() => (reason === undefined ? resolve() : reject(reason)), delay)
   );
+
+// How long a computer player is given to answer a step.
+export const ANSWER_TIMEOUT = 500;
+
+// The times in a row everyone asked may say nothing (a computer player that didn't answer in time, or answered with
+//  nothing) before the negotiation is ended for them: asked again without end, one that never answers would hold its
+//  player's turn, and so the game, for ever (civ-clone/web-renderer#877). A person is waited for however long they
+//  take, so this never ends a meeting they are thinking about.
+export const MOST_UNANSWERED = 5;
 
 // Who chooses the next step of `negotiation` from `offered`: the player whose steps they are, or, when they're more
 //  than one player's, whoever the last interaction was for. Usually those are the same, but not always: after the
@@ -53,7 +63,11 @@ export const handleNegotiation = async (
     new Initiate(player, negotiation, dependencies.ruleRegistry) as IAction
   );
 
+  let unanswered = 0;
+
   while (!negotiation.terminated()) {
+    const said = negotiation.interactions().length;
+
     // The steps on offer, worked out once for the first player asked: each call makes new actions.
     let offered: IAction[] | null = negotiation.nextSteps();
 
@@ -75,7 +89,7 @@ export const handleNegotiation = async (
                 ),
                 client instanceof AIClient
                   ? awaitTimeout(
-                      500,
+                      ANSWER_TIMEOUT,
                       new Error(
                         `Timeout waiting for ${client.player().id()} (${
                           client.player().civilization().sourceClass().name
@@ -108,6 +122,25 @@ export const handleNegotiation = async (
 
     if (negotiation.terminated()) {
       break;
+    }
+
+    unanswered =
+      negotiation.interactions().length === said ? unanswered + 1 : 0;
+
+    if (unanswered >= MOST_UNANSWERED) {
+      // A rule that throws on the ending is reported as one that throws on an answer is: the negotiation has ended
+      //  by then, as the step is recorded before the rules hear of it.
+      try {
+        negotiation.proceed(
+          new Terminate(
+            player,
+            negotiation,
+            dependencies.ruleRegistry
+          ) as IAction
+        );
+      } catch (reason) {
+        console.error(reason);
+      }
     }
   }
 

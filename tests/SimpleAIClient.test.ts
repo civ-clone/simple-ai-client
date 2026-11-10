@@ -859,7 +859,8 @@ describe('SimpleAIClient', (): void => {
       ruleRegistry,
       cityImprovementRegistry
     ),
-    ...treasuryCitySpend(ruleRegistry),
+    // With no arguments: it took a rule registry it never used, and no longer does (civ-clone/civ1-treasury#7).
+    ...treasuryCitySpend(),
     ...treasuryPlayerAction(cityRegistry, cityBuildRegistry),
     ...treasuryPlayerAdded(
       playerTreasuryRegistry,
