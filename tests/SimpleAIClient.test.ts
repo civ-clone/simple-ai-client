@@ -686,7 +686,11 @@ describe('SimpleAIClient', (): void => {
     ...cityFoodStorage(ruleRegistry),
     ...cityGrow(cityGrowthRegistry, playerWorldRegistry, workedTileRegistry),
     ...cityGrowthCost(),
-    ...cityHappinessCityCelebrateLeader(cityGrowthRegistry),
+    ...cityHappinessCityCelebrateLeader(
+      cityGrowthRegistry,
+      undefined,
+      playerGovernmentRegistry
+    ),
     ...cityHappinessCityCivilDisorder(cityGrowthRegistry),
     ...cityHappinessCityCost(
       ruleRegistry,
@@ -706,7 +710,11 @@ describe('SimpleAIClient', (): void => {
       cityRegistry,
       ruleRegistry,
       undefined,
-      cityGrowthRegistry
+      cityGrowthRegistry,
+      playerGovernmentRegistry,
+      undefined,
+      undefined,
+      cityImprovementRegistry
     ),
     ...cityImprovementCityBuild(
       cityImprovementRegistry,
