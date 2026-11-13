@@ -7,8 +7,10 @@
 //
 // Nothing here is saved: the cargo is the engine's own (`TransportManifest`), and each passenger's target is worked out
 //  again from the survey's board. A game loaded mid-voyage carries on, unloading on the first other landmass reached.
+import FoundsCities from '@civ-clone/base-unit-trait-founds-cities/FoundsCities';
+import { isA } from '@civ-clone/core-unit/traits';
 import { Embark } from '@civ-clone/library-unit/Actions';
-import { Land, NavalTransport, Worker } from '@civ-clone/library-unit/Types';
+import { Land, NavalTransport } from '@civ-clone/library-unit/Types';
 import { defendersIn, defendersKept, isDefender } from '../City/defence';
 import {
   confidentPower,
@@ -89,7 +91,7 @@ const landmassOf = (dependencies: Dependencies, tile: Tile): Set<Tile> =>
 
 // Whether `unit` can be carried by sea at all: a land unit, not one aboard already (a land unit at sea).
 const canTravel = (unit: Unit): boolean =>
-  unit instanceof Land && !unit.destroyed() && unit.tile().isLand();
+  isA(unit, Land) && !unit.destroyed() && unit.tile().isLand();
 
 // The player's coastal cities on `landmass`, nearest `target` first.
 const portsOn = (
@@ -433,8 +435,8 @@ export const waitingAt = (memory: Memory, port: City): [Unit, Passenger][] =>
       unit.tile() === port.tile()
   );
 
-// Whether `unit` is a founder (a worker), as opposed to a unit that explores or escorts.
-export const isFounder = (unit: Unit): boolean => unit instanceof Worker;
+// Whether `unit` is a founder (it `FoundsCities`), as opposed to a unit that explores or escorts.
+export const isFounder = (unit: Unit): boolean => unit.hasTrait(FoundsCities);
 
 export const isPassenger = (memory: Memory, unit: Unit): boolean =>
   overseasStateFor(memory).passengers.has(unit);
@@ -504,7 +506,7 @@ export const planGarrison = (
 
 // An attacker: a land unit with more attack than defence, not a worker.
 const isInvader = (unit: Unit): boolean =>
-  unit instanceof Land &&
+  isA(unit, Land) &&
   !isFounder(unit) &&
   unit.attack().value() > unit.defence().value();
 

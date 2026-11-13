@@ -17,6 +17,7 @@
 //  - with none of 2-4 to choose, it takes the first of Monarchy, Communism and The Republic it knows, and Democracy only
 //    when it knows none of those: Civ1's Democracy needs Philosophy and Literacy, not The Republic, so it can be the
 //    first government a player learns, where the original would stay in Despotism.
+import { isA } from '@civ-clone/core-unit/traits';
 import {
   Anarchy,
   Communism,
@@ -85,7 +86,7 @@ export const republicScore = (
           .filter(
             (unit: Unit): boolean =>
               unit.attack().value() > 0 &&
-              (unit instanceof Air || unit.tile() !== city.tile())
+              (isA(unit, Air) || unit.tile() !== city.tile())
           ).length,
         perUnit =
           (dependencies.cityImprovementRegistry

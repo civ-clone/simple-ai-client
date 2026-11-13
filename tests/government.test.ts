@@ -88,7 +88,7 @@ const setUp = async (
   unitRules(game);
   worldRules(game);
   registerTraits(game.traits);
-  game.rules.register(...personalityRules(game.traits));
+  game.rules.register(...personalityRules(game.traits, game.rules));
 
   const world = await simpleRLELoader(game.rules, game.terrainFeatures)(
       '100R',

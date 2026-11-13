@@ -2,11 +2,12 @@
 //  head for, then move. With no site to head for and no step worth taking, it joins one of the player's cities, or
 //  waits in one (`lib/Unit/idleWorker`), rather than step back and forth at random (civ-clone/web-renderer#230,
 //  #243). Always handles a worker.
+import Terraforms from '@civ-clone/base-unit-trait-terraforms/Terraforms';
+import FoundsCities from '@civ-clone/base-unit-trait-founds-cities/FoundsCities';
 import moveUnit, { hasStepWorthTaking } from '../../lib/Unit/moveUnit';
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
-import { Worker } from '@civ-clone/library-unit/Types';
 import idleWorker from '../../lib/Unit/idleWorker';
 import {
   planPassenger,
@@ -17,8 +18,14 @@ import settlerWork from '../../lib/Unit/settlerWork';
 import unitTurnContextFor from '@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor';
 
 export class WorkerTurn extends AIStrategy {
+  // A unit that `FoundsCities` or `Terraforms`.
   handles(action: PlayerAction): boolean {
-    return action.value() instanceof Worker;
+    const value = action.value();
+
+    return (
+      value instanceof Unit &&
+      (value.hasTrait(FoundsCities) || value.hasTrait(Terraforms))
+    );
   }
 
   async attempt(action: PlayerAction<Unit>): Promise<boolean> {

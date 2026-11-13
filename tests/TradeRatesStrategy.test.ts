@@ -42,6 +42,7 @@ import governmentRules from '@civ-clone/civ1-government/registerRules';
 import { inDisorder } from '../lib/City/disorder';
 import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
+import unitTraits from '@civ-clone/civ1-unit/Rules/Unit/traits';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import tradeRateRules from '@civ-clone/civ1-trade-rate/registerRules';
@@ -82,7 +83,9 @@ const setUp = async ({
   game.availableGovernments.register(Despotism, Monarchy);
   game.availableTradeRates.register(Luxuries, Research, Tax);
   registerTraits(game.traits);
-  game.rules.register(...personalityRules(game.traits));
+  // The Civ1 unit traits, which say which build items are military units.
+  game.rules.register(...unitTraits());
+  game.rules.register(...personalityRules(game.traits, game.rules));
 
   cityRules(game);
   cityHappinessRules(game);

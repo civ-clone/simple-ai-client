@@ -5,16 +5,21 @@ exports.WorkerTurn = void 0;
 //  head for, then move. With no site to head for and no step worth taking, it joins one of the player's cities, or
 //  waits in one (`lib/Unit/idleWorker`), rather than step back and forth at random (civ-clone/web-renderer#230,
 //  #243). Always handles a worker.
+const Terraforms_1 = require("@civ-clone/base-unit-trait-terraforms/Terraforms");
+const FoundsCities_1 = require("@civ-clone/base-unit-trait-founds-cities/FoundsCities");
 const moveUnit_1 = require("../../lib/Unit/moveUnit");
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
-const Types_1 = require("@civ-clone/library-unit/Types");
+const Unit_1 = require("@civ-clone/core-unit/Unit");
 const idleWorker_1 = require("../../lib/Unit/idleWorker");
 const overseas_1 = require("../../lib/Unit/overseas");
 const settlerWork_1 = require("../../lib/Unit/settlerWork");
 const unitTurnContextFor_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor");
 class WorkerTurn extends AIStrategy_1.default {
+    // A unit that `FoundsCities` or `Terraforms`.
     handles(action) {
-        return action.value() instanceof Types_1.Worker;
+        const value = action.value();
+        return (value instanceof Unit_1.default &&
+            (value.hasTrait(FoundsCities_1.default) || value.hasTrait(Terraforms_1.default)));
     }
     async attempt(action) {
         const player = action.player(), unit = action.value(), memory = this.memoryFor(player), { actions, target, tile } = (0, unitTurnContextFor_1.default)(this.dependencies(), action), { buildIrrigation, buildMine, buildRoad, foundCity } = actions;

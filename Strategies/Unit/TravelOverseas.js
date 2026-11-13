@@ -4,6 +4,7 @@ exports.TravelOverseas = void 0;
 // Generic: a passenger's turn (`lib/Unit/overseas`): walking to its port, boarding a transport alongside, or waiting
 //  in port for one (civ-clone/web-renderer#211, #374), and any land unit's turn at sea. Handles the action only for a unit with an overseas plan that
 //  still holds; otherwise the next strategies give it work.
+const traits_1 = require("@civ-clone/core-unit/traits");
 const overseas_1 = require("../../lib/Unit/overseas");
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
@@ -12,7 +13,7 @@ const Types_1 = require("@civ-clone/library-unit/Types");
 const moveUnit_1 = require("../../lib/Unit/moveUnit");
 const orders_1 = require("@civ-clone/base-strategy-ai/lib/Unit/orders");
 // A land unit on a water tile: aboard a ship, or unloaded beside a coast.
-const isAtSea = (unit) => unit instanceof Types_1.Land && unit.tile().isWater();
+const isAtSea = (unit) => (0, traits_1.isA)(unit, Types_1.Land) && unit.tile().isWater();
 class TravelOverseas extends AIStrategy_1.default {
     handles(action) {
         return ((0, isUnitAction_1.default)(action) &&

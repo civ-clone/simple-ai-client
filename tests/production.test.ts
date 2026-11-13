@@ -148,7 +148,7 @@ const setUp = async ({
     const civilization = new Civilization();
 
     registerTraits(game.traits);
-    game.rules.register(...personalityRules(game.traits));
+    game.rules.register(...personalityRules(game.traits, game.rules));
     civilization.setLeader(
       new (leader as unknown as new (registry: TraitRegistry) => Leader)(
         game.traits

@@ -1,5 +1,7 @@
 // Generic: gives a unit with no target a path to the first mission it qualifies for, taking that target off the board.
-import { Fortifiable, Land, Naval } from '@civ-clone/library-unit/Types';
+import Fortifies from '@civ-clone/base-unit-trait-fortifies/Fortifies';
+import { isA } from '@civ-clone/core-unit/traits';
+import { Land, Naval } from '@civ-clone/library-unit/Types';
 import {
   Mission,
   nearest,
@@ -20,7 +22,7 @@ export const defendUndefendedCity: Mission = (dependencies, memory, unit) => {
 
   if (
     !(
-      unit instanceof Fortifiable &&
+      unit.hasTrait(Fortifies) &&
       unit.defence().value() > 0 &&
       undefendedCities.length > 0
     )
@@ -50,7 +52,7 @@ export const liberateCity: Mission = (dependencies, memory, unit) => {
     unit,
     citiesToLiberate,
     citiesToLiberate
-      .filter((tile: Tile): boolean => unit instanceof Land && tile.isLand())
+      .filter((tile: Tile): boolean => isA(unit, Land) && tile.isLand())
       .sort(nearest(unit))
   );
 };
@@ -72,8 +74,8 @@ export const attackEnemyUnits: Mission = (dependencies, memory, unit) => {
     enemyUnitsToAttack
       .filter(
         (tile: Tile): boolean =>
-          (unit instanceof Land && tile.isLand()) ||
-          (unit instanceof Naval && tile.isWater())
+          (isA(unit, Land) && tile.isLand()) ||
+          (isA(unit, Naval) && tile.isWater())
       )
       .sort(nearest(unit))
   );
@@ -84,7 +86,7 @@ export const attackEnemyCity: Mission = (dependencies, memory, unit) => {
 
   if (
     !(
-      unit instanceof Land &&
+      isA(unit, Land) &&
       unit.attack().value() > 0 &&
       enemyCitiesToAttack.length > 0
     )
@@ -104,7 +106,7 @@ export const attackEnemyCity: Mission = (dependencies, memory, unit) => {
 // With nothing left to explore on its own landmass, a land unit that can fight goes to explore another, by sea
 //  (`lib/Unit/overseas`, civ-clone/web-renderer#211): first to its port, where `TravelOverseas` takes over.
 export const goOverseas: Mission = (dependencies, memory, unit) => {
-  if (!(unit instanceof Land && unit.attack().value() > 0) || isFounder(unit)) {
+  if (!(isA(unit, Land) && unit.attack().value() > 0) || isFounder(unit)) {
     return false;
   }
 

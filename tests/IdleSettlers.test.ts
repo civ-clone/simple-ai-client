@@ -12,6 +12,8 @@ import { travelToPathEnd } from '../lib/Unit/moveUnit';
 import Tile from '@civ-clone/core-world/Tile';
 import TurnStart from '@civ-clone/core-player/Rules/TurnStart';
 import { Worker } from '@civ-clone/library-unit/Types';
+import Terraforms from '@civ-clone/base-unit-trait-terraforms/Terraforms';
+import { unitTraits } from '@civ-clone/core-unit/Rules/UnitTraits';
 import WorkerTurn from '../Strategies/Unit/WorkerTurn';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { civ1TerrainPolicy } from '../lib/Civ1/terrain';
@@ -20,11 +22,15 @@ import { expect } from 'chai';
 import { instance as memoryRegistryInstance } from '@civ-clone/base-strategy-ai/lib/MemoryRegistry';
 import { terrainJobs } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 
-// A worker that's never offered `JoinCity`: Civ1's rule offers it to Settlers alone. It moves as Settlers do.
+// A worker that's never offered `JoinCity`: Civ1's rule offers it to units that found cities alone. It moves as Settlers
+//  do, and improves terrain (`Terraforms`) but founds no city.
 class Labourer extends Worker {}
 
 const withLabourers = <T extends UnitGame>(setup: T): T => {
-  setup.game.rules.register(...unitYield(Labourer, 0, 1, 1, 1));
+  setup.game.rules.register(
+    ...unitYield(Labourer, 0, 1, 1, 1),
+    ...unitTraits('simple-ai-client:test/unit/trait', Labourer, Terraforms)
+  );
 
   return setup;
 };

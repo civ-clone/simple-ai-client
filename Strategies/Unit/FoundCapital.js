@@ -3,8 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FoundCapital = void 0;
 // Generic: a worker founds its player's first city where it stands once the player has waited long enough for a good
 //  site. Handles the action only when it founds the city; otherwise `WorkerTurn` carries on as usual.
+const FoundsCities_1 = require("@civ-clone/base-unit-trait-founds-cities/FoundsCities");
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
-const Types_1 = require("@civ-clone/library-unit/Types");
+const Unit_1 = require("@civ-clone/core-unit/Unit");
 const foundCapital_1 = require("../../lib/Unit/foundCapital");
 const unitTurnContextFor_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/unitTurnContextFor");
 class FoundCapital extends AIStrategy_1.default {
@@ -14,8 +15,10 @@ class FoundCapital extends AIStrategy_1.default {
         super(dependencies, knowledge);
         this._foundByTurn = foundByTurn;
     }
+    // A unit that `FoundsCities`.
     handles(action) {
-        return action.value() instanceof Types_1.Worker;
+        const value = action.value();
+        return value instanceof Unit_1.default && value.hasTrait(FoundsCities_1.default);
     }
     attempt(action) {
         const { actions: { foundCity }, } = (0, unitTurnContextFor_1.default)(this.dependencies(), action);

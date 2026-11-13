@@ -35,6 +35,7 @@ import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies
 import { expect } from 'chai';
 import { Friendly, Militaristic } from '@civ-clone/civ1-civilization/Traits';
 import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
+import unitTraits from '@civ-clone/civ1-unit/Rules/Unit/traits';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 
 type SetUp = {
@@ -63,7 +64,11 @@ const setUp = (
     playerResearchRegistry = new PlayerResearchRegistry();
 
   if (withPersonality) {
-    ruleRegistry.register(...personalityRules(traitRegistry));
+    // The Civ1 unit traits, which say which build items are military units.
+    ruleRegistry.register(
+      ...unitTraits(),
+      ...personalityRules(traitRegistry, ruleRegistry)
+    );
   }
 
   advanceRegistry.register(

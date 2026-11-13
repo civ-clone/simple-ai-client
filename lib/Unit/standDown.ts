@@ -8,6 +8,7 @@
 //  3. otherwise it waits in the player's city it's in, ready for a mission when one comes up;
 //  4. or heads for the nearest of the player's cities it can reach, a ship for the sea beside one and then into it;
 //  5. or, with none it can reach, stays where it is, fortified if it can be.
+import { isA } from '@civ-clone/core-unit/traits';
 import { defendersIn, defendersKept, isDefender } from '../City/defence';
 import { martialLawUnitsIn, martialLawUnitsWanted } from '../City/defence';
 import { ActionLookup } from '@civ-clone/base-strategy-ai/lib/actionLookup';
@@ -70,7 +71,7 @@ export const citiesInReach = (
   const reachable = reachableTiles(unit),
     inReach = (city: City): boolean =>
       reachable === null ||
-      (unit instanceof Land
+      (isA(unit, Land)
         ? reachable.has(city.tile())
         : city
             .tile()
@@ -94,7 +95,7 @@ const pathInto = (
   unit: Unit,
   city: City
 ): Path | null => {
-  if (unit instanceof Land) {
+  if (isA(unit, Land)) {
     return (
       Path.for(
         unit,
@@ -250,7 +251,7 @@ export const standDown = async (
     return;
   }
 
-  if (isDefender(unit) && unit instanceof Land) {
+  if (isDefender(unit) && isA(unit, Land)) {
     const path = firstPath(
       dependencies,
       unit,

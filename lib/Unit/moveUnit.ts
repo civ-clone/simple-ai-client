@@ -1,5 +1,6 @@
 // Generic: the move executor. Follows the unit's path while it has one, otherwise takes the best-scored neighbouring
 //  step, until the unit has no moves left, negotiating with any neighbours it meets on the way.
+import { isA } from '@civ-clone/core-unit/traits';
 import {
   AbortMove,
   BribeUnit,
@@ -177,7 +178,7 @@ export const moveUnit = async (
         destination &&
         !breaksTreaty(move) &&
         !knowledge.canReturnAfter(dependencies, player, unit, move as Action) &&
-        unit instanceof Naval &&
+        isA(unit, Naval) &&
         !alongCoast.has(destination)
       ) {
         // A ship the ruleset keeps near the coast takes the way along it to the same place, if there is one
