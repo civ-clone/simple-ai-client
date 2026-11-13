@@ -1,6 +1,7 @@
 // Generic: a passenger's turn (`lib/Unit/overseas`): walking to its port, boarding a transport alongside, or waiting
 //  in port for one (civ-clone/web-renderer#211, #374), and any land unit's turn at sea. Handles the action only for a unit with an overseas plan that
 //  still holds; otherwise the next strategies give it work.
+import { isA } from '@civ-clone/core-unit/traits';
 import {
   candidatesFor,
   dropPassenger,
@@ -20,7 +21,7 @@ import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
 // A land unit on a water tile: aboard a ship, or unloaded beside a coast.
 const isAtSea = (unit: Unit): boolean =>
-  unit instanceof Land && unit.tile().isWater();
+  isA(unit, Land) && unit.tile().isWater();
 
 export class TravelOverseas extends AIStrategy {
   handles(action: PlayerAction): boolean {

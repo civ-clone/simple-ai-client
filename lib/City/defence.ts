@@ -1,12 +1,13 @@
 // Generic: how many defenders a city wants. Production builds up to `defendersWanted`, and units stay and fortify, or come
 //  in, up to `defendersKept`, which is never fewer: when the units kept fewer than the city built, cities built a
 //  defender, it walked off, and they built another.
+import { hasTrait } from '@civ-clone/core-unit/traits';
+import Fortifies from '@civ-clone/base-unit-trait-fortifies/Fortifies';
 import { MartialLaw, Unhappiness } from '@civ-clone/library-city/Yields';
 import City from '@civ-clone/core-city/City';
 import Cost from '@civ-clone/core-city/Rules/Cost';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Defence } from '@civ-clone/core-unit/Yields';
-import { Fortifiable } from '@civ-clone/library-unit/Types';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
@@ -163,16 +164,16 @@ export const keepsOrder = (
   );
 };
 
-// A unit that could defend a city: not, say, Settlers or a ship.
+// A unit that could defend a city (it `Fortifies`): not, say, Settlers or a ship.
 export const isDefender = (unit: Unit): boolean =>
-  unit instanceof Fortifiable && unit.defence().value() > 0;
+  unit.hasTrait(Fortifies) && unit.defence().value() > 0;
 
 // A type of unit that could defend a city, as `isDefender` judges a unit: not, say, a Diplomat.
 export const isDefenderType = (
   dependencies: Dependencies,
   UnitType: object
 ): boolean =>
-  Object.prototype.isPrototypeOf.call(Fortifiable, UnitType) &&
+  hasTrait(UnitType as typeof Unit, Fortifies, dependencies.ruleRegistry) &&
   baseYieldOf(dependencies, UnitType, Defence) > 0;
 
 // The units on the city's tile that could defend it, fortified or not.

@@ -14,11 +14,12 @@
 //
 // As in v474.05 (OpenCivOne `CityWorker.cs`, where the AI buys only into a build with shields in it already), nothing
 //  is bought before the city has put a shield into it: the ruleset charges double for a build not yet started.
+import { hasTrait } from '@civ-clone/core-unit/traits';
+import Terraforms from '@civ-clone/base-unit-trait-terraforms/Terraforms';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import City from '@civ-clone/core-city/City';
 import CityImprovement from '@civ-clone/core-city-improvement/CityImprovement';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
-import { Worker } from '@civ-clone/library-unit/Types';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Player from '@civ-clone/core-player/Player';
 import PlayerTreasury from '@civ-clone/core-treasury/PlayerTreasury';
@@ -101,7 +102,11 @@ const kindOf = (
       return 'defender';
     }
 
-    return isA(Worker, item) &&
+    return hasTrait(
+      item as typeof Unit,
+      Terraforms,
+      dependencies.ruleRegistry
+    ) &&
       dependencies.cityGrowthRegistry.getByCity(city).size() > 1 &&
       turnsLeft >= policy.minTurns
       ? 'build'

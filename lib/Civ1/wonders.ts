@@ -1,6 +1,7 @@
 // Civ1: whether a Wonder would do anything for a player (civ-clone/web-renderer#212). An obsolete Wonder does nothing,
 //  and Civ1 makes one obsolete as soon as anyone discovers the advance that obsoletes it. The Lighthouse and Magellan's
 //  Expedition only help ships, so they do nothing for a player with none.
+import { isA } from '@civ-clone/core-unit/traits';
 import {
   Lighthouse,
   MagellansExpedition,
@@ -27,6 +28,6 @@ export const isUsefulWonder = (
   (!forShips.includes(WonderType) ||
     dependencies.unitRegistry
       .getByPlayer(player)
-      .some((unit: Unit): boolean => unit instanceof Naval));
+      .some((unit: Unit): boolean => isA(unit, Naval)));
 
 export default isUsefulWonder;

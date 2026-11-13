@@ -1,10 +1,10 @@
 // Civ1: aircraft fuel, from Civ1's aircraft ranges, and whether an aircraft could still get home after an action.
+import AttackEndsTurn from '@civ-clone/base-unit-trait-attack-ends-turn/AttackEndsTurn';
 import {
   aircraftRange,
   turnsAloftKey,
 } from '@civ-clone/civ1-unit/Rules/Player/turnEnd';
 import Action from '@civ-clone/core-unit/Action';
-import { Bomber } from '@civ-clone/civ1-unit/Units';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Move } from '@civ-clone/civ1-unit/Actions';
@@ -39,7 +39,7 @@ export const aircraftFuel = (
 };
 
 // Whether an aircraft can still get home after taking `action`: moving costs 1 and a `Fighter` pays 1 to attack from
-//  where it is, but a `Bomber`'s attack ends its turn wherever it is.
+//  where it is, but a `Bomber`'s attack ends its turn wherever it is (`AttackEndsTurn`).
 export const aircraftCanReturn = (
   dependencies: Dependencies,
   player: Player,
@@ -55,7 +55,7 @@ export const aircraftCanReturn = (
   const moving = action instanceof Move,
     from = moving ? action.to() : unit.tile(),
     remaining =
-      !moving && unit instanceof Bomber
+      !moving && unit.hasTrait(AttackEndsTurn)
         ? fuel - unit.moves().value()
         : fuel - 1;
 

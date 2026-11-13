@@ -1,26 +1,17 @@
 // Civ1: the shields one more unit would cost a city to support, by `civ1-city`'s unit support rules
 //  (`Rules/City/cost`): under Anarchy and Despotism a city supports as many units as its size for nothing and pays a
 //  shield for each one after that; under any other government it pays a shield for every unit. Those rules charge for
-//  every aircraft, ship, worker and `Fortifiable` unit except `Diplomatic` ones (Diplomats and Caravans), which cost
-//  nothing and don't use up a free unit.
-import {
-  Air,
-  Diplomatic,
-  Fortifiable,
-  Naval,
-  Worker,
-} from '@civ-clone/library-unit/Types';
+//  every unit except `NonCombatant` ones (Diplomats and Caravans), which cost nothing and don't use up a free unit.
 import { Anarchy, Despotism } from '@civ-clone/civ1-government/Governments';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import NonCombatant from '@civ-clone/base-unit-trait-non-combatant/NonCombatant';
 import Unit from '@civ-clone/core-unit/Unit';
+import { hasTrait } from '@civ-clone/core-unit/traits';
+import { supported } from '@civ-clone/civ1-city/Rules/City/cost';
 
-const supported = (unit: Unit): boolean =>
-  [Air, Fortifiable, Naval, Worker].some(
-    (UnitType: typeof Unit): boolean => unit instanceof UnitType
-  ) && !(unit instanceof Diplomatic);
-
-// `UnitType`, when given, is the unit in question: a `Diplomatic` one costs nothing whatever the city already supports.
+// `UnitType`, when given, is the unit in question: a `NonCombatant` one costs nothing whatever the city already
+//  supports.
 export const unitSupport = (
   dependencies: Dependencies,
   city: City,
@@ -28,7 +19,7 @@ export const unitSupport = (
 ): number => {
   if (
     UnitType !== null &&
-    Object.prototype.isPrototypeOf.call(Diplomatic, UnitType)
+    hasTrait(UnitType, NonCombatant, dependencies.ruleRegistry)
   ) {
     return 0;
   }

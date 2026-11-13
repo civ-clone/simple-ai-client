@@ -10,6 +10,9 @@
 //  the leader's `ArmySize` for the rival it could take on, if any, and only enemies (no peace treaty) give it something
 //  to attack (civ-clone/web-renderer#424). Apart from a missing defender, explorers and Settlers, no unit is started
 //  that would leave the city no shields to spare once it has to support it (civ-clone/web-renderer#229).
+import Terraforms from '@civ-clone/base-unit-trait-terraforms/Terraforms';
+import FoundsCities from '@civ-clone/base-unit-trait-founds-cities/FoundsCities';
+import { hasTrait, isA } from '@civ-clone/core-unit/traits';
 import { canFerryFromLandmassOf } from '../Unit/overseas';
 import ArmySize from '@civ-clone/base-leader-personality/Rules/Player/ArmySize';
 import rivalOf, { isEnemy } from '../Player/rivals';
@@ -25,7 +28,7 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { wantsUnit } from '../City/defence';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
-import { Land, Naval, Worker } from '@civ-clone/library-unit/Types';
+import { Land, Naval } from '@civ-clone/library-unit/Types';
 import {
   Barracks,
   CityWalls,
@@ -128,12 +131,13 @@ export const defaultProductionPolicy: ProductionPolicy = {
 
 // A unit built to attack rather than defend.
 export const isAttacker = (unit: Unit): boolean =>
-  unit instanceof Land && unit.attack().value() > unit.defence().value();
+  isA(unit, Land) && unit.attack().value() > unit.defence().value();
 
-// A land unit that can fight and is out of the player's cities: exploring, or on its way to a target.
+// A land unit that can fight and is out of the player's cities: exploring, or on its way to a target. Not a worker (one
+//  that `Terraforms`).
 const isExploring = (dependencies: Dependencies, unit: Unit): boolean =>
-  unit instanceof Land &&
-  !(unit instanceof Worker) &&
+  isA(unit, Land) &&
+  !unit.hasTrait(Terraforms) &&
   unit.attack().value() > 0 &&
   dependencies.cityRegistry.getByTile(unit.tile()) === null;
 
@@ -147,7 +151,7 @@ export const isFoundingSettlers = (
   player: Player,
   unit: Unit
 ): boolean => {
-  if (!(unit instanceof Settlers)) {
+  if (!unit.hasTrait(FoundsCities)) {
     return false;
   }
 
@@ -217,10 +221,10 @@ const isAttackerType = (dependencies: Dependencies, item: object): boolean =>
   baseYield(dependencies, item, Attack) >
     baseYield(dependencies, item, Defence);
 
-// A unit type that can explore: a land unit that can fight, not a worker.
+// A unit type that can explore: a land unit that can fight, not a worker (one that `Terraforms`).
 const isExplorerType = (dependencies: Dependencies, item: object): boolean =>
   isLandUnitType(item) &&
-  !Object.prototype.isPrototypeOf.call(Worker, item) &&
+  !hasTrait(item as typeof Unit, Terraforms, dependencies.ruleRegistry) &&
   baseYield(dependencies, item, Attack) > 0;
 
 // How many of the player's units match `isUnit`, and how many more its cities are building that match `isType`, so

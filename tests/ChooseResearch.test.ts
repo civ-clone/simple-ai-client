@@ -35,6 +35,7 @@ import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies
 import { expect } from 'chai';
 import leaderHas from '@civ-clone/base-leader-personality/lib/leaderHas';
 import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
+import unitTraits from '@civ-clone/civ1-unit/Rules/Unit/traits';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import requirements from '@civ-clone/civ1-science/Rules/Research/requirements';
 
@@ -72,7 +73,11 @@ const setUp = (
   if (rules !== null) {
     ruleRegistry.register(...rules(traitRegistry));
   } else if (wanted) {
-    ruleRegistry.register(...personalityRules(traitRegistry));
+    // The Civ1 unit traits, which say which build items are military units.
+    ruleRegistry.register(
+      ...unitTraits(),
+      ...personalityRules(traitRegistry, ruleRegistry)
+    );
   }
   // Future Technology is left out: the player knows nearly everything, so the repeatable advance would always be on
   //  offer beside the ones each test is about.

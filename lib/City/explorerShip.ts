@@ -1,6 +1,7 @@
 // Generic: the ship a city should build to explore the sea with, if any (civ-clone/web-renderer#208). A player with
 //  more than one city keeps one ship at a time for this, built in a city that has its defenders and is on a sea, not a
 //  lake, that leads to water it hasn't explored. Transports and their escorts are another matter.
+import { isA } from '@civ-clone/core-unit/traits';
 import { wantsUnit } from './defence';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
@@ -114,7 +115,7 @@ export const explorerShipFor = (
       .getByPlayer(player)
       .some(
         (unit: Unit): boolean =>
-          unit instanceof Naval && !isFerrying(dependencies, memory, unit)
+          isA(unit, Naval) && !isFerrying(dependencies, memory, unit)
       ) ||
     dependencies.cityRegistry
       .getByPlayer(player)
