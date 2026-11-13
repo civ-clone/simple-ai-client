@@ -314,6 +314,7 @@ import unitStowed from '@civ-clone/civ1-unit/Rules/Unit/stowed';
 import unitUnsupported from '@civ-clone/civ1-unit/Rules/Unit/unsupported';
 import unitValidateMove from '@civ-clone/civ1-unit/Rules/Unit/validateMove';
 import unitStrength from '@civ-clone/civ1-unit/Rules/Unit/strength';
+import unitTraits from '@civ-clone/civ1-unit/Rules/Unit/traits';
 import unitYield from '@civ-clone/civ1-unit/Rules/Unit/yield';
 import { RequirementRegistry } from '@civ-clone/core-requirement/RequirementRegistry';
 import { obsoletedBy as wonderObsoletedBy } from '@civ-clone/civ1-wonder/Requirements';
@@ -652,6 +653,8 @@ describe('SimpleAIClient', (): void => {
   };
 
   ruleRegistry.register(
+    // The Civ1 unit traits, which civ1-unit's rules below ask units about.
+    ...unitTraits(),
     ...cityBuildingComplete(),
     ...cityCanBeWorked(cityRegistry, unitRegistry, workedTileRegistry),
     ...cityCaptured(
