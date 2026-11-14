@@ -2620,6 +2620,52 @@ describe('SimpleAIClient', (): void => {
     cleanUp();
   });
 
+  it("should rebuild a city's last defender without buying it for a player with no treasury", async (): Promise<void> => {
+    const { city, cleanUp, player } = await productionCity(1, true),
+      [defender] = unitRegistry.getByTile(city.tile());
+
+    // A ruleset with no treasury yet (Civ2's, until it has one) registers none for the player.
+    playerTreasuryRegistry.unregister(
+      ...playerTreasuryRegistry.getByPlayer(player)
+    );
+    playerResearchRegistry.getByPlayer(player).addAdvance(BronzeWorking);
+    city.yields = () => [new ProductionYield(1)];
+    unitRegistry.unregister(defender);
+
+    expect(playerTreasuryRegistry.getByPlayer(player)).length(0);
+
+    new SimpleAIClient(
+      player,
+      cityRegistry,
+      cityBuildRegistry,
+      cityGrowthRegistry,
+      goodyHutRegistry,
+      pathFinderRegistry,
+      playerGovernmentRegistry,
+      playerResearchRegistry,
+      playerTreasuryRegistry,
+      playerWorldRegistry,
+      ruleRegistry,
+      terrainFeatureRegistry,
+      tileImprovementRegistry,
+      unitImprovementRegistry,
+      unitRegistry,
+      undefined,
+      clientRegistry,
+      interactionRegistry,
+      turn,
+      undefined,
+      strategyNoteRegistry,
+      workedTileRegistry,
+      pendingEffectRegistry,
+      new StrategyRegistry()
+    ).unitDestroyed(defender, null);
+
+    expect(cityBuildRegistry.getByCity(city).building()!.item()).equal(Warrior);
+
+    cleanUp();
+  });
+
   it('should not build an explorer that it cannot finish soon', async (): Promise<void> => {
     const { city, cleanUp, player, world } = await productionCity(1, true),
       targets = createMemory().targets;
