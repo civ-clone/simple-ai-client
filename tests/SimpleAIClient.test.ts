@@ -249,6 +249,7 @@ import governmentAvailability from '@civ-clone/civ1-government/Rules/Governments
 import governmentPlayerAction from '@civ-clone/civ1-government/Rules/Player/action';
 import governmentPlayerAdded from '@civ-clone/civ1-government/Rules/Player/added';
 import governmentPlayerGovernmentChanged from '@civ-clone/civ1-government/Rules/Player/government-changed';
+import governmentRevolutionTerms from '@civ-clone/civ1-government/Rules/Player/revolution-terms';
 import playerAction from '@civ-clone/civ1-player/Rules/Player/action';
 import playerAdded from '@civ-clone/civ1-player/Rules/Player/added';
 import playerCityCaptured from '@civ-clone/civ1-player/Rules/City/captured';
@@ -780,6 +781,7 @@ describe('SimpleAIClient', (): void => {
       ruleRegistry
     ),
     ...governmentPlayerGovernmentChanged(undefined, playerWorldRegistry),
+    ...governmentRevolutionTerms(),
     ...playerAction(),
     ...playerAdded(),
     ...playerCityCaptured(cityRegistry, ruleRegistry),

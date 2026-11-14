@@ -1,0 +1,5 @@
+# Temporary, until base-government-change and civ1-government are released with RevolutionTerms: one copy of each,
+#  from their branches, for this package and for the civ1-* packages that depend on them.
+overrides:
+  '@civ-clone/base-government-change': 'github:civ-clone/base-government-change#feat/revolution-terms'
+  '@civ-clone/civ1-government': 'github:civ-clone/civ1-government#feat/revolution-terms'
