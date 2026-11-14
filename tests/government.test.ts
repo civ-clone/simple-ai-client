@@ -46,7 +46,14 @@ import World from '@civ-clone/core-world/World';
 import cityImprovementRules from '@civ-clone/civ1-city-improvement/registerRules';
 import cityRules from '@civ-clone/civ1-city/registerRules';
 import { dependenciesFor } from '../registerStrategies';
+import ChooseGovernment from '../Strategies/Civ1/ChooseGovernment';
+import { ChooseGovernment as ChooseGovernmentAction } from '@civ-clone/civ1-government/PlayerActions';
+import civ1Knowledge from '../lib/Civ1/knowledge';
 import { expect } from 'chai';
+import { registerRevolutionHandler } from '@civ-clone/base-government-change/lib/revolution';
+import RevolutionTerms from '@civ-clone/base-government-change/Rules/RevolutionTerms';
+import Effect from '@civ-clone/core-rule/Effect';
+import { terms } from '@civ-clone/base-government-change/lib/terms';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
 import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
@@ -327,5 +334,93 @@ describe('government (civ-clone/web-renderer#231)', (): void => {
     expect(governmentName(setup)).to.equal('Monarchy');
     expect(pendingRevolution(setup.playerGovernment, setup.game.pendingEffects))
       .null;
+  });
+});
+
+// The revolution is the loaded ruleset's (`RevolutionTerms`, base-government-change), not Civ1's: Civ2's has its own save
+//  key, and the AI must start and finish revolutions under it (civ-clone/web-renderer#1008).
+describe('government: the ruleset’s revolution', (): void => {
+  class Interregnum extends Government {}
+
+  const KEY = 'test-ruleset:revolution';
+
+  // Civ1's rules, with Civ1's `RevolutionTerms` swapped for another ruleset's key and interim government.
+  const otherRuleset = async (): Promise<SetUp> => {
+    const setup = await setUp(Shaka, MonarchyAdvance);
+
+    setup.game.rules
+      .get(RevolutionTerms)
+      .forEach((rule) => setup.game.rules.unregister(rule));
+    setup.game.rules.register(
+      new RevolutionTerms(new Effect(terms(KEY, Interregnum)))
+    );
+    registerRevolutionHandler(KEY, setup.game.pendingEffects);
+
+    return setup;
+  };
+
+  it('should start the revolution under the ruleset’s key and interim, and finish it with the choice', async (): Promise<void> => {
+    const setup = await otherRuleset(),
+      { dependencies, game, player, playerGovernment } = setup;
+
+    startRevolution(dependencies, player);
+
+    expect(playerGovernment.is(Interregnum)).true;
+    expect(pendingRevolution(playerGovernment, game.pendingEffects)).null;
+
+    const pending = game.pendingEffects
+      .getByTarget(playerGovernment)
+      .filter((pendingEffect) => pendingEffect.handler() === KEY);
+
+    expect(pending).to.have.length(1);
+
+    // Not again while in the interim.
+    startRevolution(dependencies, player);
+
+    expect(game.pendingEffects.getByTarget(playerGovernment)).to.have.length(1);
+
+    game.turn.set(Number(pending[0].data().endTurn));
+
+    expect(pickGovernment(dependencies, playerGovernment)).true;
+
+    expect(governmentName(setup)).to.equal('Monarchy');
+    expect(game.pendingEffects.getByTarget(playerGovernment)).to.have.length(0);
+  });
+
+  it('should never revolt, leave the choice unmade and warn once when the ruleset names no revolution', async (): Promise<void> => {
+    const setup = await setUp(Shaka, MonarchyAdvance),
+      warnings: unknown[][] = [],
+      warn = console.warn;
+
+    setup.game.rules
+      .get(RevolutionTerms)
+      .forEach((rule) => setup.game.rules.unregister(rule));
+
+    console.warn = (...args: unknown[]): void => {
+      warnings.push(args);
+    };
+
+    try {
+      startRevolution(setup.dependencies, setup.player);
+
+      expect(governmentName(setup)).to.equal('Despotism');
+      expect(
+        setup.game.pendingEffects.getByTarget(setup.playerGovernment)
+      ).to.have.length(0);
+
+      expect(pickGovernment(setup.dependencies, setup.playerGovernment)).false;
+      expect(
+        new ChooseGovernment(setup.dependencies, civ1Knowledge).attempt(
+          new ChooseGovernmentAction(setup.player, setup.playerGovernment)
+        )
+      ).false;
+      startRevolution(setup.dependencies, setup.player);
+    } finally {
+      console.warn = warn;
+    }
+
+    expect(governmentName(setup)).to.equal('Despotism');
+    expect(warnings).to.have.length(1);
+    expect(String(warnings[0][0])).to.contain('RevolutionTerms');
   });
 });

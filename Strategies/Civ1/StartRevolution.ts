@@ -1,5 +1,5 @@
-// Civ1: at the start of each turn, starts a revolution, as a human player would, when the player would choose another
-//  government than the one it has (`lib/Civ1/government`).
+// At the start of each turn, starts the loaded ruleset's revolution, as a human player would, when the player would
+//  choose another government than the one it has (`lib/Civ1/government`, through the ruleset's `RevolutionTerms`).
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import BeforeTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';

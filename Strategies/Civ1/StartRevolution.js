@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StartRevolution = void 0;
-// Civ1: at the start of each turn, starts a revolution, as a human player would, when the player would choose another
-//  government than the one it has (`lib/Civ1/government`).
+// At the start of each turn, starts the loaded ruleset's revolution, as a human player would, when the player would
+//  choose another government than the one it has (`lib/Civ1/government`, through the ruleset's `RevolutionTerms`).
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const BeforeTurn_1 = require("@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn");
 const government_1 = require("../../lib/Civ1/government");

@@ -1,5 +1,5 @@
-// Civ1: once the Anarchy is over, the government the player would choose now (`lib/Civ1/government`). Always handles
-//  the choice.
+// Once the ruleset's revolution allows the choice, the government the player would choose now (`lib/Civ1/government`).
+//  Handles the choice unless the ruleset names no revolution (no `RevolutionTerms`).
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
@@ -11,9 +11,7 @@ export class ChooseGovernment extends AIStrategy {
   }
 
   attempt(action: PlayerAction<PlayerGovernment>): boolean {
-    pickGovernment(this.dependencies(), action.value());
-
-    return true;
+    return pickGovernment(this.dependencies(), action.value());
   }
 }
 

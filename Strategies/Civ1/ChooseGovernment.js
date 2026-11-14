@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChooseGovernment = void 0;
-// Civ1: once the Anarchy is over, the government the player would choose now (`lib/Civ1/government`). Always handles
-//  the choice.
+// Once the ruleset's revolution allows the choice, the government the player would choose now (`lib/Civ1/government`).
+//  Handles the choice unless the ruleset names no revolution (no `RevolutionTerms`).
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const PlayerGovernment_1 = require("@civ-clone/core-government/PlayerGovernment");
 const government_1 = require("../../lib/Civ1/government");
@@ -11,8 +11,7 @@ class ChooseGovernment extends AIStrategy_1.default {
         return action.value() instanceof PlayerGovernment_1.default;
     }
     attempt(action) {
-        (0, government_1.pickGovernment)(this.dependencies(), action.value());
-        return true;
+        return (0, government_1.pickGovernment)(this.dependencies(), action.value());
     }
 }
 exports.ChooseGovernment = ChooseGovernment;
