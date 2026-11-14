@@ -1,11 +1,13 @@
 // Generic: when one of the player's units is destroyed in combat, it's forgotten, the units of whoever destroyed it
 //  nearby become targets, and a city it was defending that's left with fewer than two units switches production and
-//  buys it. Runs during combat, so perhaps during another player's turn.
+//  buys it, if the ruleset gives the player a gold treasury. Runs during combat, so perhaps during another player's
+//  turn.
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Gold from '@civ-clone/base-city-yield-gold/Gold';
 import Memory, { forgetUnit } from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
+import PlayerTreasury from '@civ-clone/core-treasury/PlayerTreasury';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 
@@ -42,9 +44,11 @@ export const unitDestroyed = (
   if (city && city.player() === player && tileUnits.length < 2) {
     buildItemInCity(city);
 
+    // A ruleset may have no treasury, as Civ2's has none yet: the city then just builds it.
     dependencies.playerTreasuryRegistry
-      .getByPlayerAndType(player, Gold)
-      .buy(city);
+      .getByPlayer(player)
+      .find((treasury: PlayerTreasury): boolean => treasury.yield() === Gold)
+      ?.buy(city);
   }
 };
 
