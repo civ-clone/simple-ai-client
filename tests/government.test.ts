@@ -46,6 +46,9 @@ import World from '@civ-clone/core-world/World';
 import cityImprovementRules from '@civ-clone/civ1-city-improvement/registerRules';
 import cityRules from '@civ-clone/civ1-city/registerRules';
 import { dependenciesFor } from '../registerStrategies';
+import ChooseGovernment from '../Strategies/Civ1/ChooseGovernment';
+import { ChooseGovernment as ChooseGovernmentAction } from '@civ-clone/civ1-government/PlayerActions';
+import civ1Knowledge from '../lib/Civ1/knowledge';
 import { expect } from 'chai';
 import { registerRevolutionHandler } from '@civ-clone/base-government-change/lib/revolution';
 import RevolutionTerms from '@civ-clone/base-government-change/Rules/RevolutionTerms';
@@ -377,24 +380,47 @@ describe('government: the ruleset’s revolution', (): void => {
     expect(game.pendingEffects.getByTarget(playerGovernment)).to.have.length(1);
 
     game.turn.set(Number(pending[0].data().endTurn));
-    pickGovernment(dependencies, playerGovernment);
+
+    expect(pickGovernment(dependencies, playerGovernment)).true;
 
     expect(governmentName(setup)).to.equal('Monarchy');
     expect(game.pendingEffects.getByTarget(playerGovernment)).to.have.length(0);
   });
 
-  it('should never revolt when the ruleset names no revolution', async (): Promise<void> => {
-    const setup = await setUp(Shaka, MonarchyAdvance);
+  it('should never revolt, leave the choice unmade and warn once when the ruleset names no revolution', async (): Promise<void> => {
+    const setup = await setUp(Shaka, MonarchyAdvance),
+      warnings: unknown[][] = [],
+      warn = console.warn;
 
     setup.game.rules
       .get(RevolutionTerms)
       .forEach((rule) => setup.game.rules.unregister(rule));
 
-    startRevolution(setup.dependencies, setup.player);
+    console.warn = (...args: unknown[]): void => {
+      warnings.push(args);
+    };
+
+    try {
+      startRevolution(setup.dependencies, setup.player);
+
+      expect(governmentName(setup)).to.equal('Despotism');
+      expect(
+        setup.game.pendingEffects.getByTarget(setup.playerGovernment)
+      ).to.have.length(0);
+
+      expect(pickGovernment(setup.dependencies, setup.playerGovernment)).false;
+      expect(
+        new ChooseGovernment(setup.dependencies, civ1Knowledge).attempt(
+          new ChooseGovernmentAction(setup.player, setup.playerGovernment)
+        )
+      ).false;
+      startRevolution(setup.dependencies, setup.player);
+    } finally {
+      console.warn = warn;
+    }
 
     expect(governmentName(setup)).to.equal('Despotism');
-    expect(
-      setup.game.pendingEffects.getByTarget(setup.playerGovernment)
-    ).to.have.length(0);
+    expect(warnings).to.have.length(1);
+    expect(String(warnings[0][0])).to.contain('RevolutionTerms');
   });
 });

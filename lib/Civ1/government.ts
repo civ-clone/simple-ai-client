@@ -41,9 +41,11 @@ import { Marketplace } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import MilitaryUnhappinessTolerance from '@civ-clone/base-leader-personality/Rules/Player/MilitaryUnhappinessTolerance';
 import Player from '@civ-clone/core-player/Player';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
+import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import { Trade } from '@civ-clone/library-city/Yields';
 import Unit from '@civ-clone/core-unit/Unit';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
+import { Terms } from '@civ-clone/base-government-change/Rules/RevolutionTerms';
 import { revolutionTerms } from '@civ-clone/base-government-change/lib/terms';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 import { sum } from '@civ-clone/base-leader-personality/lib/combine';
@@ -131,6 +133,25 @@ const playerGovernmentOf = (
 ): PlayerGovernment =>
   dependencies.playerGovernmentRegistry.getByPlayer(player);
 
+// The loaded ruleset's revolution (`RevolutionTerms`), or `null` with a warning, once per rule registry, when there is
+//  none: no ruleset registered one, or two copies of base-government-change are installed and the rule is the other
+//  copy's class.
+const warnedNoTerms = new WeakSet<RuleRegistry>();
+
+export const termsFor = (dependencies: Dependencies): Terms | null => {
+  const terms = revolutionTerms(dependencies.ruleRegistry);
+
+  if (terms === null && !warnedNoTerms.has(dependencies.ruleRegistry)) {
+    warnedNoTerms.add(dependencies.ruleRegistry);
+
+    console.warn(
+      'simple-ai-client: no `RevolutionTerms` rule (base-government-change), so computer players cannot change government.'
+    );
+  }
+
+  return terms;
+};
+
 // At the start of the player's turn: a revolution if it would choose another government than the one it has, through
 //  the ruleset's interim government (Anarchy) like a human player, then `ChooseGovernment` once it's over.
 export const startRevolution = (
@@ -138,7 +159,7 @@ export const startRevolution = (
   player: Player,
   policy: GovernmentPolicy = defaultGovernmentPolicy
 ): void => {
-  const terms = revolutionTerms(dependencies.ruleRegistry);
+  const terms = termsFor(dependencies);
 
   if (terms === null) {
     return;
@@ -186,15 +207,16 @@ export const startRevolution = (
 };
 
 // Once the interim is over: the government it would choose now. Whatever started the revolution (this player's
-//  choice, or its cities' disorder), it is the ruleset's, under its key.
+//  choice, or its cities' disorder), it is the ruleset's, under its key. `false` when the ruleset names no revolution,
+//  so the choice is left unmade.
 export const pickGovernment = (
   dependencies: Dependencies,
   playerGovernment: PlayerGovernment
-): void => {
-  const terms = revolutionTerms(dependencies.ruleRegistry);
+): boolean => {
+  const terms = termsFor(dependencies);
 
   if (terms === null) {
-    return;
+    return false;
   }
 
   chooseGovernment(
@@ -208,4 +230,6 @@ export const pickGovernment = (
     dependencies.pendingEffectRegistry,
     dependencies.turn
   );
+
+  return true;
 };
