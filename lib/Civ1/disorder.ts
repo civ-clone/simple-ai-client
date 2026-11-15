@@ -8,14 +8,42 @@ import {
   Temple,
 } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
-import { DisorderPolicy } from '../City/disorder';
+import {
+  DisorderPolicy,
+  noteDisorderAtTurnStart,
+  wasInDisorderAtTurnStart,
+} from '../City/disorder';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { King } from '@civ-clone/civ1-difficulty/Difficulties';
-import { civilDisorder } from '@civ-clone/civ1-city-happiness/lib/cityStatus';
+import {
+  CIVIL_DISORDER,
+  civilDisorder,
+} from '@civ-clone/civ1-city-happiness/lib/cityStatus';
 import { contentCitizens } from '@civ-clone/civ1-difficulty/level';
 
 // The citizens a computer player's city is born content with: 3, whatever the level (`civ1-difficulty`), so the level,
 //  which this policy can't see, makes no difference. It only ever plays computer players.
 const bornContent = contentCitizens(King.level(), false);
+
+// Whether `civ1-city-happiness` keeps its record of disorder in this game: its rules register the handler. Worked out
+//  once a turn: it's asked for each city, and `handlers()` builds its list afresh each time.
+const recordsCache: WeakMap<object, [number, boolean]> = new WeakMap();
+
+export const recordsCivilDisorder = (dependencies: Dependencies): boolean => {
+  const registry = dependencies.pendingEffectRegistry,
+    turn = dependencies.turn.value(),
+    cached = recordsCache.get(registry);
+
+  if (cached && cached[0] === turn) {
+    return cached[1];
+  }
+
+  const records = registry.handlers().includes(CIVIL_DISORDER);
+
+  recordsCache.set(registry, [turn, records]);
+
+  return records;
+};
 
 export const civ1DisorderPolicy: DisorderPolicy = {
   calmingImprovements: [
@@ -31,9 +59,18 @@ export const civ1DisorderPolicy: DisorderPolicy = {
     dependencies.cityGrowthRegistry.getByCity(city).size() + 1 > bornContent
       ? 1
       : 0,
-  // `civ1-city-happiness` records the disorder it finds at the player's turn start until order is restored.
+  // `civ1-city-happiness` records the disorder it finds at the player's turn start until order is restored. In a game
+  //  without that record (Civ2 keeps its own, under its own name), what the ruleset's `CivilDisorder` rules found at the
+  //  start of the player's turn (`turnStart`), so a city calmed since still counts.
   wasInDisorder: (dependencies, city) =>
-    civilDisorder(city, dependencies.pendingEffectRegistry) !== null,
+    recordsCivilDisorder(dependencies)
+      ? civilDisorder(city, dependencies.pendingEffectRegistry) !== null
+      : wasInDisorderAtTurnStart(dependencies, city),
+  turnStart: (dependencies, player) => {
+    if (!recordsCivilDisorder(dependencies)) {
+      noteDisorderAtTurnStart(dependencies, player);
+    }
+  },
 };
 
 export default civ1DisorderPolicy;

@@ -1,4 +1,5 @@
 import { ProductionPolicy } from '../../lib/Civ1/buildItemInCity';
+import BeforeTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/BeforeTurn';
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import City from '@civ-clone/core-city/City';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
@@ -14,7 +15,8 @@ export declare class ChooseProduction extends AIStrategy {
     policyFor?: (player: Player) => ProductionPolicy
   );
   handles(action: PlayerAction): boolean;
-  attempt(action: PlayerAction<CityBuild>): boolean;
+  attempt(action: PlayerAction<CityBuild> | BeforeTurn): boolean;
+  reviewCapitalization(player: Player): void;
   choose(player: Player, city: City): void;
 }
 export default ChooseProduction;

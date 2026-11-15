@@ -28,6 +28,7 @@ const FoundCapital_1 = require("./Strategies/Unit/FoundCapital");
 const Garrison_1 = require("./Strategies/Unit/Garrison");
 const MissionAndMove_1 = require("./Strategies/Unit/MissionAndMove");
 const NegotiationAnswers_1 = require("./Strategies/Diplomacy/NegotiationAnswers");
+const NoteDisorder_1 = require("./Strategies/City/NoteDisorder");
 const PreventDisorder_1 = require("./Strategies/City/PreventDisorder");
 const RetreatToHeal_1 = require("./Strategies/Unit/RetreatToHeal");
 const ReviewCities_1 = require("./Strategies/Turn/ReviewCities");
@@ -60,7 +61,9 @@ const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDepen
     // Aircraft fuel from base-unit-fuel where a ruleset counts it that way (Civ2); Civ1's own count otherwise.
     const knowledge = (0, spaceRace_1.withSpaceshipDefence)((0, fuel_1.default)(civ1), victoryDependencies, defence_1.isCapital), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(spaceRace_1.default), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
     return [
-        // `BeforeTurn`, all of them in turn.
+        // `BeforeTurn`, all of them in turn. What the disorder policy notes of the player's cities comes first, before
+        //  anything changes them (a revolution, their workers).
+        new NoteDisorder_1.default(dependencies, knowledge, disorder_1.default),
         new SurveyTargets_1.default(dependencies, knowledge),
         new ReviewCities_1.default(dependencies, knowledge),
         new WakeCarrierAircraft_1.default(dependencies, knowledge),

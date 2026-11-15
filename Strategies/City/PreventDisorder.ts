@@ -1,5 +1,6 @@
 // Generic: at the end of the player's turn, once its units have moved, keeps its cities out of civil disorder
-//  (`lib/City/disorder`), with the ruleset's `DisorderPolicy`.
+//  (`lib/City/disorder`), with the ruleset's `DisorderPolicy`; what the policy notes as the turn starts is
+//  `NoteDisorder`'s.
 import preventDisorder, { DisorderPolicy } from '../../lib/City/disorder';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';

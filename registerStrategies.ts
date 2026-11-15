@@ -36,6 +36,7 @@ import Garrison from './Strategies/Unit/Garrison';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import MissionAndMove from './Strategies/Unit/MissionAndMove';
 import NegotiationAnswers from './Strategies/Diplomacy/NegotiationAnswers';
+import NoteDisorder from './Strategies/City/NoteDisorder';
 import PreventDisorder from './Strategies/City/PreventDisorder';
 import RetreatToHeal from './Strategies/Unit/RetreatToHeal';
 import ReviewCities from './Strategies/Turn/ReviewCities';
@@ -82,7 +83,9 @@ export const createStrategies = (
     goals = [spaceRace, conquest];
 
   return [
-    // `BeforeTurn`, all of them in turn.
+    // `BeforeTurn`, all of them in turn. What the disorder policy notes of the player's cities comes first, before
+    //  anything changes them (a revolution, their workers).
+    new NoteDisorder(dependencies, knowledge, civ1DisorderPolicy),
     new SurveyTargets(dependencies, knowledge),
     new ReviewCities(dependencies, knowledge),
     new WakeCarrierAircraft(dependencies, knowledge),
