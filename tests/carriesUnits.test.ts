@@ -3,6 +3,7 @@
 //  missiles; Civ1 declares no `Carries` for it, so it must be no ferry or carrier, as when it was a plain naval unit.
 import {
   Carrier,
+  Fighter,
   Frigate,
   Sail,
   Submarine,
@@ -11,6 +12,11 @@ import {
 } from '@civ-clone/civ1-unit/Units';
 import { carriesUnits, carriesUnitsType } from '../lib/Unit/carriesUnits';
 import { Monarchy } from '@civ-clone/civ1-government/Governments';
+import Ferry from '../Strategies/Unit/Ferry';
+import PlayerAction from '@civ-clone/core-player/PlayerAction';
+import { canFerryFrom } from '../lib/Unit/overseas';
+import civ1Knowledge from '../lib/Civ1/knowledge';
+import waitForCarrier from '../lib/Unit/waitForCarrier';
 import { NavalTransport } from '@civ-clone/library-unit/Types';
 import Unit from '@civ-clone/core-unit/Unit';
 import { expect } from 'chai';
@@ -35,5 +41,31 @@ describe('carriesUnits', (): void => {
     });
 
     expect(carriesUnitsType({}, dependencies.ruleRegistry)).false;
+  });
+
+  it('should not sail one as a ferry, count it as a way overseas, or have aircraft wait for it', async (): Promise<void> => {
+    const { addCity, addUnit, dependencies, player } = await unitGame(
+        '1G29O',
+        1,
+        30,
+        Monarchy
+      ),
+      // No Map Making: the port can't build a transport, so only a transport the player has counts.
+      port = addCity(0, 0),
+      ferry = new Ferry(dependencies, civ1Knowledge),
+      holdless = addUnit(Holdless, 2, 0),
+      fighter = addUnit(Fighter, 3, 0);
+
+    holdless.moves().set(1);
+    expect(ferry.handles(new PlayerAction(player, holdless))).false;
+    expect(canFerryFrom(dependencies, player, port)).false;
+    expect(waitForCarrier(dependencies, player, civ1Knowledge, fighter)).false;
+
+    const carrier = addUnit(Carrier, 4, 0);
+
+    carrier.moves().set(1);
+    expect(ferry.handles(new PlayerAction(player, carrier))).true;
+    expect(canFerryFrom(dependencies, player, port)).true;
+    expect(waitForCarrier(dependencies, player, civ1Knowledge, fighter)).true;
   });
 });
