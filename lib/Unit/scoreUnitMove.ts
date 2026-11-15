@@ -1,6 +1,8 @@
 // Generic: how good a move to `tile` looks for `unit`, for the move executor's greedy step. Below 0 rules it out. The
 //  exploring terms are `base-strategy-explore`'s, added in the order they always were around the others.
+import { ferries, ferriesByCargo } from './carriesUnits';
 import { isPassenger } from './overseas';
+import { NavalTransport } from '@civ-clone/library-unit/Types';
 import {
   discoverableTilesTerm,
   goodyHutTerm,
@@ -9,7 +11,6 @@ import {
   moveGate,
   revisitTerm,
 } from '@civ-clone/base-strategy-explore/lib/Unit/scoreExploration';
-import { NavalTransport } from '@civ-clone/library-unit/Types';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
@@ -24,6 +25,8 @@ import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import strength from '@civ-clone/core-unit/strength';
+import attackOdds, { fightsInRounds, oddsWanted } from './attackOdds';
+import worthSabotaging from './sabotage';
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -53,6 +56,14 @@ export const scoreUnitMove = (
   // A computer player keeps its treaties (`breaksTreaty`), and doesn't walk onto a treaty partner's land
   //  (civ-clone/web-renderer#287) or try what a Senate would overrule.
   if (sneakAttack || sneakMove || abortMove || overruled) {
+    return -10;
+  }
+
+  // A Spy steps onto another player's lone unit only to sabotage one worth it (`actionToTake`).
+  if (
+    lookup.sabotageUnit !== undefined &&
+    !worthSabotaging(dependencies, player, unit, tile)
+  ) {
     return -10;
   }
 
@@ -103,21 +114,20 @@ export const scoreUnitMove = (
       : [0, 0],
     ourUnitsOnTile = tileUnits.some((unit: Unit) => unit.player() === player);
 
-  if (
-    unit instanceof NavalTransport &&
-    unit.hasCapacity() &&
-    tileUnits.length &&
-    ourUnitsOnTile
-  ) {
+  // A transport for passengers: by its cargo where the ruleset's transports carry other things (`ferriesByCargo`).
+  const ferry = (
+    ferriesByCargo(dependencies.ruleRegistry)
+      ? ferries(unit, dependencies.ruleRegistry)
+      : unit instanceof NavalTransport
+  )
+    ? (unit as NavalTransport)
+    : null;
+
+  if (ferry && ferry.hasCapacity() && tileUnits.length && ourUnitsOnTile) {
     score += 10;
   }
 
-  if (
-    unit instanceof NavalTransport &&
-    unit.hasCargo() &&
-    tile.isCoast() &&
-    tile.isWater()
-  ) {
+  if (ferry && ferry.hasCargo() && tile.isCoast() && tile.isWater()) {
     score += 16;
   }
 
@@ -136,17 +146,30 @@ export const scoreUnitMove = (
     score += 100;
   }
 
-  if (attack && attackStrength > defenceStrength) {
-    score += 24 * (attackStrength - defenceStrength);
-  }
+  // Battles fought in rounds, with hit points and firepower (a `CombatResolver` is registered): the odds decide. A unit
+  //  attacks only at the odds it wants (`oddsWanted`), and the better they are the more the attack is worth. Otherwise
+  //  (a single roll, as in Civ1) the strengths are compared.
+  if (attack && fightsInRounds(dependencies.ruleRegistry)) {
+    const odds = attackOdds(dependencies, unit, tile);
 
-  if (attack && attackStrength >= defenceStrength) {
-    score += 16;
-  }
+    if (odds < oddsWanted(dependencies, player, tile)) {
+      return -10;
+    }
 
-  // add some jeopardy
-  if (attack && attackStrength >= defenceStrength * (2 / 3)) {
-    score += 8;
+    score += 24 + 40 * odds;
+  } else {
+    if (attack && attackStrength > defenceStrength) {
+      score += 24 * (attackStrength - defenceStrength);
+    }
+
+    if (attack && attackStrength >= defenceStrength) {
+      score += 16;
+    }
+
+    // add some jeopardy
+    if (attack && attackStrength >= defenceStrength * (2 / 3)) {
+      score += 8;
+    }
   }
 
   score += discoverableTilesTerm(context);

@@ -1,4 +1,5 @@
 import {
+  Carrier,
   Horseman,
   Settlers,
   Trireme,
@@ -240,6 +241,14 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
 
     game.units.unregister(ship);
 
+    expect(ferryShipFor(dependencies, player, memory, port)).equal(Trireme);
+
+    // A Carrier's room is for aircraft: it's no room for passengers (M2b).
+    const carrier = new Carrier(null, player, world.get(5, 0), game.rules);
+
+    game.units.register(carrier);
+
+    expect(carrier.hasCapacity()).true;
     expect(ferryShipFor(dependencies, player, memory, port)).equal(Trireme);
   });
 

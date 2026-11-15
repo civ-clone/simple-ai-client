@@ -10,7 +10,12 @@ import {
   Transport,
   Trireme,
 } from '@civ-clone/civ1-unit/Units';
-import { carriesUnits, carriesUnitsType } from '../lib/Unit/carriesUnits';
+import {
+  carriesUnits,
+  carriesUnitsType,
+  ferries,
+  ferriesType,
+} from '../lib/Unit/carriesUnits';
 import { Monarchy } from '@civ-clone/civ1-government/Governments';
 import Ferry from '../Strategies/Unit/Ferry';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
@@ -61,11 +66,42 @@ describe('carriesUnits', (): void => {
     expect(canFerryFrom(dependencies, player, port)).false;
     expect(waitForCarrier(dependencies, player, civ1Knowledge, fighter)).false;
 
+    // A Carrier carries aircraft, not passengers: aircraft wait for it, but it's no ferry and no way overseas.
     const carrier = addUnit(Carrier, 4, 0);
 
     carrier.moves().set(1);
-    expect(ferry.handles(new PlayerAction(player, carrier))).true;
-    expect(canFerryFrom(dependencies, player, port)).true;
+    expect(ferry.handles(new PlayerAction(player, carrier))).false;
+    expect(canFerryFrom(dependencies, player, port)).false;
     expect(waitForCarrier(dependencies, player, civ1Knowledge, fighter)).true;
+
+    const transport = addUnit(Transport, 5, 0);
+
+    transport.moves().set(1);
+    expect(ferry.handles(new PlayerAction(player, transport))).true;
+    expect(canFerryFrom(dependencies, player, port)).true;
+  });
+
+  it("should count only Civ1's transports for land units as ferries", async (): Promise<void> => {
+    const { addUnit, dependencies } = await unitGame('30O', 1, 30, Monarchy);
+
+    [Trireme, Sail, Frigate, Transport].forEach(
+      (UnitType: typeof Unit, x: number): void => {
+        expect(
+          ferries(addUnit(UnitType, x, 0), dependencies.ruleRegistry),
+          UnitType.name
+        ).true;
+        expect(ferriesType(UnitType, dependencies.ruleRegistry)).true;
+      }
+    );
+
+    [Holdless, Submarine, Carrier].forEach((UnitType: typeof Unit): void => {
+      expect(
+        ferries(addUnit(UnitType, 10, 0), dependencies.ruleRegistry),
+        UnitType.name
+      ).false;
+      expect(ferriesType(UnitType, dependencies.ruleRegistry)).false;
+    });
+
+    expect(ferriesType({}, dependencies.ruleRegistry)).false;
   });
 });

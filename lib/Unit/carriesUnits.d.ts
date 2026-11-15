@@ -6,4 +6,21 @@ export declare const carriesUnitsType: (
   UnitType: object,
   ruleRegistry: RuleRegistry
 ) => boolean;
+export declare const ferries: (
+  unit: Unit,
+  ruleRegistry: RuleRegistry
+) => unit is NavalTransport;
+export declare const ferriesType: (
+  UnitType: object,
+  ruleRegistry: RuleRegistry
+) => boolean;
+export declare const ferriesByCargo: (ruleRegistry: RuleRegistry) => boolean;
+export declare const isFerry: (
+  unit: Unit,
+  ruleRegistry: RuleRegistry
+) => unit is NavalTransport;
+export declare const isFerryType: (
+  UnitType: object,
+  ruleRegistry: RuleRegistry
+) => boolean;
 export default carriesUnits;

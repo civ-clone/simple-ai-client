@@ -37,6 +37,7 @@ import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import MissionAndMove from './Strategies/Unit/MissionAndMove';
 import NegotiationAnswers from './Strategies/Diplomacy/NegotiationAnswers';
 import PreventDisorder from './Strategies/City/PreventDisorder';
+import RetreatToHeal from './Strategies/Unit/RetreatToHeal';
 import ReviewCities from './Strategies/Turn/ReviewCities';
 import SpendTreasury from './Strategies/City/SpendTreasury';
 import StandDown from './Strategies/Unit/StandDown';
@@ -50,6 +51,7 @@ import WaitForCarrier from './Strategies/Unit/WaitForCarrier';
 import WakeCarrierAircraft from './Strategies/Turn/WakeCarrierAircraft';
 import WorkerTurn from './Strategies/Unit/WorkerTurn';
 import { travelToPathEnd } from './lib/Unit/moveUnit';
+import withFuel from './lib/Unit/fuel';
 import civ1DisorderPolicy from './lib/Civ1/disorder';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import civ1SpendingPolicy from './lib/Civ1/spending';
@@ -69,7 +71,12 @@ export const createStrategies = (
   civ1: Knowledge = civ1Knowledge,
   victoryDependencies: VictoryDependencies = createVictoryDependencies()
 ): Strategy[] => {
-  const knowledge = withSpaceshipDefence(civ1, victoryDependencies, isCapital),
+  // Aircraft fuel from base-unit-fuel where a ruleset counts it that way (Civ2); Civ1's own count otherwise.
+  const knowledge = withSpaceshipDefence(
+      withFuel(civ1),
+      victoryDependencies,
+      isCapital
+    ),
     spaceRace = spaceRaceGoal(civ1SpaceRacePolicy),
     conquest = conquestGoal(civ1ConquestPolicy),
     goals = [spaceRace, conquest];
@@ -93,6 +100,9 @@ export const createStrategies = (
       travelToPathEnd
     ),
     new WorkerTurn(dependencies, knowledge),
+    // A damaged unit heals before it garrisons, goes on a mission or stands down: only a ruleset that deals damage
+    //  (Civ2) ever has one.
+    new RetreatToHeal(dependencies, knowledge),
     new Garrison(dependencies, knowledge),
     new MissionAndMove(dependencies, knowledge),
     // The attackers with nothing else to do gather for the campaign, if there is one.
