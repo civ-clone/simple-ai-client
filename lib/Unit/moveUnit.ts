@@ -13,11 +13,17 @@ import {
   Overruled,
 } from '@civ-clone/library-unit/Actions';
 import Action from '@civ-clone/core-unit/Action';
+import Airlift from '@civ-clone/base-unit-action-airlift/Airlift';
+import BuildAirbase from '@civ-clone/base-unit-action-build-airbase/BuildAirbase';
+import BuildFortress from '@civ-clone/base-unit-action-build-fortress/BuildFortress';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
+import Paradrop from '@civ-clone/base-unit-action-paradrop/Paradrop';
 import Player from '@civ-clone/core-player/Player';
+import SabotageUnit from '@civ-clone/base-unit-action-sabotage-unit/SabotageUnit';
 import Tile from '@civ-clone/core-world/Tile';
+import TransformTerrain from '@civ-clone/base-unit-action-transform-terrain/TransformTerrain';
 import Unit from '@civ-clone/core-unit/Unit';
 import { Naval } from '@civ-clone/library-unit/Types';
 import canNegotiate from '../Diplomacy/negotiate';
@@ -25,6 +31,7 @@ import coastalPath from './coastalPath';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import scoreUnitMove from './scoreUnitMove';
 import shuffle from '../shuffle';
+import worthSabotaging from './sabotage';
 
 // Whether any step from where `unit` stands scores above nothing: a hut, an enemy, unknown tiles it could go on to, a
 //  tile it's heading towards, and so on. Without one, the greedy step would pick among steps worth nothing at random.
@@ -43,7 +50,15 @@ export const actionsToTake = (actions: Action[]): Action[] =>
         action instanceof MeetWithLeader ||
         action instanceof BribeUnit ||
         action instanceof AbortMove ||
-        action instanceof Overruled
+        action instanceof Overruled ||
+        // Orders the AI doesn't give yet: a paradrop or an airlift is offered beside a move, and on a square a move
+        //  isn't (ZOC, say) would be the first left, and building a fortress or an airbase or transforming the terrain
+        //  isn't a step.
+        action instanceof Paradrop ||
+        action instanceof Airlift ||
+        action instanceof BuildFortress ||
+        action instanceof BuildAirbase ||
+        action instanceof TransformTerrain
       )
   );
 
@@ -64,6 +79,15 @@ export const actionToTake = (
   const [action] = actionsToTake(actions);
 
   if (!action || breaksTreaty(action)) {
+    return null;
+  }
+
+  // A Spy's sabotage comes before moving and attacking, so it's what a step onto another player's lone unit does:
+  //  only against a unit worth the Spy's risk.
+  if (
+    action instanceof SabotageUnit &&
+    !worthSabotaging(dependencies, player, action.unit(), action.to())
+  ) {
     return null;
   }
 
