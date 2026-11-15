@@ -11,6 +11,7 @@ import FoundsCities from '@civ-clone/base-unit-trait-founds-cities/FoundsCities'
 import { isA } from '@civ-clone/core-unit/traits';
 import { Embark } from '@civ-clone/library-unit/Actions';
 import { Land, NavalTransport } from '@civ-clone/library-unit/Types';
+import { carriesUnits, carriesUnitsType } from './carriesUnits';
 import { defendersIn, defendersKept, isDefender } from '../City/defence';
 import {
   confidentPower,
@@ -119,12 +120,12 @@ export const canFerryFrom = (
 ): boolean =>
   dependencies.unitRegistry
     .getByPlayer(player)
-    .some((unit: Unit): boolean => unit instanceof NavalTransport) ||
+    .some((unit: Unit): boolean => carriesUnits(unit)) ||
   dependencies.cityBuildRegistry
     .getByCity(port)
     .available()
     .some((buildItem): boolean =>
-      Object.prototype.isPrototypeOf.call(NavalTransport, buildItem.item())
+      carriesUnitsType(buildItem.item(), dependencies.ruleRegistry)
     );
 
 // The nearest of `candidates` on another landmass than `unit`'s, and the port it would sail from, if the player can

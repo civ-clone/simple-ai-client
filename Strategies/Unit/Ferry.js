@@ -5,12 +5,12 @@ exports.Ferry = void 0;
 //  they're waiting (civ-clone/web-renderer#211, #374). Handles the action only then; otherwise the transport explores
 //  (`MissionAndMove`).
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
-const Types_1 = require("@civ-clone/library-unit/Types");
+const carriesUnits_1 = require("../../lib/Unit/carriesUnits");
 const ferry_1 = require("../../lib/Unit/ferry");
 const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
 class Ferry extends AIStrategy_1.default {
     handles(action) {
-        return (0, isUnitAction_1.default)(action) && action.value() instanceof Types_1.NavalTransport;
+        return (0, isUnitAction_1.default)(action) && (0, carriesUnits_1.default)(action.value());
     }
     attempt(action) {
         const player = action.player();
