@@ -29,6 +29,7 @@ const Garrison_1 = require("./Strategies/Unit/Garrison");
 const MissionAndMove_1 = require("./Strategies/Unit/MissionAndMove");
 const NegotiationAnswers_1 = require("./Strategies/Diplomacy/NegotiationAnswers");
 const PreventDisorder_1 = require("./Strategies/City/PreventDisorder");
+const RetreatToHeal_1 = require("./Strategies/Unit/RetreatToHeal");
 const ReviewCities_1 = require("./Strategies/Turn/ReviewCities");
 const SpendTreasury_1 = require("./Strategies/City/SpendTreasury");
 const StandDown_1 = require("./Strategies/Unit/StandDown");
@@ -41,6 +42,7 @@ const WaitForCarrier_1 = require("./Strategies/Unit/WaitForCarrier");
 const WakeCarrierAircraft_1 = require("./Strategies/Turn/WakeCarrierAircraft");
 const WorkerTurn_1 = require("./Strategies/Unit/WorkerTurn");
 const moveUnit_1 = require("./lib/Unit/moveUnit");
+const fuel_1 = require("./lib/Unit/fuel");
 const disorder_1 = require("./lib/Civ1/disorder");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const spending_1 = require("./lib/Civ1/spending");
@@ -55,7 +57,8 @@ const tradeRates_1 = require("./lib/Civ1/tradeRates");
 //  conquest (civ-clone/web-renderer#377). A capital keeps a defender more while its player's ship is in flight, and a
 //  player builds more attackers while it plays for conquest.
 const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDependencies = (0, VictoryDependencies_1.createVictoryDependencies)()) => {
-    const knowledge = (0, spaceRace_1.withSpaceshipDefence)(civ1, victoryDependencies, defence_1.isCapital), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(spaceRace_1.default), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
+    // Aircraft fuel from base-unit-fuel where a ruleset counts it that way (Civ2); Civ1's own count otherwise.
+    const knowledge = (0, spaceRace_1.withSpaceshipDefence)((0, fuel_1.default)(civ1), victoryDependencies, defence_1.isCapital), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(spaceRace_1.default), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
     return [
         // `BeforeTurn`, all of them in turn.
         new SurveyTargets_1.default(dependencies, knowledge),
@@ -70,6 +73,9 @@ const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDepen
         new FoundCapital_1.default(dependencies, knowledge),
         new TerrainWork_1.default(dependencies, knowledge, terrain_1.civ1TerrainPolicy, moveUnit_1.travelToPathEnd),
         new WorkerTurn_1.default(dependencies, knowledge),
+        // A damaged unit heals before it garrisons, goes on a mission or stands down: only a ruleset that deals damage
+        //  (Civ2) ever has one.
+        new RetreatToHeal_1.default(dependencies, knowledge),
         new Garrison_1.default(dependencies, knowledge),
         new MissionAndMove_1.default(dependencies, knowledge),
         // The attackers with nothing else to do gather for the campaign, if there is one.
