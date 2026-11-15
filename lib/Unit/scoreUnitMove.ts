@@ -1,6 +1,8 @@
 // Generic: how good a move to `tile` looks for `unit`, for the move executor's greedy step. Below 0 rules it out. The
 //  exploring terms are `base-strategy-explore`'s, added in the order they always were around the others.
+import { ferries, ferriesByCargo } from './carriesUnits';
 import { isPassenger } from './overseas';
+import { NavalTransport } from '@civ-clone/library-unit/Types';
 import {
   discoverableTilesTerm,
   goodyHutTerm,
@@ -9,7 +11,6 @@ import {
   moveGate,
   revisitTerm,
 } from '@civ-clone/base-strategy-explore/lib/Unit/scoreExploration';
-import { NavalTransport } from '@civ-clone/library-unit/Types';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
@@ -113,21 +114,20 @@ export const scoreUnitMove = (
       : [0, 0],
     ourUnitsOnTile = tileUnits.some((unit: Unit) => unit.player() === player);
 
-  if (
-    unit instanceof NavalTransport &&
-    unit.hasCapacity() &&
-    tileUnits.length &&
-    ourUnitsOnTile
-  ) {
+  // A transport for passengers: by its cargo where the ruleset's transports carry other things (`ferriesByCargo`).
+  const ferry = (
+    ferriesByCargo(dependencies.ruleRegistry)
+      ? ferries(unit, dependencies.ruleRegistry)
+      : unit instanceof NavalTransport
+  )
+    ? (unit as NavalTransport)
+    : null;
+
+  if (ferry && ferry.hasCapacity() && tileUnits.length && ourUnitsOnTile) {
     score += 10;
   }
 
-  if (
-    unit instanceof NavalTransport &&
-    unit.hasCargo() &&
-    tile.isCoast() &&
-    tile.isWater()
-  ) {
+  if (ferry && ferry.hasCargo() && tile.isCoast() && tile.isWater()) {
     score += 16;
   }
 

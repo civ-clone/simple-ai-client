@@ -5,7 +5,7 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Strategy from '@civ-clone/core-strategy/Strategy';
 import Unit from '@civ-clone/core-unit/Unit';
-import carriesUnits from '../../lib/Unit/carriesUnits';
+import { isFerry } from '../../lib/Unit/carriesUnits';
 import isUnitAction from '@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction';
 import { raid, sail } from '../../lib/Barbarian/raid';
 
@@ -25,7 +25,7 @@ export class Raid extends Strategy {
   attempt(action: PlayerAction<Unit>): boolean {
     const unit = action.value();
 
-    if (carriesUnits(unit)) {
+    if (isFerry(unit, this._dependencies.ruleRegistry)) {
       sail(this._dependencies, action.player(), unit);
     } else {
       raid(this._dependencies, action.player(), unit);

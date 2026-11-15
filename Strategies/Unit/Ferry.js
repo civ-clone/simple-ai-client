@@ -10,7 +10,8 @@ const ferry_1 = require("../../lib/Unit/ferry");
 const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
 class Ferry extends AIStrategy_1.default {
     handles(action) {
-        return (0, isUnitAction_1.default)(action) && (0, carriesUnits_1.default)(action.value());
+        return ((0, isUnitAction_1.default)(action) &&
+            (0, carriesUnits_1.isFerry)(action.value(), this.dependencies().ruleRegistry));
     }
     attempt(action) {
         const player = action.player();

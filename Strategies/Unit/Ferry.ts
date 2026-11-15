@@ -4,13 +4,16 @@
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
 import Unit from '@civ-clone/core-unit/Unit';
-import carriesUnits from '../../lib/Unit/carriesUnits';
+import { isFerry } from '../../lib/Unit/carriesUnits';
 import ferry from '../../lib/Unit/ferry';
 import isUnitAction from '@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction';
 
 export class Ferry extends AIStrategy {
   handles(action: PlayerAction): boolean {
-    return isUnitAction(action) && carriesUnits(action.value());
+    return (
+      isUnitAction(action) &&
+      isFerry(action.value(), this.dependencies().ruleRegistry)
+    );
   }
 
   attempt(action: PlayerAction<Unit>): Promise<boolean> {

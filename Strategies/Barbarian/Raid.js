@@ -15,7 +15,7 @@ class Raid extends Strategy_1.default {
     }
     attempt(action) {
         const unit = action.value();
-        if ((0, carriesUnits_1.default)(unit)) {
+        if ((0, carriesUnits_1.isFerry)(unit, this._dependencies.ruleRegistry)) {
             (0, raid_1.sail)(this._dependencies, action.player(), unit);
         }
         else {

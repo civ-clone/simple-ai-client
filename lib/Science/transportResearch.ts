@@ -4,7 +4,7 @@
 import Advance from '@civ-clone/core-science/Advance';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { IConstructor } from '@civ-clone/core-registry/Registry';
-import { carriesUnitsType } from '../Unit/carriesUnits';
+import { isFerryType } from '../Unit/carriesUnits';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import Requirement from '@civ-clone/core-requirement/Requirement';
 
@@ -131,7 +131,7 @@ const transportTypes = (dependencies: Dependencies): IConstructor[] => [
   ...new Set(
     dependencies.requirementRegistry
       .filter((entry: Requirement): boolean =>
-        carriesUnitsType(entry.subject, dependencies.ruleRegistry)
+        isFerryType(entry.subject, dependencies.ruleRegistry)
       )
       .map((entry: Requirement): IConstructor => entry.subject)
   ),

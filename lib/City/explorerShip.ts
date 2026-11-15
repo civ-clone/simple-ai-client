@@ -10,7 +10,7 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import buildTime, { finishesWithin, netShields } from './buildTime';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import { Naval, NavalTransport } from '@civ-clone/library-unit/Types';
-import { carriesUnitsType } from '../Unit/carriesUnits';
+import { ferries, ferriesByCargo, isFerryType } from '../Unit/carriesUnits';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import { canBerthAt, isFerrying, waitingAt } from '../Unit/overseas';
 import islandBound from '../Player/islandBound';
@@ -168,7 +168,7 @@ export const ferryShipFor = (
         passenger.since !== null && turn - passenger.since >= ferryWait
     ),
     isTransport = (item: object): boolean =>
-      carriesUnitsType(item, dependencies.ruleRegistry),
+      isFerryType(item, dependencies.ruleRegistry),
     [ship] = dependencies.cityBuildRegistry
       .getByCity(city)
       .available()
@@ -187,7 +187,9 @@ export const ferryShipFor = (
       .getByPlayer(player)
       .filter(
         (unit: Unit): boolean =>
-          unit instanceof NavalTransport &&
+          (ferriesByCargo(dependencies.ruleRegistry)
+            ? ferries(unit, dependencies.ruleRegistry)
+            : unit instanceof NavalTransport) &&
           (unit as unknown as Transport).cargo().length === 0 &&
           canBerthAt(unit as unknown as Unit, city)
       )
