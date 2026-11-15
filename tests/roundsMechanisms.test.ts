@@ -342,16 +342,15 @@ describe('rounds mechanisms', (): void => {
   });
 
   describe('ferries', (): void => {
-    it('should use a Carrier as a ferry only where battles are not fought in rounds', async (): Promise<void> => {
+    it('should never use a Carrier as a ferry', async (): Promise<void> => {
       const setup = await unitGame('30O', 1, 30, Monarchy),
         { addUnit, dependencies } = setup,
         carrier = addUnit(Carrier, 0, 0),
         transport = addUnit(Transport, 1, 0);
 
-      // Without a resolver (Civ1), as it always has been: any transport that carries something.
-      expect(isFerry(carrier, dependencies.ruleRegistry)).equal(
-        carriesUnits(carrier)
-      );
+      // Without a resolver (Civ1) too, a Carrier carries aircraft, not passengers.
+      expect(carriesUnits(carrier)).true;
+      expect(isFerry(carrier, dependencies.ruleRegistry)).false;
       expect(isFerry(transport, dependencies.ruleRegistry)).true;
 
       fightInRounds(setup);
