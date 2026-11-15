@@ -58,6 +58,7 @@
     "@civ-clone/base-trade-rate-tax": "^0.1.0",
     "@civ-clone/base-unit-action-join-city": "^0.1.0",
     "@civ-clone/base-unit-trait-attack-ends-turn": "^0.1.0",
+    "@civ-clone/base-unit-trait-carries": "^0.1.0",
     "@civ-clone/base-unit-trait-coast-bound": "^0.1.0",
     "@civ-clone/base-unit-trait-fortifies": "^0.1.0",
     "@civ-clone/base-unit-trait-founds-cities": "^0.1.0",

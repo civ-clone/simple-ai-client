@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Raid = void 0;
-const NavalTransport_1 = require("@civ-clone/base-unit-type-naval-transport/NavalTransport");
 const Strategy_1 = require("@civ-clone/core-strategy/Strategy");
+const carriesUnits_1 = require("../../lib/Unit/carriesUnits");
 const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
 const raid_1 = require("../../lib/Barbarian/raid");
 class Raid extends Strategy_1.default {
@@ -15,7 +15,7 @@ class Raid extends Strategy_1.default {
     }
     attempt(action) {
         const unit = action.value();
-        if (unit instanceof NavalTransport_1.default) {
+        if ((0, carriesUnits_1.default)(unit)) {
             (0, raid_1.sail)(this._dependencies, action.player(), unit);
         }
         else {

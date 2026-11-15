@@ -1,10 +1,11 @@
 import * as Advances from '@civ-clone/civ1-science/Advances';
 import { Settlers, Trireme, Warrior } from '@civ-clone/civ1-unit/Units';
 import { RequirementRegistry } from '@civ-clone/core-requirement/RequirementRegistry';
-import { NavalTransport } from '@civ-clone/library-unit/Types';
+import { Land, NavalTransport } from '@civ-clone/library-unit/Types';
 import Requirement from '@civ-clone/core-requirement/Requirement';
 import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import Advance from '@civ-clone/core-science/Advance';
+import Carries from '@civ-clone/base-unit-trait-carries/Carries';
 import ChooseResearch from '../Strategies/Science/ChooseResearch';
 import City from '@civ-clone/core-city/City';
 import { Despotism } from '@civ-clone/civ1-government/Governments';
@@ -32,6 +33,7 @@ import moveUnit from '../lib/Unit/moveUnit';
 import scienceRules from '@civ-clone/civ1-science/registerRules';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import transportResearch from '../lib/Science/transportResearch';
+import { unitTraits } from '@civ-clone/core-unit/Rules/UnitTraits';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
 import worldRules from '@civ-clone/civ1-world/registerRules';
 
@@ -285,9 +287,11 @@ describe('islandBound (civ-clone/web-renderer#632)', (): void => {
 });
 
 describe('transportResearch (civ-clone/web-renderer#632)', (): void => {
-  // A ruleset of its own: `Ship` carries land units, the advances are letters.
+  // A ruleset of its own: `Ship` carries land units, the advances are letters. A `NavalTransport` the ruleset gives
+  //  nothing to carry (as Civ1's Submarine) is no transport to research.
   class Ship extends NavalTransport {}
   class OtherShip extends NavalTransport {}
+  class Holdless extends NavalTransport {}
   class A extends Advance {}
   class B extends Advance {}
   class C extends Advance {}
@@ -297,11 +301,16 @@ describe('transportResearch (civ-clone/web-renderer#632)', (): void => {
   class Y extends Advance {}
 
   const ruleset = (...entries: Requirement[]) => {
-      const requirementRegistry = new RequirementRegistry(new RuleRegistry());
+      const ruleRegistry = new RuleRegistry(),
+        requirementRegistry = new RequirementRegistry(ruleRegistry);
 
+      ruleRegistry.register(
+        ...unitTraits('test', Ship, new Carries(Land)),
+        ...unitTraits('test', OtherShip, new Carries(Land))
+      );
       requirementRegistry.add(null, ...entries);
 
-      return createDependencies({ requirementRegistry });
+      return createDependencies({ requirementRegistry, ruleRegistry });
     },
     entry = (
       id: string,
@@ -357,6 +366,12 @@ describe('transportResearch (civ-clone/web-renderer#632)', (): void => {
     // Ship is obsolete, so the way is to OtherShip.
     expect(transportResearch(obsolete, research([B], [A, C]))).equal(C);
     expect(transportResearch(ruleset(), research([], [A]))).null;
+    expect(
+      transportResearch(
+        ruleset(entry('holdless', Holdless, [A])),
+        research([], [A])
+      )
+    ).null;
   });
 
   it('goes for the Sail once Navigation has made the Trireme obsolete, and so wants nothing more', async (): Promise<void> => {
