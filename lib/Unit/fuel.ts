@@ -6,6 +6,7 @@ import { FuelState, fuelState } from '@civ-clone/base-unit-fuel/lib/reach';
 import Action from '@civ-clone/core-unit/Action';
 import { Air } from '@civ-clone/library-unit/Types';
 import AttackEndsTurn from '@civ-clone/base-unit-trait-attack-ends-turn/AttackEndsTurn';
+import SingleUse from '@civ-clone/base-unit-trait-single-use/SingleUse';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
@@ -64,7 +65,8 @@ const isAttack = (
 
 // Whether a fuelled aircraft could still get to somewhere it refuels after taking `action`, before its fuel runs out
 //  (`fuelState`'s reach): a move costs 1 and an attack, fought from where it is, costs 1, or the rest of this turn's
-//  moves for one whose attack ends its turn (`AttackEndsTurn`). `null` for a unit that needs no fuel.
+//  moves for one whose attack ends its turn (`AttackEndsTurn`); a missile only has to reach its target. `null` for a
+//  unit that needs no fuel.
 export const fuelCanReturn = (
   dependencies: Dependencies,
   player: Player,
@@ -77,8 +79,14 @@ export const fuelCanReturn = (
     return null;
   }
 
-  const attacking = isAttack(dependencies, player, action),
-    from = attacking ? unit.tile() : action.to(),
+  const attacking = isAttack(dependencies, player, action);
+
+  // A missile (`SingleUse`) is spent in its attack, so it needs no way back: only fuel left to reach its target.
+  if (attacking && unit.hasTrait(SingleUse)) {
+    return state.reach >= 1;
+  }
+
+  const from = attacking ? unit.tile() : action.to(),
     remaining =
       attacking && unit.hasTrait(AttackEndsTurn)
         ? state.reach - unit.moves().value()

@@ -3,6 +3,7 @@
 //  unit that didn't move in the last one, faster in a city, and fully in one with the facility for the unit's kind
 //  (base-unit-healing, as Civ2 wires it): Barracks, Port Facility or Airport.
 import { Air, Land, Naval } from '@civ-clone/library-unit/Types';
+import Airbase from '@civ-clone/base-tile-improvement-airbase/Airbase';
 import Airport from '@civ-clone/base-city-improvement-airport/Airport';
 import Barracks from '@civ-clone/base-city-improvement-barracks/Barracks';
 import City from '@civ-clone/core-city/City';
@@ -17,6 +18,7 @@ import PortFacility from '@civ-clone/base-city-improvement-portfacility/PortFaci
 import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
 import Unit from '@civ-clone/core-unit/Unit';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
+import { fuelFor } from './fuel';
 import { travelToPathEnd } from './moveUnit';
 
 // A unit with less than this share of its hit points left goes to heal.
@@ -53,14 +55,17 @@ const cityHas = (
         improvement instanceof Improvement
     );
 
-// Whether `unit` rests where it is to heal: in one of its player's cities, or on a Fortress.
+// Whether `unit` rests where it is to heal: in one of its player's cities, on a Fortress, or, an aircraft, on an
+//  Airbase.
 export const restsHere = (dependencies: Dependencies, unit: Unit): boolean =>
   dependencies.cityRegistry.getByTile(unit.tile())?.player() ===
     unit.player() ||
   dependencies.tileImprovementRegistry
     .getByTile(unit.tile())
     .some(
-      (improvement: TileImprovement): boolean => improvement instanceof Fortress
+      (improvement: TileImprovement): boolean =>
+        improvement instanceof Fortress ||
+        (unit instanceof Air && improvement instanceof Airbase)
     );
 
 // Whether `unit` is damaged enough to go and heal: below `RETREAT_BELOW` of its hit points. Asks for its hit points only
@@ -76,8 +81,10 @@ export const needsHealing = (unit: Unit): boolean => {
 };
 
 // Whether `unit` heals this turn rather than doing anything else: a damaged unit in one of its player's cities or on a
-//  Fortress stays until it's whole; one elsewhere goes once it's below `RETREAT_BELOW`. An aircraft heals where it
-//  lands, as its fuel brings it back, and a land unit at sea is a passenger, so neither turns back here.
+//  Fortress (an aircraft also on an Airbase) stays until it's whole; one elsewhere goes once it's below
+//  `RETREAT_BELOW`. An aircraft with fuel heals where it lands, as its fuel brings it back, and a land unit at sea is a
+//  passenger, so neither turns back here; an aircraft with none (Civ2's Helicopter, which loses hit points outside a
+//  city or airbase) does.
 export const healsThisTurn = (
   dependencies: Dependencies,
   unit: Unit
@@ -85,7 +92,7 @@ export const healsThisTurn = (
   unit.damage() > 0 &&
   !(unit instanceof Land && unit.tile().isWater()) &&
   (restsHere(dependencies, unit) ||
-    (!(unit instanceof Air) && needsHealing(unit)));
+    (fuelFor(dependencies, unit) === null && needsHealing(unit)));
 
 // The player's cities `unit` could heal in, best first: the nearest, counting one with the facility for its kind
 //  `FACILITY_PREFERENCE` squares nearer, up to `RETREAT_RANGE` away. A ship only looks at coastal cities.
