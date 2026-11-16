@@ -17,6 +17,8 @@
     "ts:compile": "tsc --build tsconfig.json"
   },
   "devDependencies": {
+    "@civ-clone/base-diplomacy-declaration-alliance": "^0.1.0",
+    "@civ-clone/base-diplomacy-declaration-ceasefire": "^0.1.0",
     "@civ-clone/civ1-civilization": "github:civ-clone/civ1-civilization",
     "@civ-clone/civ1-diplomacy": "github:civ-clone/civ1-diplomacy",
     "@civ-clone/civ1-game-year": "github:civ-clone/civ1-game-year",
@@ -52,8 +54,6 @@
     "@civ-clone/base-civilization-barbarian": "^0.1.0",
     "@civ-clone/base-combat-rounds": "^0.1.0",
     "@civ-clone/base-diplomacy": "^0.1.3",
-    "@civ-clone/base-diplomacy-declaration-alliance": "^0.1.0",
-    "@civ-clone/base-diplomacy-declaration-ceasefire": "^0.1.0",
     "@civ-clone/base-diplomacy-declaration-peace": "^0.1.0",
     "@civ-clone/base-government-change": "^0.1.2",
     "@civ-clone/base-leader-personality": "^0.1.2",
