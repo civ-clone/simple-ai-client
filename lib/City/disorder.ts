@@ -33,6 +33,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
 import Yield from '@civ-clone/core-yield/Yield';
 import { changeWorkedTile } from '@civ-clone/library-city/lib/assignWorkers';
+import { changeLosesShields, hasChangeRules } from './productionChange';
 
 // Why a city was left to fall into disorder: `Memory` in `base-strategy-ai` explains each reason.
 export type { UncalmedReason };
@@ -47,6 +48,9 @@ export interface DisorderPolicy {
   unhappinessOnGrowth(dependencies: Dependencies, city: City): number;
   // Whether `city` started this turn in civil disorder.
   wasInDisorder(dependencies: Dependencies, city: City): boolean;
+  // Called at the start of the player's turn (`BeforeTurn`), before anything it does changes its cities, for a policy
+  //  that notes what it needs of them then (`noteDisorderAtTurnStart`).
+  turnStart?(dependencies: Dependencies, player: Player): void;
 }
 
 // The functions below take `city`'s yields, as it stands, from a caller that has them already: working them out isn't
@@ -71,6 +75,40 @@ export const inDisorder = (
         : yields
     )
     .some((result: boolean): boolean => result);
+
+// The turn each city was last found in disorder at its player's turn start (`noteDisorderAtTurnStart`), and the player
+//  whose turn it was: a city captured later in the round wasn't in disorder at its new owner's turn start.
+const disorderAtTurnStart: WeakMap<City, [number, Player]> = new WeakMap();
+
+// Notes which of `player`'s cities the ruleset's `CivilDisorder` rules find in disorder at the start of its turn, before
+//  anything the player does calms them, for a ruleset whose own record of it isn't known here: the engine judged them
+//  by the same rules a moment before, as the turn started.
+export const noteDisorderAtTurnStart = (
+  dependencies: Dependencies,
+  player: Player
+): void => {
+  const turn = dependencies.turn.value();
+
+  dependencies.cityRegistry.getByPlayer(player).forEach((city: City): void => {
+    if (inDisorder(dependencies, city)) {
+      disorderAtTurnStart.set(city, [turn, player]);
+    }
+  });
+};
+
+// Whether `noteDisorderAtTurnStart` found `city` in disorder at the start of its owner's turn this turn.
+export const wasInDisorderAtTurnStart = (
+  dependencies: Dependencies,
+  city: City
+): boolean => {
+  const noted = disorderAtTurnStart.get(city);
+
+  return (
+    noted !== undefined &&
+    noted[0] === dependencies.turn.value() &&
+    noted[1] === city.player()
+  );
+};
 
 // Whether `city` will grow at the player's next turn start, with the food it has now.
 export const willGrow = (
@@ -111,23 +149,28 @@ const disorderRisk = (
 // The tiles `city` works, other than its centre, in the order their citizens are made Entertainers: the least food
 //  first, then the fewest shields, then the least trade, so the city keeps as much food as it can. Ties keep the order
 //  the tiles were taken in.
+//  Each tile is judged by what it gives the city (`City#tileYields`), which is what the tile gives the player unless the
+//  ruleset changes a square for the city it's worked by (Civ2's buildings and government).
 export const leastValuableWorkedTiles = (
   dependencies: Dependencies,
   city: City
-): Tile[] =>
-  dependencies.workedTileRegistry
+): Tile[] => {
+  const rules = city.tileYieldRules();
+
+  return dependencies.workedTileRegistry
     .getByCity(city)
     .map((workedTile: WorkedTile): Tile => workedTile.tile())
     .filter((tile: Tile): boolean => tile !== city.tile())
     .map((tile: Tile): [Tile, number[]] => [
       tile,
-      reduceYields(tile.yields(city.player()), Food, Production, Trade),
+      reduceYields(city.tileYields(tile, rules), Food, Production, Trade),
     ])
     .sort(
       ([, a]: [Tile, number[]], [, b]: [Tile, number[]]): number =>
         a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
     )
     .map(([tile]: [Tile, number[]]): Tile => tile);
+};
 
 // Puts `city`'s Entertainers, the ruleset's first kind of specialist (what a citizen becomes when taken off a tile),
 //  back to work on the best tiles free, as `assignWorkers` places any citizen without a job. A citizen with no tile to
@@ -258,8 +301,9 @@ export const calmCity = (
 
 // For a city that started the turn in disorder: builds the first of `improvements` it can (one it has already isn't
 //  available), unless it's building one of them already. It doesn't switch when it has more shields in hand than the
-//  improvement costs, since the rest would be thrown away when it's finished. Returns what the city is building to calm
-//  itself, or `null`.
+//  improvement costs, since the rest would be thrown away when it's finished, nor when the ruleset would take shields
+//  for the change (`lib/City/productionChange`): what calms a city isn't worth shields it would lose. Returns what the
+//  city is building to calm itself, or `null`.
 export const buildToCalm = (
   dependencies: Dependencies,
   city: City,
@@ -285,6 +329,13 @@ export const buildToCalm = (
       );
 
   if (!buildItem || cityBuild.progress().value() > buildItem.cost().value()) {
+    return null;
+  }
+
+  if (
+    hasChangeRules(dependencies) &&
+    changeLosesShields(dependencies, cityBuild, buildItem.item())
+  ) {
     return null;
   }
 

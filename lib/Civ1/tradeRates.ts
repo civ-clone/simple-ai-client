@@ -5,7 +5,8 @@ import {
   citizenSummary,
 } from '@civ-clone/civ1-city-happiness/lib/calculateCitizenState';
 import { TradeRatePolicy } from '../Turn/adjustTradeRates';
-import civ1DisorderPolicy from './disorder';
+import civ1DisorderPolicy, { recordsCivilDisorder } from './disorder';
+import { inDisorder } from '../City/disorder';
 import { createVictoryDependencies } from '@civ-clone/base-strategy-victory/lib/VictoryDependencies';
 import { scienceStopped } from '../Science/wantedAdvances';
 import { spaceAdvancesWanted } from './spaceRace';
@@ -19,6 +20,17 @@ export const civ1TradeRatePolicy: TradeRatePolicy = {
 
     if (cityGrowth.size() <= 5) {
       return false;
+    }
+
+    // A ruleset with its own citizens' moods (Civ2's angry citizens) is asked by its own `CivilDisorder` rules: on the
+    //  edge is calm now, but in disorder with one more unhappy citizen.
+    if (!recordsCivilDisorder(dependencies)) {
+      const yields = city.yields();
+
+      return (
+        !inDisorder(dependencies, city, 0, yields) &&
+        inDisorder(dependencies, city, 1, yields)
+      );
     }
 
     const [unhappy, , happy] = citizenSummary(

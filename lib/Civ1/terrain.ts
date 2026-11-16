@@ -35,6 +35,10 @@ import {
   Road,
 } from '@civ-clone/civ1-world/TileImprovements';
 import City from '@civ-clone/core-city/City';
+import Available from '@civ-clone/core-tile-improvement/Rules/Available';
+import Farmland from '@civ-clone/base-tile-improvement-farmland/Farmland';
+import { instance as availableTileImprovementRegistryInstance } from '@civ-clone/core-tile-improvement/AvailableTileImprovementRegistry';
+import Supermarket from '@civ-clone/base-city-improvement-supermarket/Supermarket';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import Terrain from '@civ-clone/core-terrain/Terrain';
@@ -1080,6 +1084,105 @@ const pollutedCount = (dependencies: Dependencies, player: Player): number => {
   return count;
 };
 
+// Whether the game has Farmland (`base-tile-improvement-farmland`) at all: the ruleset registers it as a tile
+//  improvement (Civ2). Worked out once a turn, so that a game without it (Civ1) does no more for each tile than before.
+const farmlandCache: WeakMap<object, [number, boolean]> = new WeakMap();
+
+const hasFarmlandInGame = (dependencies: Dependencies): boolean => {
+  const turn = dependencies.turn.value(),
+    cached = farmlandCache.get(dependencies);
+
+  if (cached && cached[0] === turn) {
+    return cached[1];
+  }
+
+  const has = availableTileImprovementRegistryInstance
+    .entries()
+    .some(
+      (Improvement): boolean =>
+        (Improvement as unknown) === Farmland ||
+        Object.prototype.isPrototypeOf.call(Farmland, Improvement)
+    );
+
+  farmlandCache.set(dependencies, [turn, has]);
+
+  return has;
+};
+
+// Whether `tile` has Farmland: only a ruleset that has it (Civ2) ever builds any.
+const hasFarmland = (dependencies: Dependencies, tile: Tile): boolean =>
+  hasFarmlandInGame(dependencies) &&
+  dependencies.tileImprovementRegistry
+    .getByTile(tile)
+    .some(
+      (tileImprovement: TileImprovement): boolean =>
+        tileImprovement instanceof Farmland
+    );
+
+// Whether `city` has a Supermarket (`base-city-improvement-supermarket`), or is building one: what makes Farmland worth
+//  anything to it (Civ2).
+const wantsFarmland = (dependencies: Dependencies, city: City): boolean => {
+  const building = dependencies.cityBuildRegistry
+    .getByCity(city)
+    .building()
+    ?.item();
+
+  return (
+    (building !== undefined &&
+      ((building as unknown) === Supermarket ||
+        Object.prototype.isPrototypeOf.call(Supermarket, building))) ||
+    dependencies.cityImprovementRegistry
+      .getByCity(city)
+      .some((improvement): boolean => improvement instanceof Supermarket)
+  );
+};
+
+// Of the shares of food a square's Farmland gives a city with a Supermarket, the one taken here (Civ2's +50%): what
+//  the job is worth is reckoned before the Supermarket is there, so not read from the city's yields.
+const FARMLAND_FOOD = 0.5;
+
+// Farmland on an irrigated tile `city` works, other than its own, where the city has or is building a Supermarket and
+//  the ruleset's `Available` rules let the player build it there (its advance, water, no city): the worker's
+//  `buildFarmland` action (`base-unit-action-build-farmland`), worth the food it would add to what the tile gives the
+//  city now. Nothing at all in a game without Farmland (Civ1).
+const farmlandJobs = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile,
+  city: City,
+  weights: Weights
+): TerrainJobValue[] => {
+  if (
+    !hasFarmlandInGame(dependencies) ||
+    tile === city.tile() ||
+    !hasImprovement(dependencies, tile, 'irrigation') ||
+    !wantsFarmland(dependencies, city) ||
+    hasFarmland(dependencies, tile) ||
+    !dependencies.ruleRegistry
+      .get(Available)
+      .some((rule: Available): boolean => rule.validate(tile, Farmland, player))
+  ) {
+    return [];
+  }
+
+  const food = Math.floor(
+    reduceYield(city.tileYields(tile), Food) * FARMLAND_FOOD
+  );
+
+  if (food <= 0) {
+    return [];
+  }
+
+  return [
+    {
+      improvement: 'farmland',
+      action: 'buildFarmland',
+      value: worth({ food }, weights) * IRRIGATION,
+      turns: terrainJobTurns(BuildIrrigation, tile.terrain()) ?? 1,
+    },
+  ];
+};
+
 const pollutionJobs = (
   dependencies: Dependencies,
   player: Player,
@@ -1189,9 +1292,11 @@ export const civ1TerrainPolicy: TerrainPolicy = {
               (has('road') && knowsRailroad(dependencies, player))) &&
             // Irrigation that's the only water a neighbour worth irrigating could have stays until it's irrigated, and
             //  a dry tile that water could reach isn't mined first if irrigating it would be worth more.
+            // Nor is a mine dug where it would take Farmland with the irrigation.
             (improvement !== 'mine' ||
               (has('irrigation')
-                ? !onlyWaterFor(dependencies, player, tile)
+                ? !onlyWaterFor(dependencies, player, tile) &&
+                  !hasFarmland(dependencies, tile)
                 : waterBeside(dependencies, tile) ||
                   !couldHaveWater(dependencies, tile) ||
                   IRRIGATION *
@@ -1240,6 +1345,9 @@ export const civ1TerrainPolicy: TerrainPolicy = {
       ...conversionJobs(dependencies, player, tile, weights, worked),
       ...(worked
         ? plantingJobs(dependencies, player, tile, city, weights)
+        : []),
+      ...(worked
+        ? farmlandJobs(dependencies, player, tile, city, weights)
         : []),
       ...pollutionJobs(dependencies, player, tile, weights, factor),
     ].filter(({ value }: TerrainJobValue): boolean => value > 0);

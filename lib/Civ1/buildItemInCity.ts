@@ -50,6 +50,10 @@ import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
 import isUsefulWonder from './wonders';
 import Yield from '@civ-clone/core-yield/Yield';
+import CityBuild from '@civ-clone/core-city-build/CityBuild';
+import { changeLosesShields, hasChangeRules } from '../City/productionChange';
+import { isCapitalization } from '@civ-clone/base-city-improvement-capitalization/lib/capitalizationRules';
+import { threatened } from './defence';
 import rankBuildItems, {
   RankedBuildItem,
 } from '@civ-clone/core-city-build/lib/rankBuildItems';
@@ -319,7 +323,10 @@ const shouldBuildWonder = (
 const onPurposeOnly: (typeof Barracks)[] = [Barracks, CityWalls];
 
 // The order `buildItemInCity` falls back on, when a city needs nothing it can finish soon: improvements worth having,
-//  then units it can support, then Barracks and City Walls, which cost upkeep for nothing in peace, then units it can't.
+//  then Capitalization (a ruleset's item that turns shields into gold, never finished), then units it can support, then
+//  Barracks and City Walls, which cost upkeep for nothing in peace, then units it can't. Capitalization is only ever
+//  chosen here, when nothing else is worth building: an improvement still does something for the city, while
+//  Capitalization only pays for this turn, and it costs nothing, so it mustn't win on price.
 const fallbackRank = (buildItem: BuildItem, affordable: boolean): number =>
   Object.prototype.isPrototypeOf.call(Unit, buildItem.item())
     ? affordable
@@ -327,6 +334,8 @@ const fallbackRank = (buildItem: BuildItem, affordable: boolean): number =>
       : 3
     : onPurposeOnly.includes(buildItem.item() as typeof Barracks)
     ? 2
+    : isCapitalization(buildItem.item())
+    ? 0.5
     : 0;
 
 // How much `player`'s leader favours building `buildItem` (`BuildWeight`), 1 for no preference.
@@ -392,6 +401,32 @@ export const rankWithUnits = (ranked: RankedBuildItem[]): RankedBuildItem[] =>
         compareNames(a.buildItem.item().name, b.buildItem.item().name)
     );
 
+// What of `available` `cityBuild` may change to: all of it, unless the city is part of the way through a build (it is
+//  building something with shields in hand) and isn't under threat (an enemy next to it, or a defender wanted), when
+//  anything the ruleset would take shields for changing to is left out. With no `ProductionChanged` rules, `available`
+//  itself.
+const keepsShields = (
+  dependencies: Dependencies,
+  knowledge: Knowledge,
+  cityBuild: CityBuild,
+  available: BuildItem[]
+): BuildItem[] => {
+  if (
+    !hasChangeRules(dependencies) ||
+    cityBuild.building() === null ||
+    cityBuild.progress().value() <= 0 ||
+    threatened(dependencies, cityBuild.city()) ||
+    wantsUnit(dependencies, knowledge, cityBuild.city())
+  ) {
+    return available;
+  }
+
+  return available.filter(
+    (buildItem: BuildItem): boolean =>
+      !changeLosesShields(dependencies, cityBuild, buildItem.item())
+  );
+};
+
 // Also run from `unitDestroyed`, during combat and so perhaps during another player's turn.
 export const buildItemInCity = (
   dependencies: Dependencies,
@@ -402,8 +437,16 @@ export const buildItemInCity = (
   knowledge: Knowledge = civ1Knowledge
 ): void => {
   const cityBuild = dependencies.cityBuildRegistry.getByCity(city),
-    available = cityBuild.available(),
     restrictions: IConstructor[] = [Palace, Settlers],
+    // A city part of the way through a build doesn't change to anything the ruleset would take shields for
+    //  (`lib/City/productionChange`, Civ2's change penalty) unless it's under threat; whatever it chooses below is
+    //  chosen from what's left. Rulesets with no such rule (Civ1) lose nothing by a change, so this is all `available`.
+    available = keepsShields(
+      dependencies,
+      knowledge,
+      cityBuild,
+      cityBuild.available()
+    ),
     availableFiltered = available.filter(
       (buildItem: BuildItem): boolean =>
         !restrictions.includes(buildItem.item()) &&

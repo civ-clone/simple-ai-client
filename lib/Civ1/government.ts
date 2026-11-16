@@ -80,11 +80,13 @@ export const republicScore = (
   return dependencies.cityRegistry
     .getByPlayer(player)
     .reduce((total: number, city: City): number => {
-      const tradeTiles = dependencies.workedTileRegistry
+      // What each square gives the city (`City#tileYields`), as the ruleset may change a square for its city.
+      const rules = city.tileYieldRules(),
+        tradeTiles = dependencies.workedTileRegistry
           .getByCity(city)
           .filter(
             (workedTile: WorkedTile): boolean =>
-              reduceYield(workedTile.tile().yields(player), Trade) > 0
+              reduceYield(city.tileYields(workedTile.tile(), rules), Trade) > 0
           ).length,
         unitsAway = dependencies.unitRegistry
           .getByCity(city)
