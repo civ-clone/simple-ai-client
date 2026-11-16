@@ -22,6 +22,12 @@ export declare const startRevolution: (
   player: Player,
   policy?: GovernmentPolicy
 ) => void;
+export declare const acceptRevolutionOffer: (
+  dependencies: Dependencies,
+  player: Player,
+  GovernmentType: typeof Government,
+  policy?: GovernmentPolicy
+) => boolean;
 export declare const pickGovernment: (
   dependencies: Dependencies,
   playerGovernment: PlayerGovernment

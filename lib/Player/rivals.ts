@@ -1,36 +1,25 @@
 // Generic: the players a computer player might fight (civ-clone/web-renderer#424, #374). An enemy is a player it has
-//  no peace treaty with. A rival is an enemy it's stronger than, by `core-power`'s `MilitaryStrength` with its leader's
-//  `AttackConfidence` on its side, that has a city it knows of and could reach: on a landmass where it has a city, or
-//  overseas, from a port it could ferry units from (`lib/Unit/overseas`).
+//  no treaty with: no ceasefire, peace or alliance (`lib/Player/treaties`; Civ1 has only peace). A rival is an enemy
+//  it's stronger than, by `core-power`'s `MilitaryStrength` with its leader's `AttackConfidence` on its side, that has
+//  a city it knows of and could reach: on a landmass where it has a city, or overseas, from a port it could ferry units
+//  from (`lib/Unit/overseas`).
 import AttackConfidence from '@civ-clone/base-leader-personality/Rules/Player/AttackConfidence';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
-import Peace from '@civ-clone/base-diplomacy-declaration-peace/Peace';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { canFerryFromLandmassOf } from '../Unit/overseas';
 import { continentOf } from '../City/explorers';
+import { hasTreaty } from './treaties';
 import { militaryPower } from '@civ-clone/core-power/lib/strength';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
-
-export const atPeace = (
-  dependencies: Dependencies,
-  player: Player,
-  other: Player
-): boolean =>
-  dependencies.interactionRegistry
-    .getByPlayers(player, other)
-    .some(
-      (interaction) =>
-        interaction instanceof Peace && (interaction as Peace).active()
-    );
 
 export const isEnemy = (
   dependencies: Dependencies,
   player: Player,
   other: Player
-): boolean => other !== player && !atPeace(dependencies, player, other);
+): boolean => other !== player && !hasTreaty(dependencies, player, other);
 
 // The power of `units`, attack and defence together.
 export const powerOf = (dependencies: Dependencies, units: Unit[]): number =>

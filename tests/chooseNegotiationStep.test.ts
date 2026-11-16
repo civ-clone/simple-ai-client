@@ -39,6 +39,16 @@ describe('chooseNegotiationStep (civ-clone/web-renderer#674)', (): void => {
 
     expect(choose(goodbye)).equal(goodbye);
   });
+
+  // In a meeting a person opens (Civ2), the ruleset's rows give the computer player one answer to each proposal, an
+  //  `Accept` or a `Decline`, from the original's formulas: the AI gives that answer, whichever it is.
+  it("gives the one answer the rows offer, a refusal included, in a person's meeting", (): void => {
+    const decline = step(Decline),
+      accept = step(Accept);
+
+    expect(choose(decline)).equal(decline);
+    expect(choose(accept)).equal(accept);
+  });
 });
 
 describe('chooseNegotiationStep: a negotiation that goes on and on (civ-clone/web-renderer#877)', (): void => {

@@ -23,6 +23,7 @@ import {
   turnsUntilChoice,
 } from '@civ-clone/civ1-government/lib/revolution';
 import {
+  acceptRevolutionOffer,
   pickGovernment,
   preferredGovernment,
   republicScore,
@@ -53,6 +54,14 @@ import { expect } from 'chai';
 import { registerRevolutionHandler } from '@civ-clone/base-government-change/lib/revolution';
 import RevolutionTerms from '@civ-clone/base-government-change/Rules/RevolutionTerms';
 import Effect from '@civ-clone/core-rule/Effect';
+import ClientRegistry from '@civ-clone/core-client/ClientRegistry';
+import Engine from '@civ-clone/core-engine/Engine';
+import MayRechoose from '@civ-clone/base-government-change/Rules/MayRechoose';
+import { PendingEffect } from '@civ-clone/core-pending-effect';
+import SimpleAIClient from '../SimpleAIClient';
+import listen from '../lib/Events/governmentAvailable';
+import { rechoiceKey } from '@civ-clone/base-government-change/lib/rechoice';
+import { revolutionTerms } from '@civ-clone/base-government-change/lib/terms';
 import { terms } from '@civ-clone/base-government-change/lib/terms';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import { personalityRules } from '@civ-clone/civ1-civilization/registerPersonality';
@@ -422,5 +431,99 @@ describe('government: the ruleset’s revolution', (): void => {
     expect(governmentName(setup)).to.equal('Despotism');
     expect(warnings).to.have.length(1);
     expect(String(warnings[0][0])).to.contain('RevolutionTerms');
+  });
+});
+
+// Civ2 offers a revolution when an advance makes a government available (`player:government:available`); Civ1 never
+//  does. The AI answers with the choice it would make at the start of its turn.
+describe('the revolution offer (Civ2 M2d)', (): void => {
+  it('takes an offer of the government it would change to, into Anarchy', async (): Promise<void> => {
+    const setup = await setUp(Shaka, MonarchyAdvance);
+
+    expect(acceptRevolutionOffer(setup.dependencies, setup.player, Monarchy))
+      .true;
+    expect(governmentName(setup)).to.equal('Anarchy');
+    expect(pendingRevolution(setup.playerGovernment, setup.game.pendingEffects))
+      .not.null;
+
+    // Its turn then starts no second revolution.
+    startRevolution(setup.dependencies, setup.player);
+
+    expect(
+      setup.game.pendingEffects
+        .getByTarget(setup.playerGovernment)
+        .filter((effect) => effect.handler().endsWith(':revolution'))
+    ).to.have.length(1);
+  });
+
+  it("declines an offer of a government it wouldn't choose, or while it's in a revolution", async (): Promise<void> => {
+    const setup = await setUp(Shaka, MonarchyAdvance, DemocracyAdvance);
+
+    expect(acceptRevolutionOffer(setup.dependencies, setup.player, Democracy))
+      .false;
+    expect(governmentName(setup)).to.equal('Despotism');
+
+    startRevolution(setup.dependencies, setup.player);
+
+    expect(acceptRevolutionOffer(setup.dependencies, setup.player, Monarchy))
+      .false;
+  });
+
+  it('goes into Anarchy even in a turn it chose its government, as the offer always does', async (): Promise<void> => {
+    const setup = await setUp(Shaka, MonarchyAdvance),
+      { key } = revolutionTerms(setup.game.rules)!;
+
+    // A ruleset that lets a player choose again in the turn it chose skips the interim for a plain revolution.
+    setup.game.rules.register(new MayRechoose(new Effect(() => true)));
+    setup.game.pendingEffects.register(
+      new PendingEffect(rechoiceKey(key), setup.playerGovernment, {
+        turn: String(setup.game.turn.value()),
+      })
+    );
+
+    // The control: the plain revolution of the start of its turn would have had no Anarchy.
+    const control = await setUp(Shaka, MonarchyAdvance);
+
+    control.game.rules.register(new MayRechoose(new Effect(() => true)));
+    control.game.pendingEffects.register(
+      new PendingEffect(rechoiceKey(key), control.playerGovernment, {
+        turn: String(control.game.turn.value()),
+      })
+    );
+    startRevolution(control.dependencies, control.player);
+
+    expect(governmentName(control)).to.equal('Despotism');
+
+    expect(acceptRevolutionOffer(setup.dependencies, setup.player, Monarchy))
+      .true;
+    expect(governmentName(setup)).to.equal('Anarchy');
+    expect(
+      setup.game.pendingEffects
+        .getByTarget(setup.playerGovernment)
+        .filter((effect) => effect.handler() === rechoiceKey(key))
+    ).to.have.length(0);
+  });
+
+  it("hands the engine's offer to the player's computer client only", (): void => {
+    const engine = new Engine(),
+      clients = new ClientRegistry(),
+      player = new Player(),
+      person = new Player(),
+      offers: unknown[] = [],
+      client = Object.assign(Object.create(SimpleAIClient.prototype), {
+        player: () => player,
+        governmentAvailable: (GovernmentType: unknown) =>
+          offers.push(GovernmentType),
+      });
+
+    clients.register(client);
+
+    listen(engine, clients);
+    listen(engine, clients);
+
+    engine.emit('player:government:available', player, Monarchy);
+    engine.emit('player:government:available', person, Monarchy);
+
+    expect(offers).to.deep.equal([Monarchy]);
   });
 });

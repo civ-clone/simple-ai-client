@@ -119,12 +119,14 @@ import buildItemInCity, {
   defaultProductionPolicy,
 } from './lib/Civ1/buildItemInCity';
 import ChooseProduction from './Strategies/Civ1/ChooseProduction';
+import Government from '@civ-clone/core-government/Government';
+import { acceptRevolutionOffer } from './lib/Civ1/government';
 import cityLost from './lib/Events/cityLost';
 import civ1Knowledge from './lib/Civ1/knowledge';
 import moveUnit from './lib/Unit/moveUnit';
 import reviewCities from './lib/Turn/reviewCities';
 import scoreUnitMove from './lib/Unit/scoreUnitMove';
-import surveyTargets from '@civ-clone/base-strategy-ai/lib/Turn/surveyTargets';
+import surveyTargets from './lib/Turn/surveyTargets';
 import unitDestroyed from './lib/Events/unitDestroyed';
 import wakeCarrierAircraft from './lib/Turn/wakeCarrierAircraft';
 // For its `ChoiceMetaDataMap` entry, which `chooseFromList` and its callers rely on.
@@ -392,6 +394,16 @@ export class SimpleAIClient extends StrategyAIClient {
       city,
       player,
       destroyed
+    );
+  }
+
+  // An advance made `GovernmentType` available, and the ruleset offers a revolution to it (`lib/Events/governmentAvailable`):
+  //  taken when it's the government the player would change to now. Answers whether it was taken.
+  governmentAvailable(GovernmentType: typeof Government): boolean {
+    return acceptRevolutionOffer(
+      this._dependencies,
+      this.player(),
+      GovernmentType
     );
   }
 

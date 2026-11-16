@@ -23,10 +23,22 @@ import {
 } from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import { alliedCityAt } from '../Player/treaties';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import strength from '@civ-clone/core-unit/strength';
 import attackOdds, { fightsInRounds, oddsWanted } from './attackOdds';
 import worthSabotaging from './sabotage';
+
+// What a step onto an ally's city is worth to a damaged unit: it's repaired there a little and its turn ends
+//  (civ2-unit's `AlliedRepair`), better than a step worth nothing, worse than any job, battle or exploring.
+export const ALLIED_REPAIR_SCORE = 8;
+
+// Whether `unit` would take the step onto an ally's city on `tile` (`alliedCityAt`): only to be repaired, so only when
+//  it's damaged and the ruleset offers the repair there.
+export const takesAlliedRepair = (
+  unit: Unit,
+  lookup: { [name: string]: unknown }
+): boolean => unit.damage() > 0 && lookup.alliedRepair !== undefined;
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -57,6 +69,11 @@ export const scoreUnitMove = (
   //  (civ-clone/web-renderer#287) or try what a Senate would overrule.
   if (sneakAttack || sneakMove || abortMove || overruled) {
     return -10;
+  }
+
+  // An ally's city can't be entered (Civ2): the step is worth taking only for a repair (`takesAlliedRepair`).
+  if (alliedCityAt(dependencies, player, tile) !== null) {
+    return takesAlliedRepair(unit, lookup) ? ALLIED_REPAIR_SCORE : -10;
   }
 
   // A Spy steps onto another player's lone unit only to sabotage one worth it (`actionToTake`).

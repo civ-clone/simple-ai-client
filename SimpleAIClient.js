@@ -37,12 +37,13 @@ const MemoryRegistry_1 = require("@civ-clone/base-strategy-ai/lib/MemoryRegistry
 const orders_1 = require("@civ-clone/base-strategy-ai/lib/Unit/orders");
 const buildItemInCity_1 = require("./lib/Civ1/buildItemInCity");
 const ChooseProduction_1 = require("./Strategies/Civ1/ChooseProduction");
+const government_1 = require("./lib/Civ1/government");
 const cityLost_1 = require("./lib/Events/cityLost");
 const knowledge_1 = require("./lib/Civ1/knowledge");
 const moveUnit_1 = require("./lib/Unit/moveUnit");
 const reviewCities_1 = require("./lib/Turn/reviewCities");
 const scoreUnitMove_1 = require("./lib/Unit/scoreUnitMove");
-const surveyTargets_1 = require("@civ-clone/base-strategy-ai/lib/Turn/surveyTargets");
+const surveyTargets_1 = require("./lib/Turn/surveyTargets");
 const unitDestroyed_1 = require("./lib/Events/unitDestroyed");
 const wakeCarrierAircraft_1 = require("./lib/Turn/wakeCarrierAircraft");
 // For its `ChoiceMetaDataMap` entry, which `chooseFromList` and its callers rely on.
@@ -210,6 +211,11 @@ class SimpleAIClient extends StrategyAIClient_1.default {
     }
     cityLost(city, player, destroyed) {
         (0, cityLost_1.default)(this._dependencies, this.player(), this.memory().targets, city, player, destroyed);
+    }
+    // An advance made `GovernmentType` available, and the ruleset offers a revolution to it (`lib/Events/governmentAvailable`):
+    //  taken when it's the government the player would change to now. Answers whether it was taken.
+    governmentAvailable(GovernmentType) {
+        return (0, government_1.acceptRevolutionOffer)(this._dependencies, this.player(), GovernmentType);
     }
     // `player` is whoever destroyed the unit, or `null`.
     unitDestroyed(unit, player) {
