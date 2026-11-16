@@ -27,8 +27,16 @@ export const listen = (
     (player: Player, GovernmentType: typeof Government): void => {
       const [client] = clientRegistry.getBy('player', player);
 
-      if (client instanceof SimpleAIClient) {
+      if (!(client instanceof SimpleAIClient)) {
+        return;
+      }
+
+      // Emitted from inside the ruleset's research `Complete` rule: a revolution that fails mustn't stop the rest of
+      //  the research being completed, so it's reported and the offer left untaken.
+      try {
         client.governmentAvailable(GovernmentType);
+      } catch (error) {
+        console.error(error);
       }
     }
   );

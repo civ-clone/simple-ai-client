@@ -29,7 +29,10 @@ import { Naval } from '@civ-clone/library-unit/Types';
 import canNegotiate from '../Diplomacy/negotiate';
 import coastalPath from './coastalPath';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
-import scoreUnitMove, { takesAlliedRepair } from './scoreUnitMove';
+import scoreUnitMove, {
+  offersAlliedRepair,
+  takesAlliedRepair,
+} from './scoreUnitMove';
 import { alliedCityAt } from '../Player/treaties';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import shuffle from '../shuffle';
@@ -84,10 +87,12 @@ export const actionToTake = (
     return null;
   }
 
-  // Onto an ally's city only for a repair (`takesAlliedRepair`): a wandering unit takes steps worth nothing.
+  // The repair in an ally's city only for a damaged unit (`takesAlliedRepair`): a wandering unit takes steps worth
+  //  nothing. Any other action there (a Caravan's, a Diplomat's) is the unit's own.
   if (
+    offersAlliedRepair(lookupActions([action])) &&
     alliedCityAt(dependencies, player, action.to()) !== null &&
-    !takesAlliedRepair(action.unit(), lookupActions(actions))
+    !takesAlliedRepair(action.unit())
   ) {
     return null;
   }

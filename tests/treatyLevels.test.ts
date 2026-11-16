@@ -24,6 +24,9 @@ import { threatened } from '../lib/Civ1/defence';
 // Civ2's own action on an ally's city (civ2-unit's `AlliedRepair`): the AI knows it only by its name.
 class AlliedRepair extends Action {}
 
+// A Caravan's own action in a city (civ2-unit's trade route or help with a Wonder), offered there instead of the repair.
+class HelpBuildWonder extends Action {}
+
 // A blocked attack on a player with no treaty and no war (civ2-unit's `UndeclaredAttack`, a `SneakAttack`).
 class UndeclaredAttack extends SneakAttack {}
 
@@ -159,6 +162,24 @@ describe('allied repair (Civ2 M2d)', (): void => {
       ALLIED_REPAIR_SCORE
     );
     expect(actionToTake(dependencies, player, [repair])).to.equal(repair);
+  });
+
+  it("leaves a unit the repair isn't offered to its own action in an ally's city, such as a Caravan's", async (): Promise<void> => {
+    const setup = await setUp(),
+      { dependencies, otherCity, player, treaty, warrior } = setup,
+      help = new HelpBuildWonder(
+        warrior.tile(),
+        otherCity.tile(),
+        warrior,
+        setup.game.rules
+      );
+
+    treaty(Alliance);
+
+    warrior.actions = () => [help];
+
+    expect(score(setup, warrior, otherCity.tile())).to.not.equal(-10);
+    expect(actionToTake(dependencies, player, [help])).to.equal(help);
   });
 
   it("doesn't change a step onto a city with no alliance (Civ1)", async (): Promise<void> => {

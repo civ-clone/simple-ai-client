@@ -33,12 +33,15 @@ import worthSabotaging from './sabotage';
 //  (civ2-unit's `AlliedRepair`), better than a step worth nothing, worse than any job, battle or exploring.
 export const ALLIED_REPAIR_SCORE = 8;
 
-// Whether `unit` would take the step onto an ally's city on `tile` (`alliedCityAt`): only to be repaired, so only when
-//  it's damaged and the ruleset offers the repair there.
-export const takesAlliedRepair = (
-  unit: Unit,
-  lookup: { [name: string]: unknown }
-): boolean => unit.damage() > 0 && lookup.alliedRepair !== undefined;
+// Whether `lookup` (the actions on a tile) has the ruleset's repair in an ally's city (civ2-unit's `AlliedRepair`, offered
+//  to the land units it covers), so that the repair is what a step there does. Other units keep their own actions there:
+//  a Caravan's trade route or help with a Wonder, a Diplomat's embassy.
+export const offersAlliedRepair = (lookup: {
+  [name: string]: unknown;
+}): boolean => lookup.alliedRepair !== undefined;
+
+// Whether `unit` takes the repair on offer (`offersAlliedRepair`): only when it's damaged.
+export const takesAlliedRepair = (unit: Unit): boolean => unit.damage() > 0;
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -71,9 +74,13 @@ export const scoreUnitMove = (
     return -10;
   }
 
-  // An ally's city can't be entered (Civ2): the step is worth taking only for a repair (`takesAlliedRepair`).
-  if (alliedCityAt(dependencies, player, tile) !== null) {
-    return takesAlliedRepair(unit, lookup) ? ALLIED_REPAIR_SCORE : -10;
+  // An ally's city can't be entered (Civ2): where the step would be the repair, it's worth taking only to a damaged unit
+  //  (`takesAlliedRepair`).
+  if (
+    offersAlliedRepair(lookup) &&
+    alliedCityAt(dependencies, player, tile) !== null
+  ) {
+    return takesAlliedRepair(unit) ? ALLIED_REPAIR_SCORE : -10;
   }
 
   // A Spy steps onto another player's lone unit only to sabotage one worth it (`actionToTake`).

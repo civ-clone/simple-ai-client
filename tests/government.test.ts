@@ -527,3 +527,81 @@ describe('the revolution offer (Civ2 M2d)', (): void => {
     expect(offers).to.deep.equal([Monarchy]);
   });
 });
+
+describe('the revolution offer listener (Civ2 M2d)', (): void => {
+  const clientFor = (
+    player: Player,
+    answer: (GovernmentType: unknown) => void
+  ) =>
+    Object.assign(Object.create(SimpleAIClient.prototype), {
+      player: () => player,
+      governmentAvailable: answer,
+    });
+
+  it("doesn't let a failed revolution stop the research that offered it", (): void => {
+    const engine = new Engine(),
+      clients = new ClientRegistry(),
+      player = new Player(),
+      error = console.error,
+      errors: unknown[] = [];
+
+    clients.register(
+      clientFor(player, () => {
+        throw new Error('no revolution');
+      })
+    );
+    listen(engine, clients);
+
+    console.error = (...args: unknown[]): void => {
+      errors.push(args);
+    };
+
+    try {
+      expect(() =>
+        engine.emit('player:government:available', player, Monarchy)
+      ).not.to.throw();
+    } finally {
+      console.error = error;
+    }
+
+    expect(errors).to.have.length(1);
+  });
+
+  it("hears each game's own engine, and hands the offer to that game's client", (): void => {
+    const games = [0, 1].map(() => ({
+      clients: new ClientRegistry(),
+      engine: new Engine(),
+      offers: [] as unknown[],
+      player: new Player(),
+    }));
+
+    games.forEach((game) => {
+      game.clients.register(
+        clientFor(game.player, (GovernmentType) =>
+          game.offers.push(GovernmentType)
+        )
+      );
+      listen(game.engine, game.clients);
+    });
+
+    games[1].engine.emit(
+      'player:government:available',
+      games[1].player,
+      Republic
+    );
+    games[0].engine.emit(
+      'player:government:available',
+      games[0].player,
+      Monarchy
+    );
+    // A player of the other game, on this game's engine: not this game's client.
+    games[0].engine.emit(
+      'player:government:available',
+      games[1].player,
+      Democracy
+    );
+
+    expect(games[0].offers).to.deep.equal([Monarchy]);
+    expect(games[1].offers).to.deep.equal([Republic]);
+  });
+});

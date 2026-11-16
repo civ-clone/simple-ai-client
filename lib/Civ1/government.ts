@@ -255,6 +255,8 @@ export const acceptRevolutionOffer = (
 
   lastRevolution.set(playerGovernment, dependencies.turn.value());
 
+  // As civ2-government's `acceptRevolutionOffer` does. For a computer player this drops nothing today: the record is
+  //  only written while a `MayRechoose` rule lets the player choose again, and civ2-government's lets only persons.
   dependencies.pendingEffectRegistry
     .getByTarget(playerGovernment)
     .filter(
