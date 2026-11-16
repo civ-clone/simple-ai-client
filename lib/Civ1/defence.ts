@@ -10,34 +10,21 @@
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Palace } from '@civ-clone/civ1-city-improvement/CityImprovements';
-import Peace from '@civ-clone/base-diplomacy-declaration-peace/Peace';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import { hasTreaty } from '../Player/treaties';
 
 // How far from a city an enemy unit counts as a threat to it, and how many such units a city answers with defenders.
 export const THREAT_RADIUS = 3;
 export const THREAT_CAP = 3;
 
-// Whether `player` has a peace treaty with `other`.
-const atPeace = (
-  dependencies: Dependencies,
-  player: Player,
-  other: Player
-): boolean =>
-  dependencies.interactionRegistry
-    .getByPlayers(player, other)
-    .some(
-      (interaction) =>
-        interaction instanceof Peace && (interaction as Peace).active()
-    );
-
-// A unit of a player `city`'s owner has no peace treaty with.
+// A unit of a player `city`'s owner has no treaty with (`hasTreaty`: a ceasefire, a peace or an alliance).
 const enemyOf =
   (dependencies: Dependencies, city: City) =>
   (unit: Unit): boolean =>
     unit.player() !== city.player() &&
-    !atPeace(dependencies, city.player(), unit.player());
+    !hasTreaty(dependencies, city.player(), unit.player());
 
 // Whether an enemy unit is on a tile next to `city`. v474.05 counts any other player's unit; a treaty partner's
 //  explorer passing by isn't counted here, as it isn't a threat.

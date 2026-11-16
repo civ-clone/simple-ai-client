@@ -2,11 +2,6 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import Unit from '@civ-clone/core-unit/Unit';
-export declare const atPeace: (
-  dependencies: Dependencies,
-  player: Player,
-  other: Player
-) => boolean;
 export declare const isEnemy: (
   dependencies: Dependencies,
   player: Player,

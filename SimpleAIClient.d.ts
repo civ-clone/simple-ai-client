@@ -26,6 +26,7 @@ import { PendingEffectRegistry } from '@civ-clone/core-pending-effect';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import Government from '@civ-clone/core-government/Government';
 import './lib/Diplomacy/negotiate';
 export declare class SimpleAIClient extends StrategyAIClient {
   private _dependencies;
@@ -79,6 +80,7 @@ export declare class SimpleAIClient extends StrategyAIClient {
   protected unhandledAction(action: MandatoryPlayerAction): void;
   private buildItemInCity;
   cityLost(city: City, player: Player | null, destroyed: boolean): void;
+  governmentAvailable(GovernmentType: typeof Government): boolean;
   unitDestroyed(unit: Unit, player: Player | null): void;
 }
 export default SimpleAIClient;

@@ -4,6 +4,11 @@ import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+export declare const ALLIED_REPAIR_SCORE = 8;
+export declare const offersAlliedRepair: (lookup: {
+  [name: string]: unknown;
+}) => boolean;
+export declare const takesAlliedRepair: (unit: Unit) => boolean;
 export declare const scoreUnitMove: (
   dependencies: Dependencies,
   player: Player,

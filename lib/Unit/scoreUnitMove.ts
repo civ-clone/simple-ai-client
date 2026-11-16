@@ -23,10 +23,25 @@ import {
 } from '@civ-clone/library-unit/Actions';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import { alliedCityAt } from '../Player/treaties';
 import lookupActions from '@civ-clone/base-strategy-ai/lib/actionLookup';
 import strength from '@civ-clone/core-unit/strength';
 import attackOdds, { fightsInRounds, oddsWanted } from './attackOdds';
 import worthSabotaging from './sabotage';
+
+// What a step onto an ally's city is worth to a damaged unit: it's repaired there a little and its turn ends
+//  (civ2-unit's `AlliedRepair`), better than a step worth nothing, worse than any job, battle or exploring.
+export const ALLIED_REPAIR_SCORE = 8;
+
+// Whether `lookup` (the actions on a tile) has the ruleset's repair in an ally's city (civ2-unit's `AlliedRepair`, offered
+//  to the land units it covers), so that the repair is what a step there does. Other units keep their own actions there:
+//  a Caravan's trade route or help with a Wonder, a Diplomat's embassy.
+export const offersAlliedRepair = (lookup: {
+  [name: string]: unknown;
+}): boolean => lookup.alliedRepair !== undefined;
+
+// Whether `unit` takes the repair on offer (`offersAlliedRepair`): only when it's damaged.
+export const takesAlliedRepair = (unit: Unit): boolean => unit.damage() > 0;
 
 export const scoreUnitMove = (
   dependencies: Dependencies,
@@ -57,6 +72,15 @@ export const scoreUnitMove = (
   //  (civ-clone/web-renderer#287) or try what a Senate would overrule.
   if (sneakAttack || sneakMove || abortMove || overruled) {
     return -10;
+  }
+
+  // An ally's city can't be entered (Civ2): where the step would be the repair, it's worth taking only to a damaged unit
+  //  (`takesAlliedRepair`).
+  if (
+    offersAlliedRepair(lookup) &&
+    alliedCityAt(dependencies, player, tile) !== null
+  ) {
+    return takesAlliedRepair(unit) ? ALLIED_REPAIR_SCORE : -10;
   }
 
   // A Spy steps onto another player's lone unit only to sabotage one worth it (`actionToTake`).

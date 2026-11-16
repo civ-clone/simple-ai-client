@@ -22,6 +22,11 @@ import { Game } from '@civ-clone/core-game/Game';
 import Leader from '@civ-clone/core-civilization/Leader';
 import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import { PendingEffect } from '@civ-clone/core-pending-effect';
+import Effect from '@civ-clone/core-rule/Effect';
+import ExcessRate from '@civ-clone/core-trade-rate/Rules/ExcessRate';
+import MaxRate from '@civ-clone/core-trade-rate/Rules/MaxRate';
+import PlayerTradeRates from '@civ-clone/core-trade-rate/PlayerTradeRates';
+import TradeRate from '@civ-clone/core-trade-rate/TradeRate';
 import Player from '@civ-clone/core-player/Player';
 import PlayerResearch from '@civ-clone/core-science/PlayerResearch';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
@@ -330,5 +335,76 @@ describe('TradeRates', (): void => {
 
     expect(rates(setup)).to.equal('30/40/30');
     expect(disorder(setup)).false;
+  });
+});
+
+// Civ2 caps a computer player's science (6, 7, 8 or 10 tenths by government) and moves the excess to tax
+//  (civ2-trade-rate's `MaxRate` and `ExcessRate`); `setAll` reshapes whatever the AI asks for to that. The AI's next
+//  rates depend only on its luxuries and science + tax, which the reshaping keeps, so it settles rather than asking
+//  for more science every turn.
+describe('TradeRates under a maximum rate (Civ2 M2d)', (): void => {
+  const play = async (cap: number | null): Promise<string[]> => {
+    const setup = await setUp({ leader: AbrahamLincoln, size: 3 }),
+      seen: string[] = [];
+
+    if (cap !== null) {
+      // Civ1's rates know only the global rules (civ1-trade-rate's `Added` passes none), so they're made again with
+      //  the game's, as civ2-trade-rate's are.
+      const { game, player } = setup,
+        before = game.playerTradeRates.getByPlayer(player);
+
+      game.playerTradeRates.unregister(before);
+      game.playerTradeRates.register(
+        new PlayerTradeRates(
+          player,
+          game.rules,
+          ...[Tax, Research, Luxuries].map(
+            (Type) => new Type(before.get(Type).value())
+          )
+        )
+      );
+
+      setup.game.rules.register(
+        new MaxRate(
+          new Effect((player: Player, rate: TradeRate): number | undefined =>
+            rate instanceof Research ? cap : undefined
+          )
+        ),
+        new ExcessRate(
+          new Effect((player: Player, rate: TradeRate) =>
+            rate instanceof Research ? [Tax] : undefined
+          )
+        )
+      );
+    }
+
+    for (let turn = 0; turn < 12; turn++) {
+      await setup.tradeRates();
+
+      seen.push(rates(setup));
+      setup.game.turn.increment();
+    }
+
+    return seen;
+  };
+
+  it('keeps science at the cap and its luxuries as they were, turn after turn', async (): Promise<void> => {
+    const free = await play(null),
+      capped = await play(0.3);
+
+    capped.forEach((rates: string, index: number): void => {
+      const [science, tax, luxuries] = rates.split('/').map(Number),
+        [freeScience, freeTax, freeLuxuries] = free[index]
+          .split('/')
+          .map(Number);
+
+      expect(science).to.be.at.most(30);
+      expect(luxuries).to.equal(freeLuxuries);
+      expect(science + tax).to.equal(freeScience + freeTax);
+    });
+
+    // Capped below what it asks for, so the cap is what's shown.
+    expect(free.some((rates: string) => Number(rates.split('/')[0]) > 30)).true;
+    expect(new Set(capped.slice(4)).size).to.equal(1);
   });
 });

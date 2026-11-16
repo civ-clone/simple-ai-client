@@ -5,7 +5,12 @@ const captured_1 = require("./Rules/City/captured");
 const destroyed_1 = require("./Rules/City/destroyed");
 const defeated_1 = require("./Rules/Unit/defeated");
 const core_game_1 = require("@civ-clone/core-game");
-const register = (game) => game.rules.register(...(0, captured_1.default)(game.units, game.clients), ...(0, defeated_1.default)(game.units, game.clients), ...(0, destroyed_1.default)(game.units, game.clients));
+const governmentAvailable_1 = require("./lib/Events/governmentAvailable");
+const register = (game) => {
+    game.rules.register(...(0, captured_1.default)(game.units, game.clients), ...(0, defeated_1.default)(game.units, game.clients), ...(0, destroyed_1.default)(game.units, game.clients));
+    // Not a rule: the offer of a revolution is an engine event.
+    (0, governmentAvailable_1.default)(game.engine, game.clients);
+};
 exports.register = register;
 // The plugin loader imports each package for this side effect. Until it passes
 // a `Game` of its own, dropping it would produce a game with silently absent

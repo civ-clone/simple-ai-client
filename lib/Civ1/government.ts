@@ -38,6 +38,7 @@ import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Government from '@civ-clone/core-government/Government';
 import { Marketplace } from '@civ-clone/civ1-city-improvement/CityImprovements';
+import { PendingEffect } from '@civ-clone/core-pending-effect';
 import MilitaryUnhappinessTolerance from '@civ-clone/base-leader-personality/Rules/Player/MilitaryUnhappinessTolerance';
 import Player from '@civ-clone/core-player/Player';
 import PlayerGovernment from '@civ-clone/core-government/PlayerGovernment';
@@ -46,6 +47,7 @@ import { Trade } from '@civ-clone/library-city/Yields';
 import Unit from '@civ-clone/core-unit/Unit';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
 import { Terms } from '@civ-clone/base-government-change/Rules/RevolutionTerms';
+import { rechoiceKey } from '@civ-clone/base-government-change/lib/rechoice';
 import { revolutionTerms } from '@civ-clone/base-government-change/lib/terms';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 import { sum } from '@civ-clone/base-leader-personality/lib/combine';
@@ -154,17 +156,22 @@ export const termsFor = (dependencies: Dependencies): Terms | null => {
   return terms;
 };
 
-// At the start of the player's turn: a revolution if it would choose another government than the one it has, through
-//  the ruleset's interim government (Anarchy) like a human player, then `ChooseGovernment` once it's over.
-export const startRevolution = (
+// The revolution the player would start now, if any: the ruleset's terms, its `PlayerGovernment` and the government it
+//  would choose, while it isn't in a revolution or the interim already, and it wants another government (never back
+//  to Despotism), no sooner than the policy's `revolutionTurns` after its last revolution once out of Despotism.
+const revolutionWanted = (
   dependencies: Dependencies,
   player: Player,
-  policy: GovernmentPolicy = defaultGovernmentPolicy
-): void => {
+  policy: GovernmentPolicy
+): {
+  terms: Terms;
+  playerGovernment: PlayerGovernment;
+  preferred: typeof Government;
+} | null => {
   const terms = termsFor(dependencies);
 
   if (terms === null) {
-    return;
+    return null;
   }
 
   const playerGovernment = playerGovernmentOf(dependencies, player),
@@ -182,7 +189,7 @@ export const startRevolution = (
       last !== undefined &&
       turn - last < policy.revolutionTurns)
   ) {
-    return;
+    return null;
   }
 
   const preferred = preferredGovernment(
@@ -192,10 +199,28 @@ export const startRevolution = (
   );
 
   if (playerGovernment.is(preferred) || preferred === Despotism) {
+    return null;
+  }
+
+  return { terms, playerGovernment, preferred };
+};
+
+// At the start of the player's turn: a revolution if it would choose another government than the one it has, through
+//  the ruleset's interim government (Anarchy) like a human player, then `ChooseGovernment` once it's over.
+export const startRevolution = (
+  dependencies: Dependencies,
+  player: Player,
+  policy: GovernmentPolicy = defaultGovernmentPolicy
+): void => {
+  const wanted = revolutionWanted(dependencies, player, policy);
+
+  if (wanted === null) {
     return;
   }
 
-  lastRevolution.set(playerGovernment, turn);
+  const { terms, playerGovernment } = wanted;
+
+  lastRevolution.set(playerGovernment, dependencies.turn.value());
 
   revolution(
     terms.key,
@@ -206,6 +231,53 @@ export const startRevolution = (
     dependencies.turn,
     'chosen'
   );
+};
+
+// The offer of a revolution when an advance makes `GovernmentType` available (`player:government:available`, from
+//  base-government-change's `offerGovernments`; Civ2's rules make it, Civ1's don't). The player takes it when it's
+//  the government it would start a revolution for now (`startRevolution`'s choice, a turn sooner), and declines it
+//  otherwise. Taking it is what civ2-government's `acceptRevolutionOffer` does, through the ruleset's
+//  `RevolutionTerms`: the record of a government chosen this turn is dropped first, so the revolution always has its
+//  interim (Anarchy), as the original's offer does. Answers whether it took the offer.
+export const acceptRevolutionOffer = (
+  dependencies: Dependencies,
+  player: Player,
+  GovernmentType: typeof Government,
+  policy: GovernmentPolicy = defaultGovernmentPolicy
+): boolean => {
+  const wanted = revolutionWanted(dependencies, player, policy);
+
+  if (wanted === null || wanted.preferred !== GovernmentType) {
+    return false;
+  }
+
+  const { terms, playerGovernment } = wanted;
+
+  lastRevolution.set(playerGovernment, dependencies.turn.value());
+
+  // As civ2-government's `acceptRevolutionOffer` does. For a computer player this drops nothing today: the record is
+  //  only written while a `MayRechoose` rule lets the player choose again, and civ2-government's lets only persons.
+  dependencies.pendingEffectRegistry
+    .getByTarget(playerGovernment)
+    .filter(
+      (pendingEffect: PendingEffect): boolean =>
+        pendingEffect.handler() === rechoiceKey(terms.key)
+    )
+    .forEach((pendingEffect: PendingEffect): void =>
+      dependencies.pendingEffectRegistry.unregister(pendingEffect)
+    );
+
+  revolution(
+    terms.key,
+    terms.Interim,
+    playerGovernment,
+    dependencies.pendingEffectRegistry,
+    dependencies.ruleRegistry,
+    dependencies.turn,
+    'chosen'
+  );
+
+  return true;
 };
 
 // Once the interim is over: the government it would choose now. Whatever started the revolution (this player's
