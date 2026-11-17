@@ -26,7 +26,12 @@ import civ1SpaceRacePolicy, {
 } from '../lib/Civ1/spaceRace';
 import Advance from '@civ-clone/core-science/Advance';
 import { ApolloProgram } from '@civ-clone/civ1-wonder/Wonders';
+import Default from '@civ-clone/civ1-default-spaceship-layout/Default';
+import { Game } from '@civ-clone/core-game';
+import Layout from '@civ-clone/core-spaceship/Layout';
+import LayoutRegistry from '@civ-clone/core-spaceship/LayoutRegistry';
 import Requirement from '@civ-clone/core-requirement/Requirement';
+import registerSpaceship from '@civ-clone/civ1-spaceship/registerRules';
 import RequirementRegistry from '@civ-clone/core-requirement/RequirementRegistry';
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
 import Part from '@civ-clone/core-spaceship/Part';
@@ -51,6 +56,17 @@ const requirementsWith = (...entries: Requirement[]): RequirementRegistry => {
 
 const civ1Requirements = (): RequirementRegistry =>
   requirementsWith(...requiresWonder, ...requiresAdvance);
+
+// A game's layouts, holding `entries`.
+class OtherLayout extends Layout {}
+
+const layouts = (...entries: (typeof Layout)[]): LayoutRegistry => {
+  const registry = new LayoutRegistry();
+
+  registry.register(...entries);
+
+  return registry;
+};
 
 const part = (PartType: typeof Part): Part =>
   Object.create(PartType.prototype) as Part;
@@ -225,77 +241,141 @@ describe('Civ1 space race', (): void => {
       victory = createVictoryDependencies({
         spaceshipRegistry: { getActiveByPlayer: () => null } as any,
       }),
-      player = new Player(new RuleRegistry());
+      player = new Player(new RuleRegistry()),
+      policy = createCiv1SpaceRacePolicy(
+        undefined,
+        undefined,
+        layouts(Default)
+      );
 
-    expect(
-      civ1SpaceRacePolicy.advances(dependencies([]), victory, player)
-    ).to.eql([SpaceFlight, Plastics, Robotics]);
-    expect(
-      civ1SpaceRacePolicy.weight(dependencies([]), victory, player)
-    ).to.equal(0);
-    expect(
-      civ1SpaceRacePolicy.weight(dependencies([Computers]), victory, player)
-    ).to.equal(1);
-
-    // Where the rule set's parts aren't Civ1's, it never plays for space, whatever it knows.
-    const elsewhere = requirementsWith(
-      ...requiresWonder,
-      ...requiresAdvance.filter(
-        (entry: Requirement): boolean => entry.subject === Structural
-      )
+    expect(policy.advances(dependencies([]), victory, player)).to.eql([
+      SpaceFlight,
+      Plastics,
+      Robotics,
+    ]);
+    expect(policy.weight(dependencies([]), victory, player)).to.equal(0);
+    expect(policy.weight(dependencies([Computers]), victory, player)).to.equal(
+      1
     );
 
+    // Without Civ1's parts, it never plays for space, whatever it knows.
     expect(
-      civ1SpaceRacePolicy.advances(
-        dependencies([Computers], elsewhere),
-        victory,
-        player
-      )
-    ).to.eql([]);
-    expect(
-      civ1SpaceRacePolicy.weight(
-        dependencies([Computers], elsewhere),
-        victory,
-        player
-      )
-    ).to.equal(0);
-    expect(
-      civ1SpaceRacePolicy.weight(
+      policy.weight(
         dependencies([Computers], requirementsWith()),
         victory,
         player
       )
     ).to.equal(0);
+
+    // With Civ1's parts but another ship (Civilization II's, say): never either.
+    const elsewhere = createCiv1SpaceRacePolicy(
+      undefined,
+      undefined,
+      layouts(OtherLayout)
+    );
+
+    expect(
+      elsewhere.advances(dependencies([Computers]), victory, player)
+    ).to.eql([]);
+    expect(
+      elsewhere.weight(dependencies([Computers]), victory, player)
+    ).to.equal(0);
   });
 
-  it("takes the enabler and the parts' advances from the rule set's requirements, and is off without them", (): void => {
-    const requirements = civ1Requirements();
+  it("takes the enabler and the parts' advances from the rule set's requirements, and only on Civ1's layout", (): void => {
+    const requirements = civ1Requirements(),
+      civ1 = layouts(Default);
 
-    expect(spaceRaceData(requirements)).to.eql({
+    expect(spaceRaceData(requirements, civ1)).to.eql({
       enablers: [ApolloProgram],
       advances: [SpaceFlight, Plastics, Robotics],
     });
-    expect(createCiv1SpaceRacePolicy(requirements).enablers).to.eql([
-      ApolloProgram,
-    ]);
+    expect(
+      createCiv1SpaceRacePolicy(requirements, undefined, civ1).enablers
+    ).to.eql([ApolloProgram]);
+    // A layout made from Civ1's counts as Civ1's.
+    expect(
+      spaceRaceData(requirements, layouts(class extends Default {}))
+    ).not.to.equal(null);
 
     // No enabler: off.
-    expect(spaceRaceData(requirementsWith(...requiresAdvance))).to.equal(null);
-    // No parts at all (Civilization II's set before it has any): off, with no enabler to build.
-    expect(createCiv1SpaceRacePolicy(requirementsWith()).enablers).to.eql([]);
+    expect(spaceRaceData(requirementsWith(...requiresAdvance), civ1)).to.equal(
+      null
+    );
+    // No parts at all: off, with no enabler to build.
+    expect(
+      createCiv1SpaceRacePolicy(requirementsWith(), undefined, civ1).enablers
+    ).to.eql([]);
 
-    // Read again once the rule set's entries change.
+    // A Civilization II-shaped game: the same part classes, each needing an advance, the Apollo Program at world
+    //  range, but its own layout, or none yet: off.
+    expect(spaceRaceData(requirements, layouts(OtherLayout))).to.equal(null);
+    expect(spaceRaceData(requirements, layouts())).to.equal(null);
+    expect(
+      createCiv1SpaceRacePolicy(requirements, undefined, layouts(OtherLayout))
+        .enablers
+    ).to.eql([]);
+
+    // Read afresh as the rule set's entries change, a replaced entry included.
     const growing = requirementsWith(...requiresWonder);
 
-    expect(spaceRaceData(growing)).to.equal(null);
+    expect(spaceRaceData(growing, civ1)).to.equal(null);
 
     growing.add(null, ...requiresAdvance);
 
-    expect(spaceRaceData(growing)?.advances).to.eql([
+    expect(spaceRaceData(growing, civ1)?.advances).to.eql([
       SpaceFlight,
       Plastics,
       Robotics,
     ]);
+
+    const [structural] = requiresAdvance;
+
+    growing.replace(
+      structural.id,
+      new Requirement({
+        id: structural.id,
+        subject: structural.subject,
+        relation: 'requires',
+        targets: [Rocketry],
+      })
+    );
+
+    expect(spaceRaceData(growing, civ1)?.advances).to.include(Rocketry);
+  });
+
+  it("plays on civ1-spaceship's own registration, with civ1-default-spaceship-layout's layout", (): void => {
+    const game = new Game();
+
+    registerSpaceship(game);
+    // As civ1-default-spaceship-layout's plugin does on its game's registry.
+    game.layouts.register(Default);
+
+    const policy = createCiv1SpaceRacePolicy(
+      game.requirements,
+      undefined,
+      game.layouts
+    );
+
+    expect(policy.enablers).to.eql([ApolloProgram]);
+    expect(
+      policy.advances(
+        createDependencies({ requirementRegistry: game.requirements }),
+        createVictoryDependencies(),
+        new Player(game.rules)
+      )
+    ).to.eql([SpaceFlight, Plastics, Robotics]);
+
+    // The same registration without Civ1's layout: off.
+    const other = new Game();
+
+    registerSpaceship(other);
+    other.layouts.register(OtherLayout);
+
+    expect(
+      createCiv1SpaceRacePolicy(other.requirements, undefined, other.layouts)
+        .enablers
+    ).to.eql([]);
   });
 
   it('launches by the final year it is given', (): void => {
@@ -318,7 +398,8 @@ describe('Civ1 space race', (): void => {
       launches = (finalYear: number) =>
         createCiv1SpaceRacePolicy(
           civ1Requirements(),
-          () => finalYear
+          () => finalYear,
+          layouts(Default)
         ).shouldLaunch(dependencies, victory, spaceship);
 
     // Arriving in 2005: within 10 years of 2010, not of 2020.

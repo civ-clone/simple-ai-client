@@ -4,6 +4,10 @@ import Envoys from './Strategies/Unit/Envoys';
 import Ferry from './Strategies/Unit/Ferry';
 import TravelOverseas from './Strategies/Unit/TravelOverseas';
 import { Game, defaultGame } from '@civ-clone/core-game';
+import {
+  LayoutRegistry,
+  instance as layoutRegistryInstance,
+} from '@civ-clone/core-spaceship/LayoutRegistry';
 import Dependencies, {
   dependenciesFor as gameDependencies,
 } from '@civ-clone/base-strategy-ai/lib/Dependencies';
@@ -72,7 +76,8 @@ import civ1TradeRatePolicy from './lib/Civ1/tradeRates';
 export const createStrategies = (
   dependencies: Dependencies,
   civ1: Knowledge = civ1Knowledge,
-  victoryDependencies: VictoryDependencies = createVictoryDependencies()
+  victoryDependencies: VictoryDependencies = createVictoryDependencies(),
+  layoutRegistry: LayoutRegistry = layoutRegistryInstance
 ): Strategy[] => {
   // Aircraft fuel from base-unit-fuel where a ruleset counts it that way (Civ2); Civ1's own count otherwise.
   const knowledge = withSpaceshipDefence(
@@ -80,9 +85,11 @@ export const createStrategies = (
       victoryDependencies,
       isCapital
     ),
-    // What the ship needs comes from the game's requirements: where its parts aren't Civ1's, it never plays for space.
+    // What the ship needs comes from the game's requirements; where its ship isn't Civ1's, it never plays for space.
     civ1SpaceRacePolicy = createCiv1SpaceRacePolicy(
-      dependencies.requirementRegistry
+      dependencies.requirementRegistry,
+      undefined,
+      layoutRegistry
     ),
     spaceRace = spaceRaceGoal(civ1SpaceRacePolicy),
     conquest = conquestGoal(civ1ConquestPolicy),
@@ -182,7 +189,8 @@ export const register = (game: Game): void =>
     ...createStrategies(
       dependenciesFor(game),
       civ1Knowledge,
-      victoryDependenciesFor(game)
+      victoryDependenciesFor(game),
+      game.layouts
     )
   );
 

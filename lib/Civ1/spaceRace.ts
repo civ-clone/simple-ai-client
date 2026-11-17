@@ -15,12 +15,17 @@
 //  Habitation and one Life Support need) and two each of Fuel and Propulsion, with Structurals whenever a part isn't
 //  yet joined to the frame. The first step is a ship good for about 20 years with a chance of 100%.
 //
-// What the ship needs comes from the rule set: what every part requires anyone to have built (the Apollo Program) and
-//  the advances each part requires, from the game's `requirements` (civ-clone/web-renderer#37). The policy plays only
-//  where the rule set's parts are the ones it builds: every one of them requires an advance and every part an enabler
-//  (`spaceRaceData`). A rule set with other parts (Civilization II's) plays the space race with a policy of its own.
-//  The final year is Civ1's unless the policy is made with another (`createCiv1SpaceRacePolicy`).
+// The policy plays only where the game's spaceship layout is the one its steps were planned for, Civ1's Default
+//  (`civ1-default-spaceship-layout`, registered in the game's `LayoutRegistry`): a rule set with a ship of its own
+//  (Civilization II's) has a policy of its own, even if its parts are the same classes. What the ship needs comes from
+//  the rule set: what every part requires anyone to have built (the Apollo Program) and the advances each part
+//  requires, from the game's `requirements` (civ-clone/web-renderer#37), in `spaceRaceData`. The final year is Civ1's
+//  unless the policy is made with another (`createCiv1SpaceRacePolicy`).
 import { Computers, SpaceFlight } from '@civ-clone/civ1-science/Advances';
+import {
+  LayoutRegistry,
+  instance as layoutRegistryInstance,
+} from '@civ-clone/core-spaceship/LayoutRegistry';
 import {
   RequirementRegistry,
   instance as requirementRegistryInstance,
@@ -37,6 +42,7 @@ import Advance from '@civ-clone/core-science/Advance';
 import City from '@civ-clone/core-city/City';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
 import { Production as CityProduction } from '@civ-clone/library-city/Yields';
+import Default from '@civ-clone/civ1-default-spaceship-layout/Default';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Part from '@civ-clone/core-spaceship/Part';
@@ -167,23 +173,26 @@ const isA = (Type: unknown, Base: unknown): boolean =>
       (Type as { prototype: object }).prototype
     ));
 
-const data = new WeakMap<
-  RequirementRegistry,
-  { length: number; data: SpaceRaceData | null }
->();
+// Whether the game's ships are built on the layout this policy's steps were planned for (or one made from it).
+export const buildsOnDefaultLayout = (
+  layoutRegistry: LayoutRegistry
+): boolean =>
+  layoutRegistry
+    .entries()
+    .some((LayoutType: unknown): boolean => isA(LayoutType, Default));
 
 /**
- * What the rule set says the ship needs, from its `requirements`: `null` unless every part this policy builds requires
- * an advance and every part requires something built by anyone (`range: 'world'`), which is when the policy plays the
- * space race. Worked out again only when entries are added or taken away.
+ * What the rule set says the ship needs, from its `requirements`, when this policy plays the space race: `null` unless
+ * the game's layout is Civ1's (`buildsOnDefaultLayout`), every part this policy builds requires an advance and every
+ * part requires something built by anyone (`range: 'world'`). Read afresh each time: the entries are a few hundred, and
+ * a replaced entry changes no count.
  */
 export const spaceRaceData = (
-  requirementRegistry: RequirementRegistry
+  requirementRegistry: RequirementRegistry,
+  layoutRegistry: LayoutRegistry = layoutRegistryInstance
 ): SpaceRaceData | null => {
-  const cached = data.get(requirementRegistry);
-
-  if (cached && cached.length === requirementRegistry.length) {
-    return cached.data;
+  if (!buildsOnDefaultLayout(layoutRegistry)) {
+    return null;
   }
 
   const entries = requirementRegistry
@@ -224,11 +233,6 @@ export const spaceRaceData = (
         )
       ),
     found = complete ? { enablers, advances } : null;
-
-  data.set(requirementRegistry, {
-    length: requirementRegistry.length,
-    data: found,
-  });
 
   return found;
 };
@@ -286,18 +290,19 @@ const arrival = (
 };
 
 /**
- * Civ1's space race, with what the ship needs from `requirementRegistry` (the game's) and the final year from
- * `finalYear`. Where the rule set's parts aren't the ones it builds (`spaceRaceData` is `null`), it never plays for
- * space: it wants no advance and no enabler, and never launches, as it has no ship.
+ * Civ1's space race, with what the ship needs from `requirementRegistry`, the layouts from `layoutRegistry` (the
+ * game's) and the final year from `finalYear`. Where the game's ship isn't Civ1's (`spaceRaceData` is `null`), it never
+ * plays for space: it wants no advance and no enabler, and never launches, as it has no ship.
  */
 export const createCiv1SpaceRacePolicy = (
   requirementRegistry: RequirementRegistry = requirementRegistryInstance,
-  finalYear: FinalYear = civ1FinalYear
+  finalYear: FinalYear = civ1FinalYear,
+  layoutRegistry: LayoutRegistry = layoutRegistryInstance
 ): SpaceRacePolicy => ({
   // Once a player knows Computers (Space Flight's prerequisite with Rocketry), or has a ship with parts on it, it plays
   //  for space. Every leader does: v474.05's computer players all build parts.
   weight: (dependencies, victoryDependencies, player) =>
-    spaceRaceData(dependencies.requirementRegistry) !== null &&
+    spaceRaceData(dependencies.requirementRegistry, layoutRegistry) !== null &&
     (knows(dependencies, player, Computers) ||
       partsOf(
         victoryDependencies.spaceshipRegistry.getActiveByPlayer(player) ??
@@ -311,11 +316,12 @@ export const createCiv1SpaceRacePolicy = (
 
   // What the parts require: in Civ1, Structurals Space Flight, Fuel and Propulsion Plastics, the modules Robotics.
   advances: (dependencies) =>
-    spaceRaceData(dependencies.requirementRegistry)?.advances ?? [],
+    spaceRaceData(dependencies.requirementRegistry, layoutRegistry)?.advances ??
+    [],
 
   // What every part requires built first: in Civ1, the Apollo Program.
   get enablers(): IBuildable[] {
-    return spaceRaceData(requirementRegistry)?.enablers ?? [];
+    return spaceRaceData(requirementRegistry, layoutRegistry)?.enablers ?? [];
   },
 
   // The player's most productive city that isn't already building a Wonder, and has the defenders it wants first.
