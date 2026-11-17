@@ -1,5 +1,6 @@
-// Generic: answers each step of a negotiation: declines when it's the stronger side, otherwise prefers knowledge, then
-//  peace. Every other `chooseFromList` falls through to the client's random pick.
+// Generic: answers each step of a negotiation (`lib/Diplomacy/chooseNegotiationStep`): the rule set's one answer where
+//  it gives one, its own choice where it speaks for a person and the rule set leaves one (`lib/Diplomacy/personTalks`).
+//  Every other `chooseFromList` falls through to the client's random pick.
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import ChooseFromList from '@civ-clone/core-strategy-ai-client/PlayerActions/ChooseFromList';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';

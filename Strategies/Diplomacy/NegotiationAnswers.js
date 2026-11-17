@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NegotiationAnswers = void 0;
-// Generic: answers each step of a negotiation: declines when it's the stronger side, otherwise prefers knowledge, then
-//  peace. Every other `chooseFromList` falls through to the client's random pick.
+// Generic: answers each step of a negotiation (`lib/Diplomacy/chooseNegotiationStep`): the rule set's one answer where
+//  it gives one, its own choice where it speaks for a person and the rule set leaves one (`lib/Diplomacy/personTalks`).
+//  Every other `chooseFromList` falls through to the client's random pick.
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const ChooseFromList_1 = require("@civ-clone/core-strategy-ai-client/PlayerActions/ChooseFromList");
 const chooseNegotiationStep_1 = require("../../lib/Diplomacy/chooseNegotiationStep");
