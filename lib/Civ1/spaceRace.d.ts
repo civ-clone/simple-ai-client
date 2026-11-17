@@ -1,4 +1,7 @@
+import { RequirementRegistry } from '@civ-clone/core-requirement/RequirementRegistry';
+import Advance from '@civ-clone/core-science/Advance';
 import City from '@civ-clone/core-city/City';
+import { IBuildable } from '@civ-clone/core-city-build/Buildable';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Part from '@civ-clone/core-spaceship/Part';
@@ -14,10 +17,33 @@ export declare const wantedModule: (
   spaceship: Spaceship,
   building: (typeof Part)[]
 ) => typeof Part | null;
+export type SpaceRaceData = {
+  enablers: IBuildable[];
+  advances: (typeof Advance)[];
+};
+/**
+ * What the rule set says the ship needs, from its `requirements`: `null` unless every part this policy builds requires
+ * an advance and every part requires something built by anyone (`range: 'world'`), which is when the policy plays the
+ * space race. Worked out again only when entries are added or taken away.
+ */
+export declare const spaceRaceData: (
+  requirementRegistry: RequirementRegistry
+) => SpaceRaceData | null;
+export type FinalYear = (victoryDependencies: VictoryDependencies) => number;
+export declare const civ1FinalYear: FinalYear;
 export declare const wantedPart: (
   spaceship: Spaceship,
   building: (typeof Part)[]
 ) => typeof Part | null;
+/**
+ * Civ1's space race, with what the ship needs from `requirementRegistry` (the game's) and the final year from
+ * `finalYear`. Where the rule set's parts aren't the ones it builds (`spaceRaceData` is `null`), it never plays for
+ * space: it wants no advance and no enabler, and never launches, as it has no ship.
+ */
+export declare const createCiv1SpaceRacePolicy: (
+  requirementRegistry?: RequirementRegistry,
+  finalYear?: FinalYear
+) => SpaceRacePolicy;
 export declare const civ1SpaceRacePolicy: SpaceRacePolicy;
 export declare const withSpaceshipDefence: (
   knowledge: Knowledge,

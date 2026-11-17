@@ -1,10 +1,15 @@
 import * as Advances from '@civ-clone/civ1-science/Advances';
 import {
   Computers,
+  Plastics,
   Robotics,
   Rocketry,
   SpaceFlight,
 } from '@civ-clone/civ1-science/Advances';
+import {
+  requiresAdvance,
+  requiresWonder,
+} from '@civ-clone/civ1-spaceship/Requirements';
 import {
   Fuel,
   Habitation,
@@ -15,9 +20,14 @@ import {
 } from '@civ-clone/civ1-spaceship/Parts';
 import civ1SpaceRacePolicy, {
   MAXIMUM_STEPS,
+  createCiv1SpaceRacePolicy,
+  spaceRaceData,
   wantedPart,
 } from '../lib/Civ1/spaceRace';
 import Advance from '@civ-clone/core-science/Advance';
+import { ApolloProgram } from '@civ-clone/civ1-wonder/Wonders';
+import Requirement from '@civ-clone/core-requirement/Requirement';
+import RequirementRegistry from '@civ-clone/core-requirement/RequirementRegistry';
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
 import Part from '@civ-clone/core-spaceship/Part';
 import Player from '@civ-clone/core-player/Player';
@@ -29,6 +39,18 @@ import { createVictoryDependencies } from '@civ-clone/base-strategy-victory/lib/
 import { directPrerequisites } from '@civ-clone/base-strategy-victory/lib/research';
 import { expect } from 'chai';
 import requirements from '@civ-clone/civ1-science/Rules/Research/requirements';
+
+// A game's requirements holding `entries`, as a rule set's `registerRules` adds them, describing only.
+const requirementsWith = (...entries: Requirement[]): RequirementRegistry => {
+  const registry = new RequirementRegistry(new RuleRegistry());
+
+  registry.add(null, ...entries);
+
+  return registry;
+};
+
+const civ1Requirements = (): RequirementRegistry =>
+  requirementsWith(...requiresWonder, ...requiresAdvance);
 
 const part = (PartType: typeof Part): Part =>
   Object.create(PartType.prototype) as Part;
@@ -187,8 +209,12 @@ describe('Civ1 space race', (): void => {
   });
 
   it('wants Space Flight, Plastics and Robotics, and plays for space once it knows Computers', (): void => {
-    const dependencies = (known: (typeof Advance)[]) =>
+    const dependencies = (
+        known: (typeof Advance)[],
+        requirementRegistry: RequirementRegistry = civ1Requirements()
+      ) =>
         createDependencies({
+          requirementRegistry,
           playerResearchRegistry: {
             getByPlayer: () => ({
               completed: (AdvanceType: typeof Advance) =>
@@ -203,12 +229,100 @@ describe('Civ1 space race', (): void => {
 
     expect(
       civ1SpaceRacePolicy.advances(dependencies([]), victory, player)
-    ).to.include(Robotics);
+    ).to.eql([SpaceFlight, Plastics, Robotics]);
     expect(
       civ1SpaceRacePolicy.weight(dependencies([]), victory, player)
     ).to.equal(0);
     expect(
       civ1SpaceRacePolicy.weight(dependencies([Computers]), victory, player)
     ).to.equal(1);
+
+    // Where the rule set's parts aren't Civ1's, it never plays for space, whatever it knows.
+    const elsewhere = requirementsWith(
+      ...requiresWonder,
+      ...requiresAdvance.filter(
+        (entry: Requirement): boolean => entry.subject === Structural
+      )
+    );
+
+    expect(
+      civ1SpaceRacePolicy.advances(
+        dependencies([Computers], elsewhere),
+        victory,
+        player
+      )
+    ).to.eql([]);
+    expect(
+      civ1SpaceRacePolicy.weight(
+        dependencies([Computers], elsewhere),
+        victory,
+        player
+      )
+    ).to.equal(0);
+    expect(
+      civ1SpaceRacePolicy.weight(
+        dependencies([Computers], requirementsWith()),
+        victory,
+        player
+      )
+    ).to.equal(0);
+  });
+
+  it("takes the enabler and the parts' advances from the rule set's requirements, and is off without them", (): void => {
+    const requirements = civ1Requirements();
+
+    expect(spaceRaceData(requirements)).to.eql({
+      enablers: [ApolloProgram],
+      advances: [SpaceFlight, Plastics, Robotics],
+    });
+    expect(createCiv1SpaceRacePolicy(requirements).enablers).to.eql([
+      ApolloProgram,
+    ]);
+
+    // No enabler: off.
+    expect(spaceRaceData(requirementsWith(...requiresAdvance))).to.equal(null);
+    // No parts at all (Civilization II's set before it has any): off, with no enabler to build.
+    expect(createCiv1SpaceRacePolicy(requirementsWith()).enablers).to.eql([]);
+
+    // Read again once the rule set's entries change.
+    const growing = requirementsWith(...requiresWonder);
+
+    expect(spaceRaceData(growing)).to.equal(null);
+
+    growing.add(null, ...requiresAdvance);
+
+    expect(spaceRaceData(growing)?.advances).to.eql([
+      SpaceFlight,
+      Plastics,
+      Robotics,
+    ]);
+  });
+
+  it('launches by the final year it is given', (): void => {
+    const player = new Player(new RuleRegistry()),
+      spaceship = {
+        chanceOfSuccess: () => 0.5,
+        activeParts: () => [],
+        inactiveParts: () => [],
+        launched: () => false,
+        flightTime: () => 15,
+        player: () => player,
+      } as unknown as Spaceship,
+      victory = createVictoryDependencies({
+        playerRegistry: { entries: () => [player] } as any,
+        year: { value: () => 1990 } as any,
+      }),
+      dependencies = createDependencies({
+        requirementRegistry: civ1Requirements(),
+      }),
+      launches = (finalYear: number) =>
+        createCiv1SpaceRacePolicy(
+          civ1Requirements(),
+          () => finalYear
+        ).shouldLaunch(dependencies, victory, spaceship);
+
+    // Arriving in 2005: within 10 years of 2010, not of 2020.
+    expect(launches(2010)).to.true;
+    expect(launches(2020)).to.false;
   });
 });

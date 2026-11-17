@@ -15,7 +15,8 @@ import {
 import civ1ConquestPolicy, {
   conquestProductionPolicy,
 } from './lib/Civ1/conquest';
-import civ1SpaceRacePolicy, {
+import {
+  createCiv1SpaceRacePolicy,
   withSpaceshipDefence,
 } from './lib/Civ1/spaceRace';
 import Campaign from '@civ-clone/base-strategy-victory/Strategies/Unit/Campaign';
@@ -78,6 +79,10 @@ export const createStrategies = (
       withFuel(civ1),
       victoryDependencies,
       isCapital
+    ),
+    // What the ship needs comes from the game's requirements: where its parts aren't Civ1's, it never plays for space.
+    civ1SpaceRacePolicy = createCiv1SpaceRacePolicy(
+      dependencies.requirementRegistry
     ),
     spaceRace = spaceRaceGoal(civ1SpaceRacePolicy),
     conquest = conquestGoal(civ1ConquestPolicy),
