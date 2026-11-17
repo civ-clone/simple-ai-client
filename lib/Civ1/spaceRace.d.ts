@@ -35,6 +35,10 @@ export declare const spaceRaceData: (
   requirementRegistry: RequirementRegistry,
   layoutRegistry?: LayoutRegistry
 ) => SpaceRaceData | null;
+export declare const playsSpaceRace: (
+  requirementRegistry: RequirementRegistry,
+  layoutRegistry?: LayoutRegistry
+) => boolean;
 export type FinalYear = (victoryDependencies: VictoryDependencies) => number;
 export declare const civ1FinalYear: FinalYear;
 export declare const wantedPart: (

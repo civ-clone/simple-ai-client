@@ -30,7 +30,10 @@ import Default from '@civ-clone/civ1-default-spaceship-layout/Default';
 import { Game } from '@civ-clone/core-game';
 import Layout from '@civ-clone/core-spaceship/Layout';
 import LayoutRegistry from '@civ-clone/core-spaceship/LayoutRegistry';
+import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
+import LaunchSpaceship from '@civ-clone/base-strategy-victory/Strategies/Turn/LaunchSpaceship';
 import Requirement from '@civ-clone/core-requirement/Requirement';
+import civ1Knowledge from '../lib/Civ1/knowledge';
 import registerSpaceship from '@civ-clone/civ1-spaceship/registerRules';
 import RequirementRegistry from '@civ-clone/core-requirement/RequirementRegistry';
 import AdvanceRegistry from '@civ-clone/core-science/AdvanceRegistry';
@@ -181,8 +184,13 @@ describe('Civ1 space race', (): void => {
 
       players.register(player, rival);
 
-      return civ1SpaceRacePolicy.shouldLaunch(
+      return createCiv1SpaceRacePolicy(
+        undefined,
+        undefined,
+        layouts(Default)
+      ).shouldLaunch(
         createDependencies({
+          requirementRegistry: civ1Requirements(),
           playerResearchRegistry: {
             getByPlayer: (who: Player) => ({
               completed: (AdvanceType: typeof Advance) =>
@@ -405,5 +413,61 @@ describe('Civ1 space race', (): void => {
     // Arriving in 2005: within 10 years of 2010, not of 2020.
     expect(launches(2010)).to.true;
     expect(launches(2020)).to.false;
+  });
+
+  // Civilization II's rules may hand every player a ship once anyone builds the Apollo Program, with the same part
+  //  classes and requirement entries as Civ1's; Civ1's policy must never launch it (stage AD brings Civ2's own).
+  it("never launches a ship on another layout, even one it would launch on Civ1's", (): void => {
+    const player = new Player(new RuleRegistry()),
+      full = [
+        Habitation,
+        LifeSupport,
+        Power,
+        Fuel,
+        Fuel,
+        Propulsion,
+        Propulsion,
+      ]
+        .map((PartType) => new Array(MAXIMUM_STEPS).fill(PartType))
+        .flat(),
+      launched: Spaceship[] = [],
+      spaceship = {
+        ...ship([Structural, ...full]),
+        chanceOfSuccess: () => 1,
+        launched: () => false,
+        launch: () => launched.push(spaceship),
+        flightTime: () => 10,
+        player: () => player,
+      } as unknown as Spaceship,
+      victory = createVictoryDependencies({
+        playerRegistry: { entries: () => [player] } as any,
+        spaceshipRegistry: { getActiveByPlayer: () => spaceship } as any,
+        year: { value: () => 1990 } as any,
+      }),
+      dependencies = createDependencies({
+        requirementRegistry: civ1Requirements(),
+      }),
+      policyOn = (...entries: (typeof Layout)[]) =>
+        createCiv1SpaceRacePolicy(undefined, undefined, layouts(...entries)),
+      launch = (...entries: (typeof Layout)[]): Spaceship[] => {
+        launched.splice(0);
+
+        new LaunchSpaceship(
+          dependencies,
+          civ1Knowledge,
+          policyOn(...entries),
+          victory
+        ).attempt(new AfterTurn(player, null as any));
+
+        return [...launched];
+      };
+
+    expect(policyOn(Default).shouldLaunch(dependencies, victory, spaceship)).to
+      .true;
+    expect(launch(Default)).to.eql([spaceship]);
+    expect(policyOn(OtherLayout).shouldLaunch(dependencies, victory, spaceship))
+      .to.false;
+    expect(launch(OtherLayout)).to.eql([]);
+    expect(launch()).to.eql([]);
   });
 });
