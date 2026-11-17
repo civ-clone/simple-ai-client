@@ -19,6 +19,7 @@
   "devDependencies": {
     "@civ-clone/base-diplomacy-declaration-alliance": "^0.1.0",
     "@civ-clone/base-diplomacy-declaration-ceasefire": "^0.1.0",
+    "@civ-clone/base-government-fundamentalism": "^0.1.1",
     "@civ-clone/civ1-civilization": "github:civ-clone/civ1-civilization",
     "@civ-clone/civ1-diplomacy": "github:civ-clone/civ1-diplomacy",
     "@civ-clone/civ1-game-year": "github:civ-clone/civ1-game-year",
