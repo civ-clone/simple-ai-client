@@ -237,6 +237,14 @@ export const spaceRaceData = (
   return found;
 };
 
+// Whether this policy plays the space race in the game whose `requirements` and layouts these are: only on Civ1's
+//  layout (`spaceRaceData`). Elsewhere (Civilization II's set, whose own rules may hand every player a ship and make its
+//  parts buildable) no Civ1 strategy builds a part or launches.
+export const playsSpaceRace = (
+  requirementRegistry: RequirementRegistry,
+  layoutRegistry: LayoutRegistry = layoutRegistryInstance
+): boolean => spaceRaceData(requirementRegistry, layoutRegistry) !== null;
+
 // The year the game ends in, at the game's level: Civ1's unless the policy is made with another.
 export type FinalYear = (victoryDependencies: VictoryDependencies) => number;
 
@@ -362,6 +370,11 @@ export const createCiv1SpaceRacePolicy = (
   },
 
   shouldLaunch: (dependencies, victoryDependencies, spaceship) => {
+    // Another rule set's ship (one handed out by its own rules) is never launched on Civ1's terms.
+    if (!playsSpaceRace(dependencies.requirementRegistry, layoutRegistry)) {
+      return false;
+    }
+
     const chance = spaceship.chanceOfSuccess();
 
     if (chance < MINIMUM_LAUNCH_CHANCE) {

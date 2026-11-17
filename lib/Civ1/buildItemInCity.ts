@@ -46,7 +46,9 @@ import {
   terrainJobs,
 } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import Unit from '@civ-clone/core-unit/Unit';
+import Part from '@civ-clone/core-spaceship/Part';
 import Wonder from '@civ-clone/core-wonder/Wonder';
+import { playsSpaceRace } from './spaceRace';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
 import isUsefulWonder from './wonders';
 import {
@@ -462,12 +464,20 @@ export const buildItemInCity = (
       cityBuild,
       cityBuild.available()
     ),
+    // Spaceship parts only where Civ1's space race is played (`playsSpaceRace`): another rule set's parts, which it
+    //  may make buildable for everyone, would otherwise rank with the improvements, ahead of Capitalization.
+    partsAllowed = (): boolean =>
+      playsSpaceRace(dependencies.requirementRegistry),
     availableFiltered = available.filter(
       (buildItem: BuildItem): boolean =>
         !restrictions.includes(buildItem.item()) &&
         !Object.prototype.isPrototypeOf.call(Wonder, buildItem.item()) &&
         // Ships are built on purpose, where there's sea to explore, not ranked here.
-        !Object.prototype.isPrototypeOf.call(Naval, buildItem.item())
+        !Object.prototype.isPrototypeOf.call(Naval, buildItem.item()) &&
+        !(
+          Object.prototype.isPrototypeOf.call(Part, buildItem.item()) &&
+          !partsAllowed()
+        )
     ),
     availableWonders = available.filter((buildItem: BuildItem): boolean =>
       Object.prototype.isPrototypeOf.call(Wonder, buildItem.item())

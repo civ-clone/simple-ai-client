@@ -58,6 +58,14 @@ import { autoBuildable } from '@civ-clone/civ1-city/lib/autoBuild';
 import rankBuildItems from '@civ-clone/core-city-build/lib/rankBuildItems';
 import wonderPriorities from '@civ-clone/civ1-wonder/Rules/City/build-priority';
 import Unit from '@civ-clone/core-unit/Unit';
+import {
+  requiresAdvance,
+  requiresWonder,
+} from '@civ-clone/civ1-spaceship/Requirements';
+import Capitalization from '@civ-clone/base-city-improvement-capitalization/Capitalization';
+import Default from '@civ-clone/civ1-default-spaceship-layout/Default';
+import { Structural } from '@civ-clone/civ1-spaceship/Parts';
+import { instance as layoutRegistryInstance } from '@civ-clone/core-spaceship/LayoutRegistry';
 import TraitRegistry from '@civ-clone/core-civilization/TraitRegistry';
 import World from '@civ-clone/core-world/World';
 import Yield from '@civ-clone/core-yield/Yield';
@@ -880,5 +888,40 @@ describe('buildItemInCity', (): void => {
         Library,
       ]);
     });
+  });
+});
+
+// Civilization II's rules may hand every player a ship once anyone builds the Apollo Program and make its parts
+//  buildable, with the same requirement entries as Civ1's; Civ1's space race must not play there (stage AD brings its
+//  own). Its parts are the same classes, so only the layout tells the games apart.
+describe("spaceship parts where the game is not on Civ1's layout", (): void => {
+  const chooseAmong = async (civ1Layout: boolean): Promise<unknown> => {
+    const setup = await setUp({ shields: 3 });
+
+    setup.game.availableCityBuildItems.unregister(
+      ...([Warrior, Settlers, Temple, Trireme] as unknown as IBuildable[])
+    );
+    setup.game.availableCityBuildItems.register(
+      ...([Structural, Capitalization] as unknown as IBuildable[])
+    );
+    setup.game.requirements.add(null, ...requiresWonder, ...requiresAdvance);
+
+    // civ1-default-spaceship-layout registers on the default game's layouts, which the fallback asks.
+    if (civ1Layout) {
+      layoutRegistryInstance.register(Default);
+    }
+
+    try {
+      return setup.choose();
+    } finally {
+      if (civ1Layout) {
+        layoutRegistryInstance.unregister(Default);
+      }
+    }
+  };
+
+  it("doesn't build a part through the fallback, but does on Civ1's layout", async (): Promise<void> => {
+    expect(await chooseAmong(false)).equal(Capitalization);
+    expect(await chooseAmong(true)).equal(Structural);
   });
 });
