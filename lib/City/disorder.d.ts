@@ -12,6 +12,7 @@ export interface DisorderPolicy {
   purchaseShare: number;
   unhappinessOnGrowth(dependencies: Dependencies, city: City): number;
   wasInDisorder(dependencies: Dependencies, city: City): boolean;
+  beyondCalming?(dependencies: Dependencies, city: City): boolean;
   turnStart?(dependencies: Dependencies, player: Player): void;
 }
 export declare const inDisorder: (

@@ -48,6 +48,9 @@ export interface DisorderPolicy {
   unhappinessOnGrowth(dependencies: Dependencies, city: City): number;
   // Whether `city` started this turn in civil disorder.
   wasInDisorder(dependencies: Dependencies, city: City): boolean;
+  // Whether `city` is in disorder that its citizens and what it builds can't end this turn, such as Civ1's for a city the
+  //  human has just captured: it's neither calmed nor built for, and isn't counted among the cities left in disorder.
+  beyondCalming?(dependencies: Dependencies, city: City): boolean;
   // Called at the start of the player's turn (`BeforeTurn`), before anything it does changes its cities, for a policy
   //  that notes what it needs of them then (`noteDisorderAtTurnStart`).
   turnStart?(dependencies: Dependencies, player: Player): void;
@@ -412,6 +415,10 @@ export const calmCities = (
   memory.uncalmedCities.clear();
 
   dependencies.cityRegistry.getByPlayer(player).forEach((city: City): void => {
+    if (policy.beyondCalming?.(dependencies, city)) {
+      return;
+    }
+
     const reason = calmCity(dependencies, knowledge, city, policy);
 
     if (reason !== null) {
@@ -432,6 +439,10 @@ export const preventDisorder = (
   memory.uncalmedCities.clear();
 
   dependencies.cityRegistry.getByPlayer(player).forEach((city: City): void => {
+    if (policy.beyondCalming?.(dependencies, city)) {
+      return;
+    }
+
     if (
       policy.wasInDisorder(dependencies, city) &&
       buildToCalm(dependencies, city, policy.calmingImprovements) !== null
