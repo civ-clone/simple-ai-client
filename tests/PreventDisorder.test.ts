@@ -15,6 +15,7 @@ import {
   inDisorder,
   leastValuableWorkedTiles,
 } from '../lib/City/disorder';
+import civ1TradeRatePolicy from '../lib/Civ1/tradeRates';
 import AfterTurn from '@civ-clone/core-strategy-ai-client/PlayerActions/AfterTurn';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
@@ -357,6 +358,32 @@ describe('PreventDisorder', (): void => {
 
     expect(game.cityBuilds.getByCity(city).building() === null).true;
     expect(treasury.value()).to.equal(800);
+  });
+
+  // civ1-city-happiness puts a city the human captures below a Republic in disorder until its next production is lost,
+  //  whatever its citizens think, and the Automate AI plays the human's turns (civ-clone/web-renderer#1014).
+  it('should neither calm nor build to calm a city whose disorder is only its capture', async (): Promise<void> => {
+    const setup = await setUp({ size: 3 }),
+      { city, dependencies, game, player } = setup,
+      treasury = game.playerTreasuries.getByPlayer(player)[0];
+
+    game.pendingEffects.register(
+      new PendingEffect(CIVIL_DISORDER, city, {
+        captured: String(game.turn.value()),
+      })
+    );
+    treasury.set(800);
+
+    expect(disorder(setup)).true;
+
+    await setup.afterTurn();
+
+    expect(entertainers(setup)).to.equal(0);
+    expect(game.cityBuilds.getByCity(city).building() === null).true;
+    expect(treasury.value()).to.equal(800);
+    expect(uncalmed(setup)).to.be.empty;
+    // Nor does it count towards raising the luxury rate.
+    expect(civ1TradeRatePolicy.inDisorder(dependencies, city)).false;
   });
 
   it("should keep a calmed city's Entertainers through to the engine's check at its next turn start", async (): Promise<void> => {

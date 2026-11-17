@@ -17,6 +17,7 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { King } from '@civ-clone/civ1-difficulty/Difficulties';
 import {
   CIVIL_DISORDER,
+  capturedDisorder,
   civilDisorder,
 } from '@civ-clone/civ1-city-happiness/lib/cityStatus';
 import { contentCitizens } from '@civ-clone/civ1-difficulty/level';
@@ -61,11 +62,18 @@ export const civ1DisorderPolicy: DisorderPolicy = {
       : 0,
   // `civ1-city-happiness` records the disorder it finds at the player's turn start until order is restored. In a game
   //  without that record (Civ2 keeps its own, under its own name), what the ruleset's `CivilDisorder` rules found at the
-  //  start of the player's turn (`turnStart`), so a city calmed since still counts.
+  //  start of the player's turn (`turnStart`), so a city calmed since still counts. Not a city whose disorder is only
+  //  its capture's (`beyondCalming`): it was captured this turn.
   wasInDisorder: (dependencies, city) =>
     recordsCivilDisorder(dependencies)
-      ? civilDisorder(city, dependencies.pendingEffectRegistry) !== null
+      ? civilDisorder(city, dependencies.pendingEffectRegistry) !== null &&
+        !capturedDisorder(city, dependencies.pendingEffectRegistry)
       : wasInDisorderAtTurnStart(dependencies, city),
+  // A city the human captures below a Republic is in disorder, whatever its citizens think, until its next turn's
+  //  production is lost to it (`civ1-city-happiness`'s `capturedDisorder`), and the Automate AI plays the human's
+  //  turns: Entertainers, a Temple or luxuries can't end it, so none are spent on it (civ-clone/web-renderer#1014).
+  beyondCalming: (dependencies, city) =>
+    capturedDisorder(city, dependencies.pendingEffectRegistry),
   turnStart: (dependencies, player) => {
     if (!recordsCivilDisorder(dependencies)) {
       noteDisorderAtTurnStart(dependencies, player);
