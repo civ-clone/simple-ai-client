@@ -28,6 +28,8 @@ export interface ProductionPolicy {
     reinforcement: number;
     settlers: number;
     wonder: number;
+    trader: number;
+    agent: number;
   };
 }
 export declare const defaultProductionPolicy: ProductionPolicy;

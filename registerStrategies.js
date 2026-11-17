@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.register = exports.dependenciesFor = exports.createStrategies = void 0;
 // Civ1: the strategy pack `SimpleAIClient` plays with, generic strategies given Civ1's `Knowledge` plus the Civ1 ones,
 //  registered into a game's `StrategyRegistry`.
+const Envoys_1 = require("./Strategies/Unit/Envoys");
 const Ferry_1 = require("./Strategies/Unit/Ferry");
 const TravelOverseas_1 = require("./Strategies/Unit/TravelOverseas");
 const core_game_1 = require("@civ-clone/core-game");
@@ -72,6 +73,9 @@ const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDepen
         new WaitForCarrier_1.default(dependencies, knowledge),
         new UnloadTransport_1.default(dependencies, knowledge),
         new Ferry_1.default(dependencies, knowledge),
+        // Caravans and Diplomats sent on purpose, only where the ruleset makes it worth it (not Civ1); from a ship too, so
+        //  ahead of a passenger's turn.
+        new Envoys_1.default(dependencies, knowledge),
         new TravelOverseas_1.default(dependencies, knowledge),
         new FoundCapital_1.default(dependencies, knowledge),
         new TerrainWork_1.default(dependencies, knowledge, terrain_1.civ1TerrainPolicy, moveUnit_1.travelToPathEnd),
