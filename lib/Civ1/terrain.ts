@@ -153,6 +153,22 @@ const citySiteScore = (tile: Tile, player: Player): number => {
   return score;
 };
 
+// How many tiles a whole area of `radius` is on the grid `tile` is on, wherever it is: `(2·radius + 1)²` on a grid
+//  whose tiles have eight neighbours (the square grid, and the staggered isometric one in its logical axes),
+//  `1 + 3·radius·(radius + 1)` on the hexagonal grid's six. Not the area round `tile` itself, which a world that
+//  doesn't wrap cuts short at its edge.
+const wholeAreaSize = (tile: Tile, radius: number): number =>
+  tile.map().topology().directions().length === 6
+    ? 1 + 3 * radius * (radius + 1)
+    : (2 * radius + 1) ** 2;
+
+// What a city site's surroundings have to score: 160 over the square grid's 25 tiles within two, which is 6.4 a tile.
+//  A grid whose area of two is smaller asks the same of each tile, so a hexagonal site (19 tiles) needs 121.6: asked
+//  for 160, as many tiles' worth of land as on the square grid, few sites on the hexagonal grid ever pass, and its
+//  players found half as many cities (civ-clone/web-renderer#95).
+export const citySiteThreshold = (tile: Tile): number =>
+  (160 * wholeAreaSize(tile, 2)) / 25;
+
 export const shouldBuildCity = (
   dependencies: Dependencies,
   player: Player,
@@ -184,7 +200,7 @@ export const shouldBuildCity = (
       (total: number, tile: Tile): number =>
         total + citySiteScore(tile, player),
       0
-    ) >= 160 &&
+    ) >= citySiteThreshold(tile) &&
     !surroundingArea(tile, 4).some(
       (tile: Tile): boolean =>
         dependencies.cityRegistry.getByTile(tile) !== null
