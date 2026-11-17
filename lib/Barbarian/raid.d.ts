@@ -6,6 +6,7 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 export declare const POLAR_ROWS = 2;
+export declare const MAP_ROWS = 50;
 export declare const STRANDED_EVERY = 4;
 export declare const TOO_FAR = 8;
 export declare const LANDING_DISTANCE = 8;
@@ -15,6 +16,14 @@ export declare const LEADER_GIVES_UP_FROM = 4;
 export declare const leaderGivesUp: (
   turn: number,
   fromCity: number | null
+) => boolean;
+export declare const isLeader: (
+  dependencies: Dependencies,
+  unit: Unit
+) => boolean;
+export declare const leaves: (
+  dependencies: Dependencies,
+  tile: Tile
 ) => boolean;
 export declare const liveCities: (dependencies: Dependencies) => City[];
 export declare const nearestCity: (tile: Tile, cities: City[]) => City | null;
@@ -27,7 +36,8 @@ export type Step = {
  * The best step from where `unit` stands, scored as v474.05 does (`AIEngine.cs` L2412-2440): 0–5 at random, +6 onto
  * irrigation or a mine, +4 onto any square but the unit's own city, +99 to attack a unit that isn't a Diplomat, +2 for
  * each axis on which the step agrees with the way to `target` (straight on scores +4, a diagonal +2). An enemy city
- * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked.
+ * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked. On a grid
+ * without square axes (hexagonal), a step that brings it a move nearer `target` scores +4 and one no further +2.
  */
 export declare const bestStep: (
   dependencies: Dependencies,
@@ -58,7 +68,8 @@ export declare const raid: (
 /**
  * A raiding ship's turn: off the map near the poles; gone once empty; lands its raiders beside it when a city is
  * within 8 (`tryLanding`), before and after sailing; otherwise sails for the city with the best gold for the distance
- * that it can reach a sea square beside, or is gone when there is none.
+ * that it can reach a sea square beside, or is gone when there is no city to sail for. With cities, but none it can
+ * reach a sea square beside, it waits where it is (civ-clone/web-renderer#979).
  */
 export declare const sail: (
   dependencies: Dependencies,

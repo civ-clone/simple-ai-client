@@ -1,5 +1,8 @@
 // Civ1: how a barbarian unit moves (v474.05 `AIEngine.cs` `F0_25fb_362d_MoveBarbarianUnit`), for `BarbarianClient`'s
-//  `Raid` strategy (civ-clone/web-renderer#169).
+//  `Raid` strategy (civ-clone/web-renderer#169). What differs between rule sets is asked of the rule set, by mechanism:
+//  which unit leads a group (base-barbarians' `LeadsGroup` rules) and where a barbarian leaves the map (`LeavesMap`),
+//  each with v474.05's answer when the rule set registers none; a city's worth to a raider is base-barbarians'
+//  `cityGold`, the same in Civilization II.
 import {
   Attack,
   CaptureCity,
@@ -9,26 +12,31 @@ import {
   SneakAttack,
   SneakCaptureCity,
 } from '@civ-clone/library-unit/Actions';
-import { Diplomat } from '@civ-clone/civ1-unit/Units';
-import { Irrigation, Mine } from '@civ-clone/civ1-world/TileImprovements';
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import { Diplomat } from '@civ-clone/library-unit/Units';
 import Gold from '@civ-clone/base-city-yield-gold/Gold';
+import Irrigation from '@civ-clone/base-tile-improvement-irrigation/Irrigation';
 import LandMass from '@civ-clone/core-world/LandMass';
+import Mine from '@civ-clone/base-tile-improvement-mine/Mine';
 import NavalTransport from '@civ-clone/base-unit-type-naval-transport/NavalTransport';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
 import Unit from '@civ-clone/core-unit/Unit';
-import cityGold from '@civ-clone/civ1-barbarians/lib/cityGold';
+import cityGold from '@civ-clone/base-barbarians/lib/cityGold';
 import isBarbarian from '@civ-clone/base-civilization-barbarian/isBarbarian';
-import { nearPole } from '@civ-clone/civ1-barbarians/lib/polar';
+import leadsGroup from '@civ-clone/base-barbarians/lib/leadsGroup';
+import leavesMap from '@civ-clone/base-barbarians/lib/leavesMap';
+import { nearPole } from '@civ-clone/base-barbarians/lib/polar';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
-// A barbarian within this many of v474.05's 50 rows of either edge leaves the map.
+// Unless the rule set says otherwise (`LeavesMap`), a barbarian within this many of v474.05's 50 rows of either edge
+//  leaves the map.
 export const POLAR_ROWS = 2;
+export const MAP_ROWS = 50;
 // Every fourth turn, staggered by unit, a raider too far from any city, or on the wrong continent, gives up.
 export const STRANDED_EVERY = 4;
 export const TOO_FAR = 8;
@@ -47,12 +55,51 @@ export const leaderGivesUp = (turn: number, fromCity: number | null): boolean =>
 
 const STEP_LIMIT = 50;
 
+// Whether `unit` leads its group: as the rule set says (`LeadsGroup`), or, where it says nothing, v474.05's leader, the
+//  group's Diplomat.
+export const isLeader = (dependencies: Dependencies, unit: Unit): boolean =>
+  leadsGroup(
+    dependencies.ruleRegistry,
+    unit,
+    (unit: Unit): boolean => unit instanceof Diplomat
+  );
+
+// Whether a barbarian on `tile` leaves the map: as the rule set says (`LeavesMap`), or, where it says nothing, within
+//  `POLAR_ROWS` of v474.05's 50 of either edge.
+export const leaves = (dependencies: Dependencies, tile: Tile): boolean =>
+  leavesMap(dependencies.ruleRegistry, tile, (tile: Tile): boolean =>
+    nearPole(tile, POLAR_ROWS, MAP_ROWS)
+  );
+
 // How far `to` is from `from` on one axis, the short way round a wrapping world: negative for west or north.
 const wrappedDelta = (from: number, to: number, size: number): number => {
   const delta = (((to - from) % size) + size) % size;
 
   return delta > size / 2 ? delta - size : delta;
 };
+
+// The way from `from` to `to` along the grid's two square axes, as signs: on the square grid storage x and y the short
+//  way round, as v474.05 scores a step; on a staggered isometric grid its logical axes, whose king's moves are the
+//  eight neighbours (civ-clone/web-renderer#980). `null` on a grid with no square axes, the hexagonal one.
+const heading = (from: Tile, to: Tile): number[] | null => {
+  const world = from.map(),
+    topology = world.topology();
+
+  if (topology.id() === 'square') {
+    return [
+      Math.sign(wrappedDelta(from.x(), to.x(), world.width())),
+      Math.sign(wrappedDelta(from.y(), to.y(), world.height())),
+    ];
+  }
+
+  const delta = topology.logicalDelta(from.x(), from.y(), to.x(), to.y());
+
+  return delta === null ? null : delta.map(Math.sign);
+};
+
+// How far `to` is from `target` in moves, on the unit's grid.
+const stepsTo = (to: Tile, target: Tile): number =>
+  to.map().topology().steps(to.x(), to.y(), target.x(), target.y());
 
 const landMassOf = (tile: Tile): LandMass | null =>
   tile
@@ -115,7 +162,8 @@ export type Step = { action: Action; score: number; to: Tile };
  * The best step from where `unit` stands, scored as v474.05 does (`AIEngine.cs` L2412-2440): 0–5 at random, +6 onto
  * irrigation or a mine, +4 onto any square but the unit's own city, +99 to attack a unit that isn't a Diplomat, +2 for
  * each axis on which the step agrees with the way to `target` (straight on scores +4, a diagonal +2). An enemy city
- * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked.
+ * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked. On a grid
+ * without square axes (hexagonal), a step that brings it a move nearer `target` scores +4 and one no further +2.
  */
 export const bestStep = (
   dependencies: Dependencies,
@@ -124,13 +172,9 @@ export const bestStep = (
   target: Tile | null
 ): Step | null => {
   const from = unit.tile(),
-    world = from.map(),
-    towards = target
-      ? [
-          Math.sign(wrappedDelta(from.x(), target.x(), world.width())),
-          Math.sign(wrappedDelta(from.y(), target.y(), world.height())),
-        ]
-      : null;
+    towards = target ? heading(from, target) : null,
+    stepsFrom =
+      target !== null && towards === null ? stepsTo(from, target) : null;
 
   let best: Step | null = null;
 
@@ -181,16 +225,19 @@ export const bestStep = (
     }
 
     if (towards !== null) {
-      const direction = [
-        Math.sign(wrappedDelta(from.x(), to.x(), world.width())),
-        Math.sign(wrappedDelta(from.y(), to.y(), world.height())),
-      ];
+      const direction = heading(from, to)!;
 
       [0, 1].forEach((axis: number): void => {
         if (direction[axis] === towards[axis]) {
           score += 2;
         }
       });
+    }
+
+    if (stepsFrom !== null) {
+      const stepsAfter = stepsTo(to, target!);
+
+      score += stepsAfter < stepsFrom ? 4 : stepsAfter === stepsFrom ? 2 : 0;
     }
 
     if (best === null || score > best.score) {
@@ -309,7 +356,7 @@ export const leader = (
       (other: Unit): boolean =>
         other !== unit &&
         other.player() === player &&
-        !(other instanceof Diplomat)
+        !isLeader(dependencies, other)
     );
 
   if (here.length > 0) {
@@ -323,7 +370,7 @@ export const leader = (
     .filter(
       (other: Unit): boolean =>
         other !== unit &&
-        !(other instanceof Diplomat) &&
+        !isLeader(dependencies, other) &&
         other.tile().isLand() &&
         unit.tile().distanceFrom(other.tile()) < LEADER_FOLLOWS
     )
@@ -368,13 +415,13 @@ export const raid = (
 ): void => {
   const tile = unit.tile();
 
-  if (nearPole(tile, POLAR_ROWS)) {
+  if (leaves(dependencies, tile)) {
     unit.destroy();
 
     return;
   }
 
-  if (unit instanceof Diplomat) {
+  if (isLeader(dependencies, unit)) {
     leader(dependencies, player, unit);
 
     return;
@@ -440,7 +487,7 @@ const tryLanding = (
       .find(
         (neighbour: Tile): boolean =>
           neighbour.isLand() &&
-          !nearPole(neighbour, POLAR_ROWS) &&
+          !leaves(dependencies, neighbour) &&
           dependencies.cityRegistry.getByTile(neighbour) === null &&
           dependencies.unitRegistry.getByTile(neighbour).length === 0 &&
           landMassOf(neighbour) === landMass
@@ -504,7 +551,8 @@ const approaches = (
 /**
  * A raiding ship's turn: off the map near the poles; gone once empty; lands its raiders beside it when a city is
  * within 8 (`tryLanding`), before and after sailing; otherwise sails for the city with the best gold for the distance
- * that it can reach a sea square beside, or is gone when there is none.
+ * that it can reach a sea square beside, or is gone when there is no city to sail for. With cities, but none it can
+ * reach a sea square beside, it waits where it is (civ-clone/web-renderer#979).
  */
 export const sail = (
   dependencies: Dependencies,
@@ -515,7 +563,7 @@ export const sail = (
     // A transport is a `Unit` at runtime; its type's keys differ, which is all the cast papers over.
     asUnit = ship as unknown as Unit;
 
-  if (nearPole(tile, POLAR_ROWS)) {
+  if (leaves(dependencies, tile)) {
     ship.destroy();
 
     return;
@@ -548,18 +596,25 @@ export const sail = (
       .filter(([, score]: [City, number]): boolean => score > 0)
       .sort(([, a]: [City, number], [, b]: [City, number]): number => b - a);
 
+  if (targets.length === 0) {
+    ship.destroy();
+
+    return;
+  }
+
   let path: Path | null = null;
 
   for (const [city] of targets) {
-    [path] = approaches(dependencies, asUnit, tile, city);
+    path = approaches(dependencies, asUnit, tile, city)[0] ?? null;
 
-    if (path) {
+    if (path !== null) {
       break;
     }
   }
 
+  // Nowhere it can reach from this sea: it waits, as it did when this threw on the missing path (#979).
   if (path === null) {
-    ship.destroy();
+    standDown(dependencies, asUnit);
 
     return;
   }

@@ -13,8 +13,9 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { defaultGame } from '@civ-clone/core-game';
 import { skipUnit } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
-// The barbarians' strategies: their units' turns, and what their cities build. Nothing else is offered to them:
-//  `civ1-barbarians` keeps research, revolutions and negotiation away from the barbarian player.
+// The barbarians' strategies: their units' turns, and what their cities build. Nothing else is offered to them: the
+//  rule set's barbarians (`civ1-barbarians`, on base-barbarians) keep research, revolutions and negotiation away from
+//  the barbarian player.
 export const createBarbarianStrategies = (
   dependencies: Dependencies
 ): Strategy[] => [new Raid(dependencies), new BuildRaiders(dependencies)];
@@ -22,7 +23,8 @@ export const createBarbarianStrategies = (
 /**
  * The barbarians' client (civ-clone/web-renderer#169): an `AIClient`, so `isHuman` and the hooks that tell a computer
  * player from a person treat it as one, with a strategy pack of its own rather than `SimpleAIClient`'s, which plans
- * for a civilization. A host gives it to the player `civ1-barbarians` spawns, when `player:spawned` names a barbarian.
+ * for a civilization. A host gives it to the barbarian player a rule set spawns (base-barbarians' `barbarianPlayer`),
+ * when `player:spawned` names a barbarian. What differs between rule sets it asks of the rule set (`lib/Barbarian/raid`).
  */
 export class BarbarianClient extends StrategyAIClient {
   private _dependencies: Dependencies;

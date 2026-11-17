@@ -7,6 +7,7 @@ const Envoys_1 = require("./Strategies/Unit/Envoys");
 const Ferry_1 = require("./Strategies/Unit/Ferry");
 const TravelOverseas_1 = require("./Strategies/Unit/TravelOverseas");
 const core_game_1 = require("@civ-clone/core-game");
+const LayoutRegistry_1 = require("@civ-clone/core-spaceship/LayoutRegistry");
 const Dependencies_1 = require("@civ-clone/base-strategy-ai/lib/Dependencies");
 const VictoryDependencies_1 = require("@civ-clone/base-strategy-victory/lib/VictoryDependencies");
 const conquest_1 = require("./lib/Civ1/conquest");
@@ -58,9 +59,11 @@ const tradeRates_1 = require("./lib/Civ1/tradeRates");
 // The goals a player plays to win by (`base-strategy-victory`): the space race (civ-clone/web-renderer#376) and
 //  conquest (civ-clone/web-renderer#377). A capital keeps a defender more while its player's ship is in flight, and a
 //  player builds more attackers while it plays for conquest.
-const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDependencies = (0, VictoryDependencies_1.createVictoryDependencies)()) => {
+const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDependencies = (0, VictoryDependencies_1.createVictoryDependencies)(), layoutRegistry = LayoutRegistry_1.instance) => {
     // Aircraft fuel from base-unit-fuel where a ruleset counts it that way (Civ2); Civ1's own count otherwise.
-    const knowledge = (0, spaceRace_1.withSpaceshipDefence)((0, fuel_1.default)(civ1), victoryDependencies, defence_1.isCapital), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(spaceRace_1.default), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
+    const knowledge = (0, spaceRace_1.withSpaceshipDefence)((0, fuel_1.default)(civ1), victoryDependencies, defence_1.isCapital), 
+    // What the ship needs comes from the game's requirements; where its ship isn't Civ1's, it never plays for space.
+    civ1SpaceRacePolicy = (0, spaceRace_1.createCiv1SpaceRacePolicy)(dependencies.requirementRegistry, undefined, layoutRegistry), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(civ1SpaceRacePolicy), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
     return [
         // `BeforeTurn`, all of them in turn. What the disorder policy notes of the player's cities comes first, before
         //  anything changes them (a revolution, their workers).
@@ -90,7 +93,7 @@ const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDepen
         new StandDown_1.default(dependencies, knowledge, standDown_1.default),
         // The other mandatory choices.
         new BuildExplorerShip_1.default(dependencies, knowledge),
-        new BuildSpaceship_1.default(dependencies, knowledge, spaceRace, goals, spaceRace_1.default, victoryDependencies),
+        new BuildSpaceship_1.default(dependencies, knowledge, spaceRace, goals, civ1SpaceRacePolicy, victoryDependencies),
         new ChooseProduction_1.default(dependencies, knowledge, (player) => (0, goal_1.goalFor)(goals, dependencies, victoryDependencies, player) === conquest
             ? conquest_1.conquestProductionPolicy
             : buildItemInCity_1.defaultProductionPolicy),
@@ -107,7 +110,7 @@ const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDepen
         //  the treasury the player earned.
         new SpendTreasury_1.default(dependencies, knowledge, spending_1.default),
         // Once the turn's parts are on the ship.
-        new LaunchSpaceship_1.default(dependencies, knowledge, spaceRace_1.default, victoryDependencies),
+        new LaunchSpaceship_1.default(dependencies, knowledge, civ1SpaceRacePolicy, victoryDependencies),
         // Standing orders for a player's units (`UnitOrder`): it handles none of the computer players' actions, so it
         //  changes nothing they do.
         new Explore_1.default(dependencies, knowledge),
@@ -117,7 +120,7 @@ exports.createStrategies = createStrategies;
 // The game's registries, as the strategies take them: `base-strategy-ai`'s, exported from here as it always was, for
 //  the callers that import it from here (the arena among them).
 exports.dependenciesFor = Dependencies_1.dependenciesFor;
-const register = (game) => game.strategies.register(...(0, exports.createStrategies)((0, exports.dependenciesFor)(game), knowledge_1.default, (0, VictoryDependencies_1.victoryDependenciesFor)(game)));
+const register = (game) => game.strategies.register(...(0, exports.createStrategies)((0, exports.dependenciesFor)(game), knowledge_1.default, (0, VictoryDependencies_1.victoryDependenciesFor)(game), game.layouts));
 exports.register = register;
 // The plugin loader imports each package for this side effect, as it does `registerRules`.
 (0, exports.register)(core_game_1.defaultGame);
