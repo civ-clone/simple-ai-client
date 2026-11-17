@@ -1,11 +1,18 @@
 import {
   Battleship,
   Cannon,
+  Diplomat,
   Horseman,
   Musketman,
   Nuclear,
+  Swordman,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
+import {
+  generateGenerator,
+  generateWorld,
+} from '@civ-clone/core-world/tests/lib/buildWorld';
+import { isLeader, leaderGivesUp, leaves } from '../lib/Barbarian/raid';
 import BarbarianClient, { createBarbarianStrategies } from '../BarbarianClient';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import BuildRaiders from '../Strategies/Barbarian/BuildRaiders';
@@ -14,9 +21,15 @@ import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
 import { StrategyRegistry } from '@civ-clone/core-strategy/StrategyRegistry';
 import { dependenciesFor } from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { expect } from 'chai';
-import { leaderGivesUp } from '../lib/Barbarian/raid';
 import unitYields from '@civ-clone/civ1-unit/Rules/Unit/yield';
+import Criterion from '@civ-clone/core-rule/Criterion';
+import Effect from '@civ-clone/core-rule/Effect';
+import LeadsGroup from '@civ-clone/base-barbarians/Rules/LeadsGroup';
+import LeavesMap from '@civ-clone/base-barbarians/Rules/LeavesMap';
 import Player from '@civ-clone/core-player/Player';
+import Terrain from '@civ-clone/core-terrain/Terrain';
+import Tile from '@civ-clone/core-world/Tile';
+import Unit from '@civ-clone/core-unit/Unit';
 
 describe('BarbarianClient', (): void => {
   it('plays with the barbarian strategies only, in its own registry', (): void => {
@@ -92,5 +105,53 @@ describe('a stranded leader', (): void => {
 
   it('gives up with no city left to go to', (): void => {
     expect(leaderGivesUp(0, null)).to.be.true;
+  });
+});
+
+describe('what the raiders ask the rule set', (): void => {
+  it("takes the group's Diplomat as its leader, unless the rule set says who leads", async (): Promise<void> => {
+    const rules = new RuleRegistry(),
+      dependencies = dependenciesFor({ rules } as any),
+      world = await generateWorld(undefined, rules),
+      player = new Player(rules),
+      diplomat = new Diplomat(null, player, world.get(0, 0), rules),
+      swordman = new Swordman(null, player, world.get(0, 0), rules);
+
+    expect(isLeader(dependencies, diplomat)).to.be.true;
+    expect(isLeader(dependencies, swordman)).to.be.false;
+
+    rules.register(
+      new LeadsGroup(
+        new Criterion((unit: Unit): boolean => unit instanceof Swordman),
+        new Effect((): boolean => true)
+      )
+    );
+
+    expect(isLeader(dependencies, diplomat)).to.be.false;
+    expect(isLeader(dependencies, swordman)).to.be.true;
+  });
+
+  it('leaves the map within 2 of 50 rows of the top or bottom, unless the rule set says where', async (): Promise<void> => {
+    const rules = new RuleRegistry(),
+      dependencies = dependenciesFor({ rules } as any),
+      // 100 rows: 2 of 50 is 4.
+      world = await generateWorld(generateGenerator(100, 4, Terrain), rules),
+      at = (y: number): Tile => world.get(0, y);
+
+    expect(
+      [0, 3, 4, 50, 95, 96, 99].map((y) => leaves(dependencies, at(y)))
+    ).to.eql([true, true, false, false, false, true, true]);
+
+    rules.register(
+      new LeavesMap(new Effect((tile: Tile): boolean => tile.y() === 50))
+    );
+
+    expect([0, 3, 4, 50, 96].map((y) => leaves(dependencies, at(y)))).to.eql([
+      false,
+      false,
+      false,
+      true,
+      false,
+    ]);
   });
 });

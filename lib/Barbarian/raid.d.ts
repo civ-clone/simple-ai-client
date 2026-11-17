@@ -6,6 +6,7 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 export declare const POLAR_ROWS = 2;
+export declare const MAP_ROWS = 50;
 export declare const STRANDED_EVERY = 4;
 export declare const TOO_FAR = 8;
 export declare const LANDING_DISTANCE = 8;
@@ -15,6 +16,14 @@ export declare const LEADER_GIVES_UP_FROM = 4;
 export declare const leaderGivesUp: (
   turn: number,
   fromCity: number | null
+) => boolean;
+export declare const isLeader: (
+  dependencies: Dependencies,
+  unit: Unit
+) => boolean;
+export declare const leaves: (
+  dependencies: Dependencies,
+  tile: Tile
 ) => boolean;
 export declare const liveCities: (dependencies: Dependencies) => City[];
 export declare const nearestCity: (tile: Tile, cities: City[]) => City | null;

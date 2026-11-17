@@ -10,7 +10,8 @@ export declare const createBarbarianStrategies: (
 /**
  * The barbarians' client (civ-clone/web-renderer#169): an `AIClient`, so `isHuman` and the hooks that tell a computer
  * player from a person treat it as one, with a strategy pack of its own rather than `SimpleAIClient`'s, which plans
- * for a civilization. A host gives it to the player `civ1-barbarians` spawns, when `player:spawned` names a barbarian.
+ * for a civilization. A host gives it to the barbarian player a rule set spawns (base-barbarians' `barbarianPlayer`),
+ * when `player:spawned` names a barbarian. What differs between rule sets it asks of the rule set (`lib/Barbarian/raid`).
  */
 export declare class BarbarianClient extends StrategyAIClient {
   private _dependencies;

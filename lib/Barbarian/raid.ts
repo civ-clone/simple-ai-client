@@ -1,5 +1,8 @@
 // Civ1: how a barbarian unit moves (v474.05 `AIEngine.cs` `F0_25fb_362d_MoveBarbarianUnit`), for `BarbarianClient`'s
-//  `Raid` strategy (civ-clone/web-renderer#169).
+//  `Raid` strategy (civ-clone/web-renderer#169). What differs between rule sets is asked of the rule set, by mechanism:
+//  which unit leads a group (base-barbarians' `LeadsGroup` rules) and where a barbarian leaves the map (`LeavesMap`),
+//  each with v474.05's answer when the rule set registers none; a city's worth to a raider is base-barbarians'
+//  `cityGold`, the same in Civilization II.
 import {
   Attack,
   CaptureCity,
@@ -9,26 +12,31 @@ import {
   SneakAttack,
   SneakCaptureCity,
 } from '@civ-clone/library-unit/Actions';
-import { Diplomat } from '@civ-clone/civ1-unit/Units';
-import { Irrigation, Mine } from '@civ-clone/civ1-world/TileImprovements';
 import Action from '@civ-clone/core-unit/Action';
 import City from '@civ-clone/core-city/City';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import { Diplomat } from '@civ-clone/library-unit/Units';
 import Gold from '@civ-clone/base-city-yield-gold/Gold';
+import Irrigation from '@civ-clone/base-tile-improvement-irrigation/Irrigation';
 import LandMass from '@civ-clone/core-world/LandMass';
+import Mine from '@civ-clone/base-tile-improvement-mine/Mine';
 import NavalTransport from '@civ-clone/base-unit-type-naval-transport/NavalTransport';
 import Path from '@civ-clone/core-world-path/Path';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import TileImprovement from '@civ-clone/core-tile-improvement/TileImprovement';
 import Unit from '@civ-clone/core-unit/Unit';
-import cityGold from '@civ-clone/civ1-barbarians/lib/cityGold';
+import cityGold from '@civ-clone/base-barbarians/lib/cityGold';
 import isBarbarian from '@civ-clone/base-civilization-barbarian/isBarbarian';
-import { nearPole } from '@civ-clone/civ1-barbarians/lib/polar';
+import leadsGroup from '@civ-clone/base-barbarians/lib/leadsGroup';
+import leavesMap from '@civ-clone/base-barbarians/lib/leavesMap';
+import { nearPole } from '@civ-clone/base-barbarians/lib/polar';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
-// A barbarian within this many of v474.05's 50 rows of either edge leaves the map.
+// Unless the rule set says otherwise (`LeavesMap`), a barbarian within this many of v474.05's 50 rows of either edge
+//  leaves the map.
 export const POLAR_ROWS = 2;
+export const MAP_ROWS = 50;
 // Every fourth turn, staggered by unit, a raider too far from any city, or on the wrong continent, gives up.
 export const STRANDED_EVERY = 4;
 export const TOO_FAR = 8;
@@ -46,6 +54,22 @@ export const leaderGivesUp = (turn: number, fromCity: number | null): boolean =>
   (turn % LEADER_GIVES_UP_EVERY) + LEADER_GIVES_UP_FROM <= fromCity;
 
 const STEP_LIMIT = 50;
+
+// Whether `unit` leads its group: as the rule set says (`LeadsGroup`), or, where it says nothing, v474.05's leader, the
+//  group's Diplomat.
+export const isLeader = (dependencies: Dependencies, unit: Unit): boolean =>
+  leadsGroup(
+    dependencies.ruleRegistry,
+    unit,
+    (unit: Unit): boolean => unit instanceof Diplomat
+  );
+
+// Whether a barbarian on `tile` leaves the map: as the rule set says (`LeavesMap`), or, where it says nothing, within
+//  `POLAR_ROWS` of v474.05's 50 of either edge.
+export const leaves = (dependencies: Dependencies, tile: Tile): boolean =>
+  leavesMap(dependencies.ruleRegistry, tile, (tile: Tile): boolean =>
+    nearPole(tile, POLAR_ROWS, MAP_ROWS)
+  );
 
 // How far `to` is from `from` on one axis, the short way round a wrapping world: negative for west or north.
 const wrappedDelta = (from: number, to: number, size: number): number => {
@@ -309,7 +333,7 @@ export const leader = (
       (other: Unit): boolean =>
         other !== unit &&
         other.player() === player &&
-        !(other instanceof Diplomat)
+        !isLeader(dependencies, other)
     );
 
   if (here.length > 0) {
@@ -323,7 +347,7 @@ export const leader = (
     .filter(
       (other: Unit): boolean =>
         other !== unit &&
-        !(other instanceof Diplomat) &&
+        !isLeader(dependencies, other) &&
         other.tile().isLand() &&
         unit.tile().distanceFrom(other.tile()) < LEADER_FOLLOWS
     )
@@ -368,13 +392,13 @@ export const raid = (
 ): void => {
   const tile = unit.tile();
 
-  if (nearPole(tile, POLAR_ROWS)) {
+  if (leaves(dependencies, tile)) {
     unit.destroy();
 
     return;
   }
 
-  if (unit instanceof Diplomat) {
+  if (isLeader(dependencies, unit)) {
     leader(dependencies, player, unit);
 
     return;
@@ -440,7 +464,7 @@ const tryLanding = (
       .find(
         (neighbour: Tile): boolean =>
           neighbour.isLand() &&
-          !nearPole(neighbour, POLAR_ROWS) &&
+          !leaves(dependencies, neighbour) &&
           dependencies.cityRegistry.getByTile(neighbour) === null &&
           dependencies.unitRegistry.getByTile(neighbour).length === 0 &&
           landMassOf(neighbour) === landMass
@@ -515,7 +539,7 @@ export const sail = (
     // A transport is a `Unit` at runtime; its type's keys differ, which is all the cast papers over.
     asUnit = ship as unknown as Unit;
 
-  if (nearPole(tile, POLAR_ROWS)) {
+  if (leaves(dependencies, tile)) {
     ship.destroy();
 
     return;
