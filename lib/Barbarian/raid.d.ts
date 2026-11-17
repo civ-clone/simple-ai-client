@@ -36,7 +36,8 @@ export type Step = {
  * The best step from where `unit` stands, scored as v474.05 does (`AIEngine.cs` L2412-2440): 0–5 at random, +6 onto
  * irrigation or a mine, +4 onto any square but the unit's own city, +99 to attack a unit that isn't a Diplomat, +2 for
  * each axis on which the step agrees with the way to `target` (straight on scores +4, a diagonal +2). An enemy city
- * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked.
+ * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked. On a grid
+ * without square axes (hexagonal), a step that brings it a move nearer `target` scores +4 and one no further +2.
  */
 export declare const bestStep: (
   dependencies: Dependencies,

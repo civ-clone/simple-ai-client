@@ -78,6 +78,29 @@ const wrappedDelta = (from: number, to: number, size: number): number => {
   return delta > size / 2 ? delta - size : delta;
 };
 
+// The way from `from` to `to` along the grid's two square axes, as signs: on the square grid storage x and y the short
+//  way round, as v474.05 scores a step; on a staggered isometric grid its logical axes, whose king's moves are the
+//  eight neighbours (civ-clone/web-renderer#980). `null` on a grid with no square axes, the hexagonal one.
+const heading = (from: Tile, to: Tile): number[] | null => {
+  const world = from.map(),
+    topology = world.topology();
+
+  if (topology.id() === 'square') {
+    return [
+      Math.sign(wrappedDelta(from.x(), to.x(), world.width())),
+      Math.sign(wrappedDelta(from.y(), to.y(), world.height())),
+    ];
+  }
+
+  const delta = topology.logicalDelta(from.x(), from.y(), to.x(), to.y());
+
+  return delta === null ? null : delta.map(Math.sign);
+};
+
+// How far `to` is from `target` in moves, on the unit's grid.
+const stepsTo = (to: Tile, target: Tile): number =>
+  to.map().topology().steps(to.x(), to.y(), target.x(), target.y());
+
 const landMassOf = (tile: Tile): LandMass | null =>
   tile
     .map()
@@ -139,7 +162,8 @@ export type Step = { action: Action; score: number; to: Tile };
  * The best step from where `unit` stands, scored as v474.05 does (`AIEngine.cs` L2412-2440): 0–5 at random, +6 onto
  * irrigation or a mine, +4 onto any square but the unit's own city, +99 to attack a unit that isn't a Diplomat, +2 for
  * each axis on which the step agrees with the way to `target` (straight on scores +4, a diagonal +2). An enemy city
- * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked.
+ * next door is always entered, defended or not. `null` when no neighbour can be stepped onto or attacked. On a grid
+ * without square axes (hexagonal), a step that brings it a move nearer `target` scores +4 and one no further +2.
  */
 export const bestStep = (
   dependencies: Dependencies,
@@ -148,13 +172,9 @@ export const bestStep = (
   target: Tile | null
 ): Step | null => {
   const from = unit.tile(),
-    world = from.map(),
-    towards = target
-      ? [
-          Math.sign(wrappedDelta(from.x(), target.x(), world.width())),
-          Math.sign(wrappedDelta(from.y(), target.y(), world.height())),
-        ]
-      : null;
+    towards = target ? heading(from, target) : null,
+    stepsFrom =
+      target !== null && towards === null ? stepsTo(from, target) : null;
 
   let best: Step | null = null;
 
@@ -205,16 +225,19 @@ export const bestStep = (
     }
 
     if (towards !== null) {
-      const direction = [
-        Math.sign(wrappedDelta(from.x(), to.x(), world.width())),
-        Math.sign(wrappedDelta(from.y(), to.y(), world.height())),
-      ];
+      const direction = heading(from, to)!;
 
       [0, 1].forEach((axis: number): void => {
         if (direction[axis] === towards[axis]) {
           score += 2;
         }
       });
+    }
+
+    if (stepsFrom !== null) {
+      const stepsAfter = stepsTo(to, target!);
+
+      score += stepsAfter < stepsFrom ? 4 : stepsAfter === stepsFrom ? 2 : 0;
     }
 
     if (best === null || score > best.score) {
