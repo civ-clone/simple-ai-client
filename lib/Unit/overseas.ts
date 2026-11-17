@@ -34,10 +34,17 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
+import { tradeTargets } from './envoys';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 
-export type Role = 'explorer' | 'founder' | 'escort' | 'garrison' | 'invader';
+export type Role =
+  | 'explorer'
+  | 'founder'
+  | 'escort'
+  | 'garrison'
+  | 'invader'
+  | 'trader';
 
 export interface Passenger {
   // What it's going for: a tile to explore, a site for a city, a city of the player's that's short of defenders or an
@@ -478,6 +485,8 @@ export const candidatesFor = (
     ? citiesShortOfDefenders(dependencies, knowledge, player)
     : role === 'invader'
     ? invasionTargets(dependencies, player, unit)
+    : role === 'trader'
+    ? tradeTargets(dependencies, player, unit)
     : [...overseasStateFor(memory).passengers.entries()]
         .filter(
           ([other, passenger]) => other !== unit && passenger.role === 'founder'

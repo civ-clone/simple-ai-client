@@ -5,7 +5,13 @@ import Memory from '@civ-clone/base-strategy-ai/lib/Memory';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
-export type Role = 'explorer' | 'founder' | 'escort' | 'garrison' | 'invader';
+export type Role =
+  | 'explorer'
+  | 'founder'
+  | 'escort'
+  | 'garrison'
+  | 'invader'
+  | 'trader';
 export interface Passenger {
   target: Tile;
   role: Role;

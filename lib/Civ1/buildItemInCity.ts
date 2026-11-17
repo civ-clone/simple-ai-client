@@ -49,6 +49,15 @@ import Unit from '@civ-clone/core-unit/Unit';
 import Wonder from '@civ-clone/core-wonder/Wonder';
 import buildTime, { finishesWithin, netShields } from '../City/buildTime';
 import isUsefulWonder from './wonders';
+import {
+  isAgent,
+  isCovert,
+  isTrader,
+  missionsChosen,
+  tradeRoutesMatter,
+  wantsAgent,
+  wantsTrader,
+} from '../Unit/envoys';
 import Yield from '@civ-clone/core-yield/Yield';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import { changeLosesShields, hasChangeRules } from '../City/productionChange';
@@ -106,6 +115,10 @@ export interface ProductionPolicy {
     reinforcement: number;
     settlers: number;
     wonder: number;
+    // A Caravan for a city with a route to spare, and a Diplomat or Spy, where the ruleset makes them worth it
+    //  (`lib/Unit/envoys`; never in Civ1).
+    trader: number;
+    agent: number;
   };
 }
 
@@ -130,6 +143,8 @@ export const defaultProductionPolicy: ProductionPolicy = {
     reinforcement: 3,
     settlers: 4,
     wonder: 3,
+    trader: 1,
+    agent: 0.5,
   },
 };
 
@@ -660,6 +675,79 @@ export const buildItemInCity = (
 
   // An army, however peaceful the world.
   addNeed(itemFor(getOffensiveUnit()), policy.needs.army, 0, 1);
+
+  // A Caravan and a Diplomat or Spy, only where the ruleset makes them worth it (`lib/Unit/envoys`): Civ1's ruleset
+  //  registers neither `TradeRouteLimit` nor `MissionChoice`, so nothing here is asked there.
+  if (tradeRoutesMatter(dependencies.ruleRegistry)) {
+    const isTraderType = (item: object): boolean =>
+        isTrader(item as typeof Unit, dependencies.ruleRegistry),
+      [trader] = affordableUnits
+        .filter((buildItem: BuildItem): boolean =>
+          isTraderType(buildItem.item())
+        )
+        .sort(
+          (a: BuildItem, b: BuildItem): number =>
+            a.cost().value() - b.cost().value()
+        ),
+      ownTraders =
+        dependencies.unitRegistry
+          .getByCity(city)
+          .filter(
+            (unit: Unit): boolean =>
+              unit.city() === city && isTraderType(unit.constructor)
+          ).length +
+        (cityBuild.building() !== null &&
+        isTraderType(cityBuild.building()!.item())
+          ? 1
+          : 0);
+
+    if (
+      trader &&
+      unitsAndOrders(
+        dependencies,
+        player,
+        (unit: Unit): boolean => isTraderType(unit.constructor),
+        isTraderType
+      ) < Math.ceil(cities / 2) &&
+      wantsTrader(dependencies, player, city, ownTraders)
+    ) {
+      addNeed(trader, policy.needs.trader, 0, 1);
+    }
+  }
+
+  if (missionsChosen(dependencies.ruleRegistry)) {
+    const isAgentType = (item: object): boolean =>
+        isAgent(item as typeof Unit, dependencies.ruleRegistry),
+      [agent] = affordableUnits
+        .filter((buildItem: BuildItem): boolean =>
+          isAgentType(buildItem.item())
+        )
+        .sort(
+          (a: BuildItem, b: BuildItem): number =>
+            Number(
+              isCovert(b.item() as typeof Unit, dependencies.ruleRegistry)
+            ) -
+              Number(
+                isCovert(a.item() as typeof Unit, dependencies.ruleRegistry)
+              ) || a.cost().value() - b.cost().value()
+        ),
+      onOrder = unitsAndOrders(
+        dependencies,
+        player,
+        (): boolean => false,
+        isAgentType
+      ),
+      agents = unitsAndOrders(
+        dependencies,
+        player,
+        (unit: Unit): boolean => isAgentType(unit.constructor),
+        (): boolean => false
+      );
+
+    if (agent && wantsAgent(dependencies, player, city, agents, onOrder)) {
+      addNeed(agent, policy.needs.agent, 0, 1);
+    }
+  }
 
   // A defender for another city, only one this city can finish within the policy's turns.
   if (targets.undefendedCities.length > 0) {
