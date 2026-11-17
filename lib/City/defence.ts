@@ -8,13 +8,20 @@ import City from '@civ-clone/core-city/City';
 import Cost from '@civ-clone/core-city/Rules/Cost';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import { Defence } from '@civ-clone/core-unit/Yields';
-import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
+import Knowledge, {
+  MartialLawPolicy,
+} from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Unit from '@civ-clone/core-unit/Unit';
 import Yield from '@civ-clone/core-yield/Yield';
 import baseYieldOf from '../Unit/unitType';
 
 // The ruleset's part of martial law: `Knowledge` in `base-strategy-ai` describes it.
 export type { MartialLawPolicy } from '@civ-clone/base-strategy-ai/lib/Knowledge';
+
+// A martial law policy that may also say how many citizens each unit keeps content (1 when it doesn't).
+export interface MartialLawPolicyWithPerUnit extends MartialLawPolicy {
+  perUnit?(dependencies: Dependencies, city: City): number;
+}
 
 // More unhappy citizens than any city has, for `calmedWithoutMartialLaw`.
 const CROWD = 100;
@@ -82,13 +89,22 @@ export const martialLawUnitsWanted = (
     return 0;
   }
 
-  return Math.min(
-    limit,
-    Math.max(
+  const citizens = Math.max(
       0,
       unhappiness(yields ?? city.yields()).positive -
         calmedWithoutMartialLaw(dependencies, city)
-    )
+    ),
+    perUnit =
+      (knowledge.martialLaw as MartialLawPolicyWithPerUnit).perUnit?.(
+        dependencies,
+        city
+      ) ?? 1;
+
+  // A unit that keeps more than one citizen content (Civ2's Communism) is wanted for each such share, part shares
+  //  included.
+  return Math.min(
+    limit,
+    perUnit === 1 ? citizens : Math.ceil(citizens / perUnit)
   );
 };
 

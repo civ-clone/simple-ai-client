@@ -27,6 +27,7 @@ import {
   terrainJobs,
 } from '@civ-clone/base-strategy-terrain-work/lib/Unit/terrainWork';
 import { Game, Oasis } from '@civ-clone/civ1-world/TerrainFeatures';
+import RiverFeature from '@civ-clone/base-terrain-feature-river/River';
 import {
   Irrigation,
   Mine,
@@ -79,6 +80,15 @@ import {
   terrainMovementCost,
 } from '@civ-clone/civ1-unit/Rules/Unit/movementCost';
 import PollutionConcern from '@civ-clone/base-leader-personality/Rules/Player/PollutionConcern';
+import MovementCost from '@civ-clone/core-unit/Rules/MovementCost';
+import Terraforms from '@civ-clone/base-unit-trait-terraforms/Terraforms';
+import TransformTerrain from '@civ-clone/base-unit-action-transform-terrain/TransformTerrain';
+import Unit from '@civ-clone/core-unit/Unit';
+import WorkRate from '@civ-clone/core-unit/Rules/WorkRate';
+import YieldModifier from '@civ-clone/core-world/Rules/YieldModifier';
+import YieldRule from '@civ-clone/core-world/Rules/Yield';
+import { conversionOf } from '@civ-clone/base-unit-action-transform-terrain/lib/conversion';
+import { playerGovernmentTerm } from '../Government/terms';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
 
 export const isACityTile = (
@@ -227,7 +237,7 @@ export const shouldIrrigate = (
     isACityTile(dependencies, player, tile) &&
     [...tile.getAdjacent(), tile].some(
       (tile: Tile): boolean =>
-        tile.terrain() instanceof River ||
+        hasRiver(dependencies, tile) ||
         tile.isCoast() ||
         (dependencies.tileImprovementRegistry
           .getByTile(tile)
@@ -502,8 +512,16 @@ const gainOn = (
   improvement: Improvement
 ): Gain => {
   const government = dependencies.playerGovernmentRegistry.getByPlayer(player),
-    advanced = government.is(Monarchy, Communism, Republic, Democracy),
-    republic = government.is(Republic, Democracy),
+    // Where the rule set numbers its governments (base-government-terms), a government with no tile penalty gets the
+    //  `advanced` column, and one with a trade bonus the `republic` one: Civ2's Fundamentalism has no penalty.
+    penalty = playerGovernmentTerm(dependencies, player, 'tilePenalty'),
+    bonus = playerGovernmentTerm(dependencies, player, 'tradeBonus'),
+    advanced =
+      penalty !== undefined
+        ? penalty === null
+        : government.is(Monarchy, Communism, Republic, Democracy),
+    republic =
+      bonus !== undefined ? bonus > 0 : government.is(Republic, Democracy),
     row = gains.find(
       ([rowImprovement, RowTerrain]): boolean =>
         rowImprovement === improvement && isA(TerrainType, RowTerrain)
@@ -561,15 +579,25 @@ const hasFeature = (dependencies: Dependencies, tile: Tile): boolean =>
 const isCityTile = (dependencies: Dependencies, tile: Tile): boolean =>
   dependencies.cityRegistry.getByTile(tile) !== null;
 
+// Whether `tile` has a river, as a source of water for irrigation: Civ1's River is a terrain, Civ2's a feature of the
+//  square's terrain (base-terrain-feature-river), where a `River` terrain check never matches.
+const hasRiver = (dependencies: Dependencies, tile: Tile): boolean =>
+  tile.terrain() instanceof River ||
+  dependencies.terrainFeatureRegistry
+    .getByTerrain(tile.terrain())
+    .some(
+      (feature: TerrainFeature): boolean => feature instanceof RiverFeature
+    );
+
 // Whether `tile` could be irrigated as far as water goes, as `civ1-unit`'s `BuildIrrigation` rule has it: it's a River,
 //  or a River, water or an irrigated tile with no city on it is next to it, north, east, south or west.
 const waterBeside = (dependencies: Dependencies, tile: Tile): boolean =>
-  tile.terrain() instanceof River ||
+  hasRiver(dependencies, tile) ||
   tile
     .getAdjacent()
     .some(
       (neighbour: Tile): boolean =>
-        neighbour.terrain() instanceof River ||
+        hasRiver(dependencies, neighbour) ||
         neighbour.isWater() ||
         (hasImprovement(dependencies, neighbour, 'irrigation') &&
           !isCityTile(dependencies, neighbour))
@@ -700,12 +728,12 @@ const onlyWaterFor = (
       neighbour.isLand() &&
       irrigable(terrainTypeOf(neighbour)) &&
       irrigationWorth(dependencies, player, neighbour) > 0 &&
-      !(neighbour.terrain() instanceof River) &&
+      !hasRiver(dependencies, neighbour) &&
       neighbour
         .getAdjacent()
         .filter(
           (source: Tile): boolean =>
-            source.terrain() instanceof River ||
+            hasRiver(dependencies, source) ||
             source.isWater() ||
             (hasImprovement(dependencies, source, 'irrigation') &&
               !isCityTile(dependencies, source))
@@ -784,6 +812,196 @@ const conversionJobs = (
     });
 };
 
+// Transforming a square's terrain (Civ2's Engineers, civ-clone/web-renderer#1008 M2e): offered only where the rule set
+//  converts the terrain by a transform (base-unit-action-transform-terrain's `TerrainConversion`, which Civ1 has none
+//  of) and the player has a unit that can do it. What it's worth is what the square would yield as its new terrain
+//  against its old, both asked of the rule set's own `Yield` and `YieldModifier` rules for the player, with no feature
+//  or improvement on either; how long it takes is the rule set's `MovementCost` for the action, at the unit's
+//  `WorkRate`, as the action itself works it out. Only on a square a city works, as a clearing is.
+
+// The unit types of each game known to transform, once one of them has been offered the action.
+const transformerTypes: WeakMap<object, Set<Function>> = new WeakMap();
+
+// A unit of the player's that can transform terrain this turn, or `null`: of each type with `Terraforms`, the first is
+//  asked once a turn for its actions where it stands, until one offers a transform.
+const transformerCache: WeakMap<Player, [number, Unit | null]> = new WeakMap();
+
+const transformerOf = (
+  dependencies: Dependencies,
+  player: Player
+): Unit | null => {
+  const turn = dependencies.turn.value(),
+    cached = transformerCache.get(player);
+
+  if (cached && cached[0] === turn) {
+    return cached[1];
+  }
+
+  let known = transformerTypes.get(dependencies.ruleRegistry);
+
+  if (!known) {
+    known = new Set();
+    transformerTypes.set(dependencies.ruleRegistry, known);
+  }
+
+  const asked = new Set<Function>();
+
+  let found: Unit | null = null;
+
+  for (const unit of dependencies.unitRegistry.getByPlayer(player)) {
+    if (!unit.hasTrait(Terraforms)) {
+      continue;
+    }
+
+    if (known.has(unit.constructor)) {
+      found = unit;
+
+      break;
+    }
+
+    if (asked.has(unit.constructor)) {
+      continue;
+    }
+
+    asked.add(unit.constructor);
+
+    if (
+      unit
+        .actions(unit.tile(), unit.tile())
+        .some(
+          (action: UnitAction): boolean => action instanceof TransformTerrain
+        )
+    ) {
+      known.add(unit.constructor);
+      found = unit;
+
+      break;
+    }
+  }
+
+  transformerCache.set(player, [turn, found]);
+
+  return found;
+};
+
+// What `tile` would yield `player` as a `TerrainType`, with no feature or improvement: a stand-in for the square and
+//  its terrain, as `Tile#yields` asks the rules, without its cache.
+const terrainYield = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile,
+  TerrainType: typeof Terrain
+): Gain => {
+  const terrain = Object.create(TerrainType.prototype) as Terrain,
+    probe = Object.create(tile, {
+      terrain: { value: (): Terrain => terrain },
+    }) as Tile,
+    tileYields = dependencies.ruleRegistry
+      .process(YieldRule, probe, player)
+      .flat();
+
+  dependencies.ruleRegistry.process(YieldModifier, probe, player, tileYields);
+
+  return {
+    food: reduceYield(tileYields, Food),
+    shields: reduceYield(tileYields, Production),
+    trade: reduceYield(tileYields, Trade),
+  };
+};
+
+// The turns `unit` would take to transform `tile`, worked out once a turn for each terrain.
+const transformTurnsCache: WeakMap<Unit, [number, Map<Function, number>]> =
+  new WeakMap();
+
+const transformTurns = (
+  dependencies: Dependencies,
+  unit: Unit,
+  tile: Tile
+): number => {
+  const turn = dependencies.turn.value();
+  let cached = transformTurnsCache.get(unit);
+
+  if (!cached || cached[0] !== turn) {
+    cached = [turn, new Map()];
+    transformTurnsCache.set(unit, cached);
+  }
+
+  const byTerrain = cached[1],
+    known = byTerrain.get(tile.terrain().constructor);
+
+  if (known !== undefined) {
+    return known;
+  }
+
+  const action = new TransformTerrain(
+      tile,
+      tile,
+      unit,
+      dependencies.ruleRegistry,
+      dependencies.turn
+    ),
+    [work = 1]: number[] = dependencies.ruleRegistry
+      .process(MovementCost, unit, action)
+      .sort((a: number, b: number): number => b - a),
+    rate = dependencies.ruleRegistry
+      .process(WorkRate, unit)
+      .find((answer: number | undefined): boolean => answer !== undefined),
+    turns = Math.max(
+      1,
+      rate !== undefined && rate > 0 && Number.isFinite(rate)
+        ? Math.ceil(work / rate)
+        : work
+    );
+
+  byTerrain.set(tile.terrain().constructor, turns);
+
+  return turns;
+};
+
+const transformJobs = (
+  dependencies: Dependencies,
+  player: Player,
+  tile: Tile,
+  weights: Weights,
+  worked: boolean
+): TerrainJobValue[] => {
+  if (!worked) {
+    return [];
+  }
+
+  const To = conversionOf(
+    dependencies.ruleRegistry,
+    tile.terrain(),
+    TransformTerrain.kind
+  );
+
+  if (To === undefined) {
+    return [];
+  }
+
+  const unit = transformerOf(dependencies, player);
+
+  if (unit === null) {
+    return [];
+  }
+
+  return [
+    {
+      improvement: 'transform',
+      action: 'transformTerrain',
+      value: worth(
+        add(
+          terrainYield(dependencies, player, tile, To),
+          terrainYield(dependencies, player, tile, terrainTypeOf(tile)),
+          -1
+        ),
+        weights
+      ),
+      turns: transformTurns(dependencies, unit, tile),
+    },
+  ];
+};
+
 // Planting Forest (civ-clone/web-renderer#428): Grassland or Plains with no feature, no irrigation and no mine, and no
 //  water near it (`waterNear`), worked by a city with at least `PLANT_FOOD` food to spare and at most `PLANT_SHIELDS`
 //  shields. It trades a point of food for shields, which only pays a city with food to spare and few shields.
@@ -800,7 +1018,7 @@ const WATER_NEAR = 3;
 const waterNear = (dependencies: Dependencies, tile: Tile): boolean =>
   surroundingArea(tile, WATER_NEAR).some(
     (near: Tile): boolean =>
-      near.terrain() instanceof River ||
+      hasRiver(dependencies, near) ||
       near.isWater() ||
       (hasImprovement(dependencies, near, 'irrigation') &&
         !isCityTile(dependencies, near))
@@ -1359,6 +1577,7 @@ export const civ1TerrainPolicy: TerrainPolicy = {
           };
         }),
       ...conversionJobs(dependencies, player, tile, weights, worked),
+      ...transformJobs(dependencies, player, tile, weights, worked),
       ...(worked
         ? plantingJobs(dependencies, player, tile, city, weights)
         : []),

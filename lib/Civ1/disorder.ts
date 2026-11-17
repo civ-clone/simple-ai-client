@@ -21,6 +21,7 @@ import {
   civilDisorder,
 } from '@civ-clone/civ1-city-happiness/lib/cityStatus';
 import { contentCitizens } from '@civ-clone/civ1-difficulty/level';
+import rulesBornContent from '@civ-clone/base-city-happiness/lib/bornContent';
 
 // The citizens a computer player's city is born content with: 3, whatever the level (`civ1-difficulty`), so the level,
 //  which this policy can't see, makes no difference. It only ever plays computer players.
@@ -54,10 +55,12 @@ export const civ1DisorderPolicy: DisorderPolicy = {
     Colosseum,
   ] as IBuildable[],
   purchaseShare: 1 / 8,
-  // Every citizen of a computer player's city beyond those born content is born unhappy (`civ1-city-happiness`'s
-  //  `PopulationUnhappiness`).
+  // Every citizen of a city beyond those born content is born unhappy (`civ1-city-happiness`'s `PopulationUnhappiness`):
+  //  as many as the rule set's `BornContent` rules say (base-city-happiness; Civ2's count a person's level and empire),
+  //  or else Civ1's for a computer player.
   unhappinessOnGrowth: (dependencies, city) =>
-    dependencies.cityGrowthRegistry.getByCity(city).size() + 1 > bornContent
+    dependencies.cityGrowthRegistry.getByCity(city).size() + 1 >
+    (rulesBornContent(city, dependencies.ruleRegistry) ?? bornContent)
       ? 1
       : 0,
   // `civ1-city-happiness` records the disorder it finds at the player's turn start until order is restored. In a game
