@@ -67,7 +67,8 @@ export declare const raid: (
 /**
  * A raiding ship's turn: off the map near the poles; gone once empty; lands its raiders beside it when a city is
  * within 8 (`tryLanding`), before and after sailing; otherwise sails for the city with the best gold for the distance
- * that it can reach a sea square beside, or is gone when there is none.
+ * that it can reach a sea square beside, or is gone when there is no city to sail for. With cities, but none it can
+ * reach a sea square beside, it waits where it is (civ-clone/web-renderer#979).
  */
 export declare const sail: (
   dependencies: Dependencies,

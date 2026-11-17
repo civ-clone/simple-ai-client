@@ -12,14 +12,21 @@ import {
   generateGenerator,
   generateWorld,
 } from '@civ-clone/core-world/tests/lib/buildWorld';
-import { isLeader, leaderGivesUp, leaves } from '../lib/Barbarian/raid';
+import { isLeader, leaderGivesUp, leaves, sail } from '../lib/Barbarian/raid';
 import BarbarianClient, { createBarbarianStrategies } from '../BarbarianClient';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import BuildRaiders from '../Strategies/Barbarian/BuildRaiders';
 import Raid from '../Strategies/Barbarian/Raid';
 import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
 import { StrategyRegistry } from '@civ-clone/core-strategy/StrategyRegistry';
-import { dependenciesFor } from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import {
+  createDependencies,
+  dependenciesFor,
+} from '@civ-clone/base-strategy-ai/lib/Dependencies';
+import City from '@civ-clone/core-city/City';
+import NavalTransport from '@civ-clone/base-unit-type-naval-transport/NavalTransport';
+import PathFinderRegistry from '@civ-clone/core-world-path/PathFinderRegistry';
+import { Water } from '@civ-clone/core-terrain/Types';
 import { expect } from 'chai';
 import unitYields from '@civ-clone/civ1-unit/Rules/Unit/yield';
 import Criterion from '@civ-clone/core-rule/Criterion';
@@ -153,5 +160,64 @@ describe('what the raiders ask the rule set', (): void => {
       true,
       false,
     ]);
+  });
+});
+
+describe('a raiding ship', (): void => {
+  // A ship mid-ocean with a raider aboard, and one city 20 squares away on the coast, where nothing can find it a way.
+  const setUp = async () => {
+    const rules = new RuleRegistry(),
+      world = await generateWorld(generateGenerator(40, 40, Water), rules),
+      owner = new Player(rules),
+      city = {
+        destroyed: () => false,
+        player: () => owner,
+        tile: () => world.get(20, 20),
+      } as unknown as City,
+      actions: unknown[] = [],
+      ship = {
+        active: () => true,
+        action: (action: unknown) => actions.push(action),
+        cargo: () => [{}],
+        destroy: () => actions.push('destroyed'),
+        destroyed: () => false,
+        moves: () => ({ value: () => 3 }),
+        tile: () => world.get(0, 20),
+      } as unknown as NavalTransport,
+      dependencies = (cities: City[]) =>
+        createDependencies({
+          cityGrowthRegistry: {
+            getByCity: () => ({ size: () => 1 }),
+          } as any,
+          cityRegistry: {
+            entries: () => cities,
+            getByPlayer: () => cities,
+          } as any,
+          pathFinderRegistry: new PathFinderRegistry(),
+          playerTreasuryRegistry: {
+            getByPlayerAndType: () => ({ value: () => 0 }),
+          } as any,
+          ruleRegistry: rules,
+        });
+
+    return { actions, city, dependencies, ship };
+  };
+
+  it("waits where it is when it can reach no city's coast, rather than failing (civ-clone/web-renderer#979)", async (): Promise<void> => {
+    const { actions, city, dependencies, ship } = await setUp();
+
+    expect(() =>
+      sail(dependencies([city]), new Player(new RuleRegistry()), ship)
+    ).not.to.throw();
+    expect(actions.length).to.equal(1);
+    expect((actions[0] as object).constructor.name).to.equal('NoOrders');
+  });
+
+  it('is gone when there is no city to sail for', async (): Promise<void> => {
+    const { actions, dependencies, ship } = await setUp();
+
+    sail(dependencies([]), new Player(new RuleRegistry()), ship);
+
+    expect(actions).to.eql(['destroyed']);
   });
 });
