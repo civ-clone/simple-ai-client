@@ -12,7 +12,16 @@ import {
   generateGenerator,
   generateWorld,
 } from '@civ-clone/core-world/tests/lib/buildWorld';
-import { isLeader, leaderGivesUp, leaves, sail } from '../lib/Barbarian/raid';
+import {
+  bestStep,
+  isLeader,
+  leaderGivesUp,
+  leaves,
+  sail,
+} from '../lib/Barbarian/raid';
+import FillGenerator from '@civ-clone/core-world/tests/lib/FillGenerator';
+import { Move } from '@civ-clone/library-unit/Actions';
+import World from '@civ-clone/core-world/World';
 import BarbarianClient, { createBarbarianStrategies } from '../BarbarianClient';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import BuildRaiders from '../Strategies/Barbarian/BuildRaiders';
@@ -219,5 +228,114 @@ describe('a raiding ship', (): void => {
     sail(dependencies([]), new Player(new RuleRegistry()), ship);
 
     expect(actions).to.eql(['destroyed']);
+  });
+});
+
+describe("a raider's step towards its target (civ-clone/web-renderer#980)", (): void => {
+  const world = async (
+    topologyId: 'square' | 'hex-odd-r' | 'staggered-iso'
+  ): Promise<World> =>
+    generateWorld(
+      new FillGenerator(20, 20, Terrain, { topologyId }),
+      new RuleRegistry()
+    );
+
+  // The best step for a raider on `from` that may step only onto `allowed`, with every random roll 0: so +4 for a
+  //  square that isn't its own city, plus what the way to `target` adds.
+  const step = (from: Tile, target: Tile, allowed: Tile[]) => {
+    const unit = {
+        tile: () => from,
+        actions: (to: Tile) =>
+          allowed.includes(to) ? [Object.create(Move.prototype)] : [],
+      } as unknown as Unit,
+      dependencies = createDependencies({
+        cityRegistry: { getByTile: () => null } as any,
+        randomNumberGenerator: () => 0,
+        ruleRegistry: new RuleRegistry(),
+        tileImprovementRegistry: { getByTile: () => [] } as any,
+        unitRegistry: { getByTile: () => [] } as any,
+      });
+
+    return bestStep(dependencies, new Player(new RuleRegistry()), unit, target);
+  };
+
+  const scoreOnto = (from: Tile, target: Tile, to: Tile): number =>
+    step(from, target, [to])!.score;
+
+  it('on the square grid, scores +2 for each storage axis the step agrees with, as v474.05', async (): Promise<void> => {
+    const map = await world('square'),
+      from = map.get(10, 10),
+      target = map.get(10, 5);
+
+    // Straight on (north) +4, a diagonal towards it +2, sideways nothing.
+    expect(scoreOnto(from, target, map.get(10, 9))).to.equal(8);
+    expect(scoreOnto(from, target, map.get(11, 9))).to.equal(6);
+    expect(scoreOnto(from, target, map.get(11, 10))).to.equal(4);
+    expect(step(from, target, from.getNeighbours())!.to).to.equal(
+      map.get(10, 9)
+    );
+  });
+
+  it('on the hexagonal grid, scores +4 a move nearer, +2 no further and nothing further away', async (): Promise<void> => {
+    const map = await world('hex-odd-r'),
+      topology = map.topology(),
+      from = map.get(10, 10),
+      target = map.get(10, 4),
+      steps = (tile: Tile) =>
+        topology.steps(tile.x(), tile.y(), target.x(), target.y()),
+      here = steps(from),
+      neighbours = from.getNeighbours(),
+      nearer = neighbours.filter((tile) => steps(tile) < here),
+      level = neighbours.filter((tile) => steps(tile) === here),
+      further = neighbours.filter((tile) => steps(tile) > here);
+
+    expect(neighbours).to.have.length(6);
+    expect(nearer.length).to.be.greaterThan(0);
+    expect(level.length).to.be.greaterThan(0);
+    expect(further.length).to.be.greaterThan(0);
+    nearer.forEach((tile) => expect(scoreOnto(from, target, tile)).to.equal(8));
+    level.forEach((tile) => expect(scoreOnto(from, target, tile)).to.equal(6));
+    further.forEach((tile) =>
+      expect(scoreOnto(from, target, tile)).to.equal(4)
+    );
+    expect(nearer).to.include(step(from, target, neighbours)!.to);
+  });
+
+  it('on the staggered isometric grid, scores +2 for each logical axis the step agrees with', async (): Promise<void> => {
+    const map = await world('staggered-iso'),
+      topology = map.topology(),
+      from = map.get(10, 10),
+      neighbours = from.getNeighbours(),
+      delta = (to: Tile): number[] =>
+        topology.logicalDelta(from.x(), from.y(), to.x(), to.y())!,
+      // The neighbour one logical step along +a (se), and a target further along the same way.
+      along = neighbours.find(
+        (tile) => delta(tile)[0] === 1 && delta(tile)[1] === 0
+      )!,
+      target = [1, 2, 3].reduce(
+        (tile: Tile): Tile =>
+          tile
+            .getNeighbours()
+            .find(
+              (next) =>
+                topology
+                  .logicalDelta(tile.x(), tile.y(), next.x(), next.y())!
+                  .join() === '1,0'
+            )!,
+        along
+      );
+
+    expect(neighbours).to.have.length(8);
+    expect(delta(target)).to.eql([4, 0]);
+
+    neighbours.forEach((tile) => {
+      const [a, b] = delta(tile),
+        agrees = (a === 1 ? 1 : 0) + (b === 0 ? 1 : 0);
+
+      expect(scoreOnto(from, target, tile), `${a},${b}`).to.equal(
+        4 + 2 * agrees
+      );
+    });
+    expect(step(from, target, neighbours)!.to).to.equal(along);
   });
 });
