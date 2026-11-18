@@ -797,6 +797,35 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
         .null;
     });
 
+    it('leaves a lake beside a port out of its seas', async (): Promise<void> => {
+      // Land x 0-2, a lake at x 3 (10 squares), land x 4, sea x 5-15: a city at (4, 4) is on both the lake and the sea.
+      const setup = await setUp({ row: '3G1O1G11O' }),
+        { dependencies, enemy, game, loaded, player, unitOf, world } = setup,
+        city = new City(
+          player,
+          world.get(4, 4),
+          '',
+          game.rules,
+          game.workedTiles
+        );
+
+      // An enemy ship on the lake is no threat to the sea.
+      loaded(enemy, 3, 6);
+      setup.survey();
+
+      expect(warshipsWanted(dependencies, player, setup.memory.targets, city))
+        .null;
+
+      // One on the sea is, and a warship on the lake is no use against it.
+      loaded(enemy, 7, 4);
+      unitOf(player, Cruiser, 3, 2);
+      setup.survey();
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, city)
+      ).eql({ wanted: 1, have: 0, submarines: false });
+    });
+
     it('counts the ports on two seas the same whichever port asks first, from the kept counts', async (): Promise<void> => {
       // Land x 0-2 and x 8 (an isthmus), sea A x 3-7, sea B x 9-15 (wrapping to x 0). The player's port at (2, 4) is on
       //  sea A only, the isthmus city at (8, 4) on both, and a port at (0, 8) on sea B only.

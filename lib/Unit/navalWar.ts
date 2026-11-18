@@ -36,7 +36,6 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { hasRole } from '@civ-clone/base-unit-role/roleOf';
 import { healsThisTurn } from './retreatToHeal';
 import { isEnemy } from '../Player/rivals';
-import { isOnSea } from '../City/explorerShip';
 import { reachableTiles } from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 import { isFerry, isFerryType } from './carriesUnits';
 import { isFerrying } from './overseas';
@@ -490,18 +489,26 @@ export const navalThreatsNear = (
   };
 };
 
-// The bodies of water found so far this turn, by each of their tiles. No rule turns land into sea or sea into land, but a
-//  body is only kept for the turn all the same.
-let waterBodies: { turn: number; byTile: WeakMap<Tile, Set<Tile>> } | null =
-  null;
+// The bodies of water found so far this turn, by each of their tiles, kept per game (by its turn counter). No rule turns
+//  land into sea or sea into land, but a body is only kept for the turn all the same.
+const waterBodies = new WeakMap<
+  object,
+  { turn: number; byTile: WeakMap<Tile, Set<Tile>> }
+>();
 
 // The water tiles joined by water to `start`, a water tile, found once a turn for each body of water.
-export const waterBodyOf = (turn: number, start: Tile): Set<Tile> => {
-  if (waterBodies === null || waterBodies.turn !== turn) {
-    waterBodies = { turn, byTile: new WeakMap() };
+export const waterBodyOf = (
+  turn: { value(): number },
+  start: Tile
+): Set<Tile> => {
+  let kept = waterBodies.get(turn);
+
+  if (!kept || kept.turn !== turn.value()) {
+    kept = { turn: turn.value(), byTile: new WeakMap() };
+    waterBodies.set(turn, kept);
   }
 
-  const known = waterBodies.byTile.get(start);
+  const known = kept.byTile.get(start);
 
   if (known) {
     return known;
@@ -520,22 +527,24 @@ export const waterBodyOf = (turn: number, start: Tile): Set<Tile> => {
   }
 
   reached.forEach((tile: Tile): void => {
-    waterBodies!.byTile.set(tile, reached);
+    kept!.byTile.set(tile, reached);
   });
 
   return reached;
 };
 
-// The bodies of water beside `city` (one, mostly; two for a city on an isthmus).
+// The smallest body of water that's a sea rather than a lake, as `isOnSea` judges it.
+export const SEA_SIZE = 20;
+
+// The seas beside `city` (one, mostly; two for a city on an isthmus). A lake beside it isn't one.
 export const seasOf = (dependencies: Dependencies, city: City): Set<Tile>[] => [
   ...new Set(
     city
       .tile()
       .getNeighbours()
       .filter((tile: Tile): boolean => tile.isWater())
-      .map(
-        (tile: Tile): Set<Tile> => waterBodyOf(dependencies.turn.value(), tile)
-      )
+      .map((tile: Tile): Set<Tile> => waterBodyOf(dependencies.turn, tile))
+      .filter((sea: Set<Tile>): boolean => sea.size >= SEA_SIZE)
   ),
 ];
 
