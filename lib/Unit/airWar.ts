@@ -299,9 +299,10 @@ const besideFor = (
         .getByTile(tile)
         .filter((other: Unit): boolean => !other.destroyed());
 
+      // A nuclear weapon's own square counts as empty: it fires from where it stands when that's beside its target.
       if (nuclear) {
         return (
-          units.length === 0 &&
+          units.every((other: Unit): boolean => other === unit) &&
           dependencies.cityRegistry.getByTile(tile) === null
         );
       }

@@ -31,6 +31,10 @@ import planAirTask, {
   raidTarget,
 } from '../lib/Unit/airWar';
 import { ActiveUnit } from '@civ-clone/civ1-unit/PlayerActions';
+import { IBuildable } from '@civ-clone/core-city-build/Buildable';
+import { Production } from '@civ-clone/civ1-world/Yields';
+import buildItemInCity from '../lib/Civ1/buildItemInCity';
+import requiredAdvances from '@civ-clone/civ1-unit/lib/requiredAdvances';
 import AirWar from '../Strategies/Unit/AirWar';
 import City from '@civ-clone/core-city/City';
 import Civilization from '@civ-clone/core-civilization/Civilization';
@@ -533,6 +537,38 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(isNuclearTargetCity(dependencies, player, other)).false;
     });
 
+    it('fly out and fire through the strategy, from an empty square beside the target', async (): Promise<void> => {
+      const { dependencies, first, player, target, unitOf } =
+          await withTarget(),
+        taken: string[] = [],
+        action = first.action.bind(first),
+        strategy = new AirWar(dependencies, civ1Knowledge);
+
+      unitOf(player, Nuclear, 5, 5);
+      first.action = (performed: any, ...args: any[]): void => {
+        taken.push(performed.constructor.name);
+
+        return action(performed, ...args);
+      };
+      first.setActive(true);
+
+      for (
+        let i = 0;
+        i < 6 &&
+        first.active() &&
+        !first.destroyed() &&
+        !taken.includes('NuclearAttack');
+        i++
+      ) {
+        await strategy.attempt(new ActiveUnit(player, first));
+      }
+
+      expect(taken).include('NuclearAttack');
+      // It fired from beside the city, not from a square it shuttled on to.
+      expect(taken.filter((name) => name === 'Move').length).below(6);
+      expect(target.tile()).not.equal(null);
+    });
+
     it('never go for a city destroyed since', async (): Promise<void> => {
       const { dependencies, first, player, target, unitOf } =
         await withTarget();
@@ -599,12 +635,15 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
         target.tile()
       );
 
-      // Not onto the ruins of a city destroyed since (still among the registry's entries).
-      target.destroy();
+      // Not once it has moved.
+      paratrooper.moves().set(0.5);
 
       expect(paradropTarget(dependencies, player, paratrooper)).null;
 
-      paratrooper.moves().set(0.5);
+      paratrooper.moves().set(paratrooper.movement().value());
+
+      // Not onto the ruins of a city destroyed since (still among the registry's entries).
+      target.destroy();
 
       expect(paradropTarget(dependencies, player, paratrooper)).null;
     });
@@ -665,6 +704,60 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
           new ActiveUnit(player, paratrooper)
         )
       ).false;
+    });
+  });
+
+  describe('production', (): void => {
+    it('builds a fighter while an enemy aircraft is near, and a bomber while a defended enemy city is in reach', async (): Promise<void> => {
+      const setup = await setUp(),
+        {
+          city,
+          dependencies,
+          enemy,
+          enemyCity,
+          game,
+          memory,
+          player,
+          survey,
+          unitOf,
+        } = setup,
+        research = game.playerResearch.getByPlayer(player),
+        choose = (): unknown => {
+          buildItemInCity(dependencies, player, memory.targets, city);
+
+          return game.cityBuilds.getByCity(city).building()?.item();
+        };
+
+      game.availableCityBuildItems.register(
+        ...([Fighter, Bomber] as unknown as IBuildable[])
+      );
+      requiredAdvances
+        .filter(([UnitType]) => [Fighter, Bomber].includes(UnitType as any))
+        .forEach(([, Advance]) => research.addAdvance(Advance as any));
+      city.yields = () => [new Production(30)];
+      unitOf(player, Musketman, 5, 5);
+
+      expect(choose()).not.oneOf([Fighter, Bomber]);
+
+      unitOf(enemy, Fighter, 8, 5);
+      survey();
+
+      expect(
+        airWanted(dependencies, player, memory.targets, city, 'fighter', 10)
+      ).eql([1, 0]); // One more than the enemy aircraft, at most one a city.
+      expect(choose()).equal(Fighter);
+
+      dependencies.unitRegistry
+        .getByTile(dependencies.unitRegistry.getByPlayer(enemy)[0].tile())
+        .forEach((unit: Unit) => unit.destroy());
+      enemyCity(10, 5, 3);
+      unitOf(enemy, Warrior, 10, 5);
+      survey();
+
+      expect(
+        airWanted(dependencies, player, memory.targets, city, 'striker', 8)
+      ).eql([1, 0]);
+      expect(choose()).equal(Bomber);
     });
   });
 });
