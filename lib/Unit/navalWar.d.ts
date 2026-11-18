@@ -67,6 +67,11 @@ export declare const navalThreatsNear: (
   ships: Tile[];
   cities: Tile[];
 };
+export declare const waterBodyOf: (turn: number, start: Tile) => Set<Tile>;
+export declare const seasOf: (
+  dependencies: Dependencies,
+  city: City
+) => Set<Tile>[];
 export declare const warshipsWanted: (
   dependencies: Dependencies,
   player: Player,

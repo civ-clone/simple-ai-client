@@ -66,7 +66,8 @@ import worldRules from '@civ-clone/civ1-world/registerRules';
 const setUp = async ({
   roles = true,
   height = 10,
-}: { roles?: boolean; height?: number } = {}) => {
+  row = '3G13O',
+}: { roles?: boolean; height?: number; row?: string } = {}) => {
   const game = new Game();
 
   game.availableGovernments.register(Despotism, Monarchy);
@@ -122,7 +123,7 @@ const setUp = async ({
   }
 
   const world = await simpleRLELoader(game.rules, game.terrainFeatures)(
-      '3G13O'.repeat(height),
+      row.repeat(height),
       height,
       16
     ),
@@ -754,6 +755,46 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(
         navalThreatsNear(dependencies, player, memory.targets, port).cities
       ).eql([city.tile()]);
+    });
+  });
+
+  describe('warships per body of water (Copilot on civ-clone/web-renderer#1171)', (): void => {
+    it("counts only the warships on a port's own sea against its need", async (): Promise<void> => {
+      // Land x 0-2, sea A x 3-7, land x 8-10, sea B x 11-15: the port at (2, 4) is on sea A only.
+      const setup = await setUp({ row: '3G5O3G5O' }),
+        { dependencies, enemy, loaded, player, port, unitOf } = setup;
+
+      loaded(enemy, 5, 4);
+      setup.survey();
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 1, have: 0, submarines: false });
+
+      // A warship on the other sea is no use here.
+      unitOf(player, Cruiser, 13, 4);
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 1, have: 0, submarines: false });
+
+      // One on this sea is (and, a surface warship there, it lets a submarine be built for the hunting).
+      unitOf(player, Cruiser, 4, 2);
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 1, have: 1, submarines: true });
+    });
+
+    it("isn't threatened by an enemy ship on another sea", async (): Promise<void> => {
+      const setup = await setUp({ row: '3G5O3G5O' }),
+        { dependencies, enemy, loaded, player, port } = setup;
+
+      loaded(enemy, 12, 4);
+      setup.survey();
+
+      expect(warshipsWanted(dependencies, player, setup.memory.targets, port))
+        .null;
     });
   });
 });

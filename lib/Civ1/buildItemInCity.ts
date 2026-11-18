@@ -776,29 +776,39 @@ export const buildItemInCity = (
       return;
     }
 
-    const wanted = airWanted(
-      dependencies,
-      player,
-      targets,
-      city,
-      kind,
-      Math.max(
-        ...items.map((buildItem: BuildItem): number =>
-          baseYield(dependencies, buildItem.item(), Movement)
-        )
-      )
-    );
+    // Only the types that reach a target from here: each is asked with its own moves, so a shorter-ranged type is never
+    //  chosen for a target only a longer-ranged one reaches.
+    const reaching = items
+        .map((buildItem: BuildItem) => ({
+          buildItem,
+          wanted: airWanted(
+            dependencies,
+            player,
+            targets,
+            city,
+            kind,
+            baseYield(dependencies, buildItem.item(), Movement)
+          ),
+        }))
+        .filter(({ wanted }) => wanted !== null),
+      [first] = reaching;
 
-    if (wanted === null) {
+    if (!first) {
       return;
     }
+
+    // `have` is the same for every type of a kind; `wanted` grows with the reach, so the most any type wants.
+    const wanted: [number, number] = [
+      Math.max(...reaching.map(({ wanted }) => wanted![0])),
+      first.wanted![1],
+    ];
 
     addNeed(
       itemFor(
         chooseUnit(
           dependencies,
           city,
-          items,
+          reaching.map(({ buildItem }) => buildItem),
           Attack,
           airPolicy,
           false,

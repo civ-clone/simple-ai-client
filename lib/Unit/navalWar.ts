@@ -490,65 +490,170 @@ export const navalThreatsNear = (
   };
 };
 
-// How many warships `player` wants, how many it has (and has on order), and whether `city` may build a submarine, when
-//  `city` (a coastal city on the sea) should build one; otherwise `null`. A city builds them while an enemy ship or an
-//  enemy's coastal city is within reach of it, as the original builds naval units only in a coastal city on open water
-//  (`city_choose_production`, `city_production.cpp:1906-1911`); or, while any of the player's coastal cities is, for
-//  its transports in use (`isFerrying`), to escort them. It wants one for every two such cities, and one for each
-//  transport in use. A submarine can neither bombard nor keep up with a transport, so it builds one only for ships to
-//  hunt and only while it has more surface warships than submarines.
-// The number of `player`'s coastal cities with an enemy ship or an enemy's coastal city within reach. Production runs it
-//  for every city that chooses, so it's kept for the rest of the turn once the player's own survey has filled the board
-//  this turn (`Memory#surveyedTurn`), and never from a board left from an earlier turn (a choice made during another
-//  player's turn, from `unitDestroyed`).
+// The bodies of water found so far this turn, by each of their tiles. No rule turns land into sea or sea into land, but a
+//  body is only kept for the turn all the same.
+let waterBodies: { turn: number; byTile: WeakMap<Tile, Set<Tile>> } | null =
+  null;
+
+// The water tiles joined by water to `start`, a water tile, found once a turn for each body of water.
+export const waterBodyOf = (turn: number, start: Tile): Set<Tile> => {
+  if (waterBodies === null || waterBodies.turn !== turn) {
+    waterBodies = { turn, byTile: new WeakMap() };
+  }
+
+  const known = waterBodies.byTile.get(start);
+
+  if (known) {
+    return known;
+  }
+
+  const reached = new Set<Tile>([start]),
+    queue: Tile[] = [start];
+
+  for (let i = 0; i < queue.length; i++) {
+    queue[i].getNeighbours().forEach((tile: Tile): void => {
+      if (!reached.has(tile) && tile.isWater()) {
+        reached.add(tile);
+        queue.push(tile);
+      }
+    });
+  }
+
+  reached.forEach((tile: Tile): void => {
+    waterBodies!.byTile.set(tile, reached);
+  });
+
+  return reached;
+};
+
+// The bodies of water beside `city` (one, mostly; two for a city on an isthmus).
+export const seasOf = (dependencies: Dependencies, city: City): Set<Tile>[] => [
+  ...new Set(
+    city
+      .tile()
+      .getNeighbours()
+      .filter((tile: Tile): boolean => tile.isWater())
+      .map(
+        (tile: Tile): Set<Tile> => waterBodyOf(dependencies.turn.value(), tile)
+      )
+  ),
+];
+
+// Whether `tile` is on one of `seas`, or is a city's (a port) beside one.
+const onSeas = (tile: Tile, seas: Set<Tile>[]): boolean =>
+  seas.some(
+    (sea: Set<Tile>): boolean =>
+      sea.has(tile) ||
+      (tile.isLand() &&
+        tile
+          .getNeighbours()
+          .some((neighbour: Tile): boolean => sea.has(neighbour)))
+  );
+
+// `navalThreatsNear` `city` on `seas` only: enemy ships on them, and enemy coastal cities beside them.
+const threatsOnSeas = (
+  dependencies: Dependencies,
+  player: Player,
+  targets: TargetBoard,
+  city: City,
+  seas: Set<Tile>[]
+): { ships: Tile[]; cities: Tile[] } => {
+  const near = navalThreatsNear(dependencies, player, targets, city);
+
+  return {
+    ships: near.ships.filter((tile: Tile): boolean => onSeas(tile, seas)),
+    cities: near.cities.filter((tile: Tile): boolean => onSeas(tile, seas)),
+  };
+};
+
+// The number of `player`'s coastal cities on `seas` with an enemy ship or an enemy's coastal city within reach on them.
+//  Production runs it for every city that chooses, so it's kept for the rest of the turn for each body of water once the
+//  player's own survey has filled the board this turn (`Memory#surveyedTurn`), and never from a board left from an
+//  earlier turn (a choice made during another player's turn, from `unitDestroyed`).
 const threatenedCounts = new WeakMap<
   TargetBoard,
-  { turn: number; count: number }
+  { turn: number; bySea: Map<Set<Tile>, number> }
 >();
 
 const threatenedPorts = (
   dependencies: Dependencies,
   player: Player,
-  targets: TargetBoard
+  targets: TargetBoard,
+  seas: Set<Tile>[]
 ): number => {
   const turn = dependencies.turn.value(),
     memory = dependencies.memoryRegistry.memoryFor(player),
-    surveyed = memory.targets === targets && memory.surveyedTurn === turn,
-    known = surveyed ? threatenedCounts.get(targets) : undefined;
+    surveyed = memory.targets === targets && memory.surveyedTurn === turn;
+  let known = surveyed ? threatenedCounts.get(targets) : undefined;
 
-  if (known && known.turn === turn) {
-    return known.count;
+  if (known && known.turn !== turn) {
+    known = undefined;
+  }
+
+  const key = seas[0],
+    kept = known?.bySea.get(key);
+
+  if (kept !== undefined) {
+    return kept;
   }
 
   const count = dependencies.cityRegistry
     .getByPlayer(player)
     .filter((other: City): boolean => {
-      if (!other.tile().isCoast() || !isOnSea(other)) {
+      if (!other.tile().isCoast() || !onSeas(other.tile(), seas)) {
         return false;
       }
 
-      const near = navalThreatsNear(dependencies, player, targets, other);
+      const near = threatsOnSeas(dependencies, player, targets, other, seas);
 
       return near.ships.length > 0 || near.cities.length > 0;
     }).length;
 
   if (surveyed) {
-    threatenedCounts.set(targets, { turn, count });
+    if (!known) {
+      known = { turn, bySea: new Map() };
+      threatenedCounts.set(targets, known);
+    }
+
+    known.bySea.set(key, count);
   }
 
   return count;
 };
 
+// How many warships `player` wants on `city`'s seas, how many it has there (and has on order in ports on them), and
+//  whether `city` may build a submarine, when `city` (a coastal city on the sea) should build one; otherwise `null`. A
+//  ship on another sea is no use to this port, so demand and supply are both counted on the bodies of water beside it
+//  (`seasOf`). A city builds them while an enemy ship on its seas or an enemy's coastal city on them is within reach of
+//  it, as the original builds naval units only in a coastal city on open water (`city_choose_production`,
+//  `city_production.cpp:1906-1911`); or, while any of the player's ports on those seas is, for its transports in use on
+//  them (`isFerrying`), to escort them. It wants one for every two such ports, and one for each such transport. A
+//  submarine can neither bombard nor keep up with a transport, so it builds one only for ships to hunt and only while
+//  it has more surface warships than submarines there.
 export const warshipsWanted = (
   dependencies: Dependencies,
   player: Player,
   targets: TargetBoard,
   city: City
 ): { wanted: number; have: number; submarines: boolean } | null => {
-  const threatenedHere = navalThreatsNear(dependencies, player, targets, city),
+  const seas = seasOf(dependencies, city);
+
+  if (seas.length === 0) {
+    return null;
+  }
+
+  const threatenedHere = threatsOnSeas(
+      dependencies,
+      player,
+      targets,
+      city,
+      seas
+    ),
     here = threatenedHere.ships.length > 0 || threatenedHere.cities.length > 0,
     memory = dependencies.memoryRegistry.memoryFor(player),
-    units = dependencies.unitRegistry.getByPlayer(player),
+    units = dependencies.unitRegistry
+      .getByPlayer(player)
+      .filter((unit: Unit): boolean => onSeas(unit.tile(), seas)),
     ferrying = units.filter(
       (unit: Unit): boolean =>
         isFerry(unit, dependencies.ruleRegistry) &&
@@ -561,7 +666,7 @@ export const warshipsWanted = (
 
   // This city counts whatever was kept, as it may have become threatened since.
   const threatened = Math.max(
-    threatenedPorts(dependencies, player, targets),
+    threatenedPorts(dependencies, player, targets, seas),
     here ? 1 : 0
   );
 
@@ -585,7 +690,11 @@ export const warshipsWanted = (
           .getByCity(other)
           .building();
 
-        return building !== null && isWarshipItem(building.item());
+        return (
+          building !== null &&
+          isWarshipItem(building.item()) &&
+          onSeas(other.tile(), seas)
+        );
       }).length;
 
   return {

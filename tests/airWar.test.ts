@@ -75,8 +75,15 @@ const setupTile = (unit: Unit, x: number, y: number) =>
 const setUp = async ({
   roles = true,
   leader = NapoleonI as typeof Leader,
-}: { roles?: boolean; leader?: typeof Leader } = {}) => {
-  const setup = await unitGame('30G'.repeat(30), 30, 30, Monarchy),
+  known = () => true,
+  fighterRole = AirSuperiorityRole as typeof AirSuperiorityRole,
+}: {
+  roles?: boolean;
+  leader?: typeof Leader;
+  known?: (tile: Tile) => boolean;
+  fighterRole?: typeof AirSuperiorityRole;
+} = {}) => {
+  const setup = await unitGame('30G'.repeat(30), 30, 30, Monarchy, known),
     { dependencies, game, player, world } = setup,
     enemy = new Player(game.rules),
     civilization = new Civilization();
@@ -114,7 +121,7 @@ const setUp = async ({
 
   if (roles) {
     game.rules.register(
-      unitRole('test:role', Fighter, AirSuperiorityRole),
+      unitRole('test:role', Fighter, fighterRole),
       unitRole('test:role', Bomber, AttackRole),
       unitRole('test:role', Nuclear, AttackRole),
       unitRole('test:role', Rifleman, DefendRole),
@@ -788,6 +795,70 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
         airWanted(dependencies, player, memory.targets, city, 'striker', 8)
       ).eql([1, 0]);
       expect(choose()).equal(Bomber);
+    });
+  });
+
+  describe('what the player knows, and the reach of each type (Copilot on civ-clone/web-renderer#1171)', (): void => {
+    it("doesn't drop on, or aim a nuclear weapon at, a city the player hasn't seen", async (): Promise<void> => {
+      const hidden = (tile: Tile): boolean =>
+          !(tile.x() === 12 && tile.y() === 5) &&
+          !(tile.x() === 10 && tile.y() === 5),
+        setup = await setUp({ known: hidden }),
+        { declareWar, dependencies, enemyCity, player, unitOf } = setup,
+        paratrooper = unitOf(player, Rifleman, 5, 5);
+
+      unitOf(player, Musketman, 5, 5);
+      enemyCity(12, 5, 3);
+      declareWar();
+
+      expect(paradropTarget(dependencies, player, paratrooper)).null;
+
+      // Seen, it's a target.
+      dependencies.playerWorldRegistry
+        .getByPlayer(player)
+        .register(setup.world.get(12, 5));
+
+      expect(paradropTarget(dependencies, player, paratrooper)).equal(
+        setup.world.get(12, 5)
+      );
+    });
+
+    it('builds only a type that reaches the target from the city', async (): Promise<void> => {
+      // Both Fighter (10 moves) and Bomber (8) are strikers here; the only defended enemy city is 9 away.
+      const setup = await setUp({ fighterRole: AttackRole }),
+        {
+          city,
+          dependencies,
+          enemy,
+          enemyCity,
+          game,
+          memory,
+          player,
+          survey,
+          unitOf,
+        } = setup,
+        research = game.playerResearch.getByPlayer(player);
+
+      game.availableCityBuildItems.register(
+        ...([Fighter, Bomber] as unknown as IBuildable[])
+      );
+      requiredAdvances
+        .filter(([UnitType]) => [Fighter, Bomber].includes(UnitType as any))
+        .forEach(([, Advance]) => research.addAdvance(Advance as any));
+      city.yields = () => [new Production(30)];
+      unitOf(player, Musketman, 5, 5);
+      enemyCity(14, 5, 3);
+      unitOf(enemy, Warrior, 14, 5);
+      survey();
+
+      expect(airKindOf(Fighter, dependencies.ruleRegistry)).equal('striker');
+      expect(
+        airWanted(dependencies, player, memory.targets, city, 'striker', 8)
+      ).null;
+
+      buildItemInCity(dependencies, player, memory.targets, city);
+
+      expect(game.cityBuilds.getByCity(city).building()?.item()).equal(Fighter);
     });
   });
 });
