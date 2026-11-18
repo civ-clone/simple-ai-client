@@ -21,6 +21,12 @@
 //  the rule set: what every part requires anyone to have built (the Apollo Program) and the advances each part
 //  requires, from the game's `requirements` (civ-clone/web-renderer#37), in `spaceRaceData`. The final year is Civ1's
 //  unless the policy is made with another (`createCiv1SpaceRacePolicy`).
+//
+// A rule set whose own computer players build and launch their ships their own way (Civilization II's) says so with
+//  base-spaceship's `ComputerSpaceshipPart` and `ComputerLaunch` rules (`rulesPlaySpaceRace`). There the policy plays
+//  too, on that rule set's terms: the same Apollo Program and advances from its requirements, the part and the launch
+//  as its rules answer (nothing, where they give no answer), and it plays for space once its player could research the
+//  first part's advance, rather than once it knows Civ1's Computers.
 import { Computers, SpaceFlight } from '@civ-clone/civ1-science/Advances';
 import {
   LayoutRegistry,
@@ -38,7 +44,13 @@ import {
   Propulsion,
   Structural,
 } from '@civ-clone/civ1-spaceship/Parts';
+import {
+  RuleRegistry,
+  instance as ruleRegistryInstance,
+} from '@civ-clone/core-rule/RuleRegistry';
 import Advance from '@civ-clone/core-science/Advance';
+import ComputerLaunch from '@civ-clone/base-spaceship/lib/Rules/ComputerLaunch';
+import ComputerSpaceshipPart from '@civ-clone/base-spaceship/lib/Rules/ComputerSpaceshipPart';
 import City from '@civ-clone/core-city/City';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
 import { Production as CityProduction } from '@civ-clone/library-city/Yields';
@@ -181,20 +193,17 @@ export const buildsOnDefaultLayout = (
     .entries()
     .some((LayoutType: unknown): boolean => isA(LayoutType, Default));
 
-/**
- * What the rule set says the ship needs, from its `requirements`, when this policy plays the space race: `null` unless
- * the game's layout is Civ1's (`buildsOnDefaultLayout`), every part this policy builds requires an advance and every
- * part requires something built by anyone (`range: 'world'`). Read afresh each time: the entries are a few hundred, and
- * a replaced entry changes no count.
- */
-export const spaceRaceData = (
-  requirementRegistry: RequirementRegistry,
-  layoutRegistry: LayoutRegistry = layoutRegistryInstance
-): SpaceRaceData | null => {
-  if (!buildsOnDefaultLayout(layoutRegistry)) {
-    return null;
-  }
+// Whether the rule set says how its own computer players choose their ships' parts (base-spaceship's
+//  `ComputerSpaceshipPart`): the policy then plays the space race on its terms, whatever its layout.
+export const rulesPlaySpaceRace = (
+  ruleRegistry: RuleRegistry = ruleRegistryInstance
+): boolean => ruleRegistry.get(ComputerSpaceshipPart).length > 0;
 
+// What the rule set's `requirements` say the ship needs: `null` unless every part this policy builds requires an
+//  advance and every part requires something built by anyone (`range: 'world'`).
+const requiredForSpace = (
+  requirementRegistry: RequirementRegistry
+): SpaceRaceData | null => {
   const entries = requirementRegistry
       .entries()
       .filter(
@@ -231,19 +240,36 @@ export const spaceRaceData = (
           (entry: Requirement): boolean =>
             entry.subject === PartType && advancesOf(entry).length > 0
         )
-      ),
-    found = complete ? { enablers, advances } : null;
+      );
 
-  return found;
+  return complete ? { enablers, advances } : null;
 };
 
-// Whether this policy plays the space race in the game whose `requirements` and layouts these are: only on Civ1's
-//  layout (`spaceRaceData`). Elsewhere (Civilization II's set, whose own rules may hand every player a ship and make its
-//  parts buildable) no Civ1 strategy builds a part or launches.
+/**
+ * What the rule set says the ship needs, from its `requirements`, when this policy plays the space race: `null` unless
+ * the game's layout is Civ1's (`buildsOnDefaultLayout`) or the rule set has its computer players' own rules
+ * (`rulesPlaySpaceRace`), every part this policy builds requires an advance and every part requires something built by
+ * anyone (`range: 'world'`). Read afresh each time: the entries are a few hundred, and a replaced entry changes no
+ * count.
+ */
+export const spaceRaceData = (
+  requirementRegistry: RequirementRegistry,
+  layoutRegistry: LayoutRegistry = layoutRegistryInstance,
+  ruleRegistry: RuleRegistry = ruleRegistryInstance
+): SpaceRaceData | null =>
+  buildsOnDefaultLayout(layoutRegistry) || rulesPlaySpaceRace(ruleRegistry)
+    ? requiredForSpace(requirementRegistry)
+    : null;
+
+// Whether Civ1's own space race is played in the game whose `requirements` and layouts these are: only on Civ1's layout.
+//  Elsewhere no Civ1 step builds a part or launches: production's fallback never ranks a part, and a rule set with its
+//  computer players' own rules (`rulesPlaySpaceRace`) builds and launches as they say, through the policy alone.
 export const playsSpaceRace = (
   requirementRegistry: RequirementRegistry,
   layoutRegistry: LayoutRegistry = layoutRegistryInstance
-): boolean => spaceRaceData(requirementRegistry, layoutRegistry) !== null;
+): boolean =>
+  buildsOnDefaultLayout(layoutRegistry) &&
+  requiredForSpace(requirementRegistry) !== null;
 
 // The year the game ends in, at the game's level: Civ1's unless the policy is made with another.
 export type FinalYear = (victoryDependencies: VictoryDependencies) => number;
@@ -297,39 +323,100 @@ const arrival = (
   );
 };
 
+// Whether `player` could research `AdvanceType` now, or knows it: worked out once a turn, as `available` asks every
+//  advance's requirements.
+const reached = new WeakMap<
+  Player,
+  { turn: number; advance: unknown; known: boolean }
+>();
+
+const reaches = (
+  dependencies: Dependencies,
+  player: Player,
+  AdvanceType: typeof Advance
+): boolean => {
+  const turn = dependencies.turn.value(),
+    cached = reached.get(player);
+
+  if (cached && cached.turn === turn && cached.advance === AdvanceType) {
+    return cached.known;
+  }
+
+  const playerResearch =
+      dependencies.playerResearchRegistry.getByPlayer(player),
+    known =
+      playerResearch.completed(AdvanceType) ||
+      playerResearch.available().includes(AdvanceType);
+
+  reached.set(player, { turn, advance: AdvanceType, known });
+
+  return known;
+};
+
+const emptyShip = {
+  activeParts: () => [],
+  inactiveParts: () => [],
+} as unknown as Spaceship;
+
 /**
  * Civ1's space race, with what the ship needs from `requirementRegistry`, the layouts from `layoutRegistry` (the
- * game's) and the final year from `finalYear`. Where the game's ship isn't Civ1's (`spaceRaceData` is `null`), it never
- * plays for space: it wants no advance and no enabler, and never launches, as it has no ship.
+ * game's) and the final year from `finalYear`. Where the game's ship isn't Civ1's and the rule set has no computer
+ * players' rules of its own (`spaceRaceData` is `null`), it never plays for space: it wants no advance and no enabler,
+ * and never launches, as it has no ship. Where the rule set has them (`rulesPlaySpaceRace`, read from `ruleRegistry`
+ * for the enablers and from the game's rules otherwise), the part and the launch are theirs.
  */
 export const createCiv1SpaceRacePolicy = (
   requirementRegistry: RequirementRegistry = requirementRegistryInstance,
   finalYear: FinalYear = civ1FinalYear,
-  layoutRegistry: LayoutRegistry = layoutRegistryInstance
+  layoutRegistry: LayoutRegistry = layoutRegistryInstance,
+  ruleRegistry: RuleRegistry = ruleRegistryInstance
 ): SpaceRacePolicy => ({
-  // Once a player knows Computers (Space Flight's prerequisite with Rocketry), or has a ship with parts on it, it plays
-  //  for space. Every leader does: v474.05's computer players all build parts.
-  weight: (dependencies, victoryDependencies, player) =>
-    spaceRaceData(dependencies.requirementRegistry, layoutRegistry) !== null &&
-    (knows(dependencies, player, Computers) ||
+  // On Civ1's layout, once a player knows Computers (Space Flight's prerequisite with Rocketry), or has a ship with
+  //  parts on it, it plays for space. Every leader does: v474.05's computer players all build parts. On a rule set's
+  //  own terms, once it could research the first part's advance (Civilization II's Space Flight), or has parts.
+  weight: (dependencies, victoryDependencies, player) => {
+    const data = spaceRaceData(
+      dependencies.requirementRegistry,
+      layoutRegistry,
+      dependencies.ruleRegistry
+    );
+
+    if (data === null) {
+      return 0;
+    }
+
+    if (
       partsOf(
         victoryDependencies.spaceshipRegistry.getActiveByPlayer(player) ??
-          ({
-            activeParts: () => [],
-            inactiveParts: () => [],
-          } as unknown as Spaceship)
-      ).length > 0)
-      ? 1
-      : 0,
+          emptyShip
+      ).length > 0
+    ) {
+      return 1;
+    }
+
+    if (buildsOnDefaultLayout(layoutRegistry)) {
+      return knows(dependencies, player, Computers) ? 1 : 0;
+    }
+
+    const [First] = data.advances;
+
+    return First !== undefined && reaches(dependencies, player, First) ? 1 : 0;
+  },
 
   // What the parts require: in Civ1, Structurals Space Flight, Fuel and Propulsion Plastics, the modules Robotics.
   advances: (dependencies) =>
-    spaceRaceData(dependencies.requirementRegistry, layoutRegistry)?.advances ??
-    [],
+    spaceRaceData(
+      dependencies.requirementRegistry,
+      layoutRegistry,
+      dependencies.ruleRegistry
+    )?.advances ?? [],
 
   // What every part requires built first: in Civ1, the Apollo Program.
   get enablers(): IBuildable[] {
-    return spaceRaceData(requirementRegistry, layoutRegistry)?.enablers ?? [];
+    return (
+      spaceRaceData(requirementRegistry, layoutRegistry, ruleRegistry)
+        ?.enablers ?? []
+    );
   },
 
   // The player's most productive city that isn't already building a Wonder, and has the defenders it wants first.
@@ -364,12 +451,39 @@ export const createCiv1SpaceRacePolicy = (
     available,
     building
   ) => {
+    // The rule set's own computer players' choice, where it has one (Civilization II's): its first answer, nothing
+    //  without one.
+    if (!buildsOnDefaultLayout(layoutRegistry)) {
+      const [ruled] = dependencies.ruleRegistry.process(
+        ComputerSpaceshipPart,
+        spaceship,
+        available,
+        building
+      );
+
+      return ruled ?? null;
+    }
+
     const wanted = wantedPart(spaceship, building);
 
     return wanted !== null && available.includes(wanted) ? wanted : null;
   },
 
   shouldLaunch: (dependencies, victoryDependencies, spaceship) => {
+    // The rule set's own computer players' decision, where it has one (Civilization II's): its first answer, no launch
+    //  without one.
+    if (
+      !buildsOnDefaultLayout(layoutRegistry) &&
+      rulesPlaySpaceRace(dependencies.ruleRegistry)
+    ) {
+      const [ruled] = dependencies.ruleRegistry.process(
+        ComputerLaunch,
+        spaceship
+      );
+
+      return ruled === true;
+    }
+
     // Another rule set's ship (one handed out by its own rules) is never launched on Civ1's terms.
     if (!playsSpaceRace(dependencies.requirementRegistry, layoutRegistry)) {
       return false;

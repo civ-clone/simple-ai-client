@@ -62,8 +62,9 @@ const tradeRates_1 = require("./lib/Civ1/tradeRates");
 const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDependencies = (0, VictoryDependencies_1.createVictoryDependencies)(), layoutRegistry = LayoutRegistry_1.instance) => {
     // Aircraft fuel from base-unit-fuel where a ruleset counts it that way (Civ2); Civ1's own count otherwise.
     const knowledge = (0, spaceRace_1.withSpaceshipDefence)((0, fuel_1.default)(civ1), victoryDependencies, defence_1.isCapital), 
-    // What the ship needs comes from the game's requirements; where its ship isn't Civ1's, it never plays for space.
-    civ1SpaceRacePolicy = (0, spaceRace_1.createCiv1SpaceRacePolicy)(dependencies.requirementRegistry, undefined, layoutRegistry), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(civ1SpaceRacePolicy), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
+    // What the ship needs comes from the game's requirements; where its ship isn't Civ1's, it plays for space only on the
+    //  rule set's own computer players' terms (`rulesPlaySpaceRace`), and otherwise never.
+    civ1SpaceRacePolicy = (0, spaceRace_1.createCiv1SpaceRacePolicy)(dependencies.requirementRegistry, undefined, layoutRegistry, dependencies.ruleRegistry), spaceRace = (0, SpaceRacePolicy_1.spaceRaceGoal)(civ1SpaceRacePolicy), conquest = (0, ConquestPolicy_1.conquestGoal)(conquest_1.default), goals = [spaceRace, conquest];
     return [
         // `BeforeTurn`, all of them in turn. What the disorder policy notes of the player's cities comes first, before
         //  anything changes them (a revolution, their workers).

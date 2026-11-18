@@ -64,6 +64,7 @@
     "@civ-clone/base-government-terms": "^0.1.0",
     "@civ-clone/base-leader-personality": "^0.1.2",
     "@civ-clone/base-player-action-end-turn": "^0.1.0",
+    "@civ-clone/base-spaceship": "github:civ-clone/base-spaceship#feat/m2e-ad",
     "@civ-clone/base-strategy-ai": "^0.1.4",
     "@civ-clone/base-strategy-explore": "^0.1.0",
     "@civ-clone/base-strategy-terrain-work": "^0.1.2",
