@@ -5,6 +5,7 @@ import {
   Republic,
 } from '@civ-clone/civ1-government/Governments';
 import BornContent from '@civ-clone/base-city-happiness/Rules/BornContent';
+import Fundamentalism from '@civ-clone/base-government-fundamentalism/Fundamentalism';
 import City from '@civ-clone/core-city/City';
 import Criterion from '@civ-clone/core-rule/Criterion';
 import Effect from '@civ-clone/core-rule/Effect';
@@ -47,6 +48,16 @@ const civ2Terms = new Map<typeof Government, Partial<Terms>>([
     {
       freeUnits: (): number => 3,
       martialLaw: { maximumUnits: 3, perUnit: 2 },
+      tilePenalty: null,
+      tradeBonus: 0,
+    },
+  ],
+  [
+    Fundamentalism,
+    {
+      freeUnits: (): number => 8,
+      martialLaw: { maximumUnits: 0, perUnit: 1 },
+      noUnhappiness: true,
       tilePenalty: null,
       tradeBonus: 0,
     },
@@ -216,6 +227,18 @@ describe('rule set terms (L24)', (): void => {
       expect(
         civ1DisorderPolicy.unhappinessOnGrowth(deity.dependencies, deity.city)
       ).equal(1);
+    });
+
+    it('should expect no unhappiness from growth under a government with none', (): void => {
+      const { dependencies, city } = setUp({
+        GovernmentType: Fundamentalism,
+        civ2: true,
+        size: 6,
+      });
+
+      expect(civ1DisorderPolicy.unhappinessOnGrowth(dependencies, city)).equal(
+        0
+      );
     });
   });
 });

@@ -143,9 +143,10 @@ export const proposalFrom = (
   made: Set<Function> = new Set()
 ): unknown | null => {
   const find = (Type: Function): unknown | null =>
-    made.has(Type)
-      ? null
-      : menu.find((step: unknown): boolean => step instanceof Type) ?? null;
+    menu.find(
+      (step: unknown): boolean =>
+        step instanceof Type && !made.has((step as object).constructor)
+    ) ?? null;
 
   // At war, peace or failing that a ceasefire; under a ceasefire, which lapses, peace.
   if (!hasTreatyLevel(dependencies, player, other, TreatyLevel.Peace)) {

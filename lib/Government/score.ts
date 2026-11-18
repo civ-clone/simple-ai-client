@@ -117,7 +117,9 @@ const factsOf = (
 };
 
 // The trade a square gains or loses under `terms`, from what it gives now under `current`'s terms: a tile penalty
-//  taken off a yield over its threshold, so a yield the current one has already taken from counts at the threshold.
+//  takes `amount` off a yield over its threshold. A yield at the threshold under a government that has a penalty
+//  already may be one that was a point over it or one that never was: the yields don't say which, so it counts as
+//  penalised half the time.
 const squareTrade = (
   square: CityFacts['squares'][number],
   terms: Partial<Terms>,
@@ -127,21 +129,27 @@ const squareTrade = (
     currentPenalty = current?.tilePenalty ?? null,
     bonus = terms.tradeBonus ?? 0,
     currentBonus = current?.tradeBonus ?? 0,
-    // Each yield as it would be with no penalty: one the current government took from is back over its threshold.
-    raw = (value: number): number =>
-      currentPenalty !== null && value === currentPenalty.threshold
-        ? value + currentPenalty.amount
-        : value,
-    penalised = (value: number): number =>
-      penalty !== null && raw(value) > penalty.threshold ? penalty.amount : 0,
+    penalised = (value: number): number => {
+      if (penalty === null) {
+        return 0;
+      }
+
+      if (
+        currentPenalty !== null &&
+        value === currentPenalty.threshold &&
+        value + currentPenalty.amount > penalty.threshold
+      ) {
+        return penalty.amount / 2;
+      }
+
+      return value > penalty.threshold ? penalty.amount : 0;
+    },
     // Trade without the current government's bonus, which is added after any penalty.
-    trade = raw(square.trade) - (square.trade > 0 ? currentBonus : 0),
-    penalisedTrade =
-      penalty !== null && trade > penalty.threshold ? penalty.amount : 0;
+    trade = square.trade - (square.trade > 0 ? currentBonus : 0);
 
   return (
     (trade > 0 ? bonus : 0) -
-    penalisedTrade -
+    penalised(trade) -
     SHIELD * penalised(square.shields) -
     FOOD * penalised(square.food)
   );
