@@ -357,6 +357,26 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(planNavalTask(dependencies, player, memory, second)).null;
     });
 
+    it('frees a transport whose escort has gone to heal', async (): Promise<void> => {
+      const { dependencies, loaded, memory, player, unitOf } = await setUp(),
+        first = unitOf(player, Cruiser, 5, 4),
+        second = unitOf(player, Cruiser, 5, 5),
+        transport = loaded(player, 7, 4);
+
+      expect(planNavalTask(dependencies, player, memory, first)?.task).equal(
+        'escort'
+      );
+      expect(transportsToEscort(dependencies, player, memory, second)).empty;
+
+      // Damaged, it heals this turn rather than escort.
+      first.setDamage(6);
+
+      expect(
+        transportsToEscort(dependencies, player, memory, second)[0] ===
+          transport
+      ).true;
+    });
+
     it('leaves the escorting to surface ships', async (): Promise<void> => {
       const { dependencies, loaded, memory, player, unitOf } = await setUp(),
         submarine = unitOf(player, Submarine, 5, 4);
@@ -612,6 +632,57 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(taken).length(1);
       expect(taken[0]).instanceOf(Attack);
       expect((taken[0] as Attack).to()).equal(prey.tile());
+    });
+
+    it('stands down where its path is blocked, rather than wandering', async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, enemy, loaded, player, unitOf } = setup,
+        cruiser = unitOf(player, Cruiser, 5, 4),
+        start = cruiser.tile(),
+        strategy = new NavalWar(dependencies, civ1Knowledge),
+        taken: string[] = [],
+        action = cruiser.action.bind(cruiser);
+
+      loaded(enemy, 10, 4);
+      boardFor(setup);
+      ready(cruiser);
+      // No step is open to it: every move is blocked.
+      cruiser.actions = (): any[] => [];
+      cruiser.action = (performed: any, ...args: any[]): void => {
+        taken.push(performed.constructor.name);
+
+        return action(performed, ...args);
+      };
+
+      expect(await strategy.attempt(new ActiveUnit(player, cruiser))).true;
+      expect(cruiser.tile()).equal(start);
+      expect(taken).eql(['NoOrders']);
+    });
+
+    it("stands down beside its prey when the battle isn't on offer (a treaty partner's ship there)", async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, enemy, game, loaded, player, unitOf } = setup,
+        partner = new Player(game.rules),
+        cruiser = unitOf(player, Cruiser, 5, 4),
+        strategy = new NavalWar(dependencies, civ1Knowledge),
+        taken: string[] = [],
+        action = cruiser.action.bind(cruiser);
+
+      game.playerWorlds.register(new PlayerWorld(partner, setup.world));
+      game.interactions.register(new Peace(player, partner, game.rules));
+      loaded(enemy, 6, 4);
+      unitOf(partner, Transport, 6, 4);
+      boardFor(setup);
+      ready(cruiser);
+      cruiser.action = (performed: any, ...args: any[]): void => {
+        taken.push(performed.constructor.name);
+
+        return action(performed, ...args);
+      };
+
+      expect(await strategy.attempt(new ActiveUnit(player, cruiser))).true;
+      expect(taken).not.include('Attack');
+      expect(taken).include('NoOrders');
     });
 
     it('handles nothing with no task, leaving the ship to the other strategies', async (): Promise<void> => {

@@ -34,6 +34,7 @@ import Submerged from '@civ-clone/base-unit-trait-submerged/Submerged';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { hasRole } from '@civ-clone/base-unit-role/roleOf';
+import { healsThisTurn } from './retreatToHeal';
 import { isEnemy } from '../Player/rivals';
 import { isOnSea } from '../City/explorerShip';
 import { reachableTiles } from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
@@ -325,7 +326,8 @@ export const transportsToEscort = (
   return dependencies.unitRegistry
     .getByPlayer(player)
     .filter((transport: Unit): boolean => {
-      // Unclaimed, claimed by `unit`, or claimed by a warship since sunk.
+      // Unclaimed, claimed by `unit`, or claimed by a warship since sunk or gone to heal (`RetreatToHeal` takes a
+      //  damaged one before it's asked again).
       const by = escorts.get(transport);
 
       return (
@@ -333,7 +335,10 @@ export const transportsToEscort = (
         transport.tile().isWater() &&
         isLoadedTransport(dependencies, transport) &&
         transport.tile().distanceFrom(unit.tile()) <= reach &&
-        (by === undefined || by === unit || by.destroyed())
+        (by === undefined ||
+          by === unit ||
+          by.destroyed() ||
+          healsThisTurn(dependencies, by))
       );
     })
     .sort(

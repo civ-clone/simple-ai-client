@@ -5,6 +5,9 @@ import { Warrior } from '@civ-clone/civ1-unit/Units';
 import civ1Knowledge from '../lib/Civ1/knowledge';
 import { expect } from 'chai';
 import moveUnit from '../lib/Unit/moveUnit';
+import Path from '@civ-clone/core-world-path/Path';
+import Player from '@civ-clone/core-player/Player';
+import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import shuffle from '../lib/shuffle';
 
 // A seeded generator (mulberry32), so that the draws are the same each run.
@@ -162,5 +165,62 @@ describe('moveUnit', (): void => {
     await moveUnit(dependencies, player, memory, civ1Knowledge, warrior);
 
     expect(taken).to.deep.equal(['Move', 'Move', 'Move', 'NoOrders']);
+  });
+
+  describe('stopIfBlocked', (): void => {
+    // A Warrior at (5, 3) with a path whose first step, (6, 3), holds another player's Warrior: no `Move` there.
+    const blocked = async () => {
+      const setup = await unitGame('84G', 7, 12, Monarchy),
+        { addUnit, dependencies, game, player, world } = setup,
+        rival = new Player(game.rules),
+        warrior = addUnit(Warrior, 5, 3),
+        memory = dependencies.memoryRegistry.memoryFor(player),
+        taken: string[] = [],
+        action = warrior.action.bind(warrior);
+
+      game.playerWorlds.register(new PlayerWorld(rival, world));
+      game.units.register(
+        new Warrior(null, rival, world.get(6, 3), game.rules)
+      );
+      warrior.moves().set(1);
+      warrior.setActive(true);
+      memory.unitPathData.set(
+        warrior,
+        new Path(world.get(6, 3), world.get(7, 3))
+      );
+      warrior.action = (step: Action, ...args: any[]): void => {
+        taken.push(step.constructor.name);
+        action(step, ...args);
+      };
+
+      return { dependencies, memory, player, taken, warrior, world };
+    };
+
+    it('stops where the path is blocked, its moves kept and the path dropped', async (): Promise<void> => {
+      const { dependencies, memory, player, taken, warrior, world } =
+        await blocked();
+
+      await moveUnit(dependencies, player, memory, civ1Knowledge, warrior, {
+        stopAtPathEnd: true,
+        stopIfBlocked: true,
+        wander: false,
+      });
+
+      expect(taken).to.deep.equal([]);
+      expect(warrior.tile()).to.equal(world.get(5, 3));
+      expect(warrior.moves().value()).to.equal(1);
+      expect(memory.unitPathData.has(warrior)).to.equal(false);
+    });
+
+    it('takes the greedy step there without it, as before', async (): Promise<void> => {
+      const { dependencies, memory, player, taken, warrior } = await blocked();
+
+      await moveUnit(dependencies, player, memory, civ1Knowledge, warrior, {
+        stopAtPathEnd: true,
+        wander: false,
+      });
+
+      expect(taken.length).to.be.above(0);
+    });
   });
 });
