@@ -53,6 +53,7 @@ import Paradrop from '@civ-clone/base-unit-trait-paradrop/Paradrop';
 import Player from '@civ-clone/core-player/Player';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import TraitRegistry from '@civ-clone/core-civilization/TraitRegistry';
+import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import UnitYield from '@civ-clone/core-unit/Rules/Yield';
 import War from '@civ-clone/base-diplomacy-declaration-war/War';
@@ -523,7 +524,10 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(isNuclearTargetCity(dependencies, player, enemyCity(20, 20, 4)))
         .false;
 
-      game.cityImprovements.register(new SdiDefence(target, game.rules));
+      // Another of the enemy's cities with an SDI Defence, 2 away, stops a strike on it too (Civ2's rule).
+      game.cityImprovements.register(
+        new SdiDefence(enemyCity(12, 5, 2), game.rules)
+      );
 
       expect(isNuclearTargetCity(dependencies, player, target)).false;
 
@@ -537,36 +541,61 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(isNuclearTargetCity(dependencies, player, other)).false;
     });
 
-    it('fly out and fire through the strategy, from an empty square beside the target', async (): Promise<void> => {
-      const { dependencies, first, player, target, unitOf } =
+    it('fly out and fire through the strategy, from an empty square beside the target, with fuel as in Civ2 and a score 1 over its threshold', async (): Promise<void> => {
+      const { dependencies, enemy, first, game, player, target, unitOf } =
           await withTarget(),
-        taken: string[] = [],
-        action = first.action.bind(first),
-        strategy = new AirWar(dependencies, civ1Knowledge);
+        taken: [string, Tile][] = [],
+        action = first.action.bind(first);
 
+      // 3 enemy units around the city (size 8): 4 + 3 = 7 against a threshold of 6 with one city, counted without the
+      //  weapon itself once it's beside the city.
+      dependencies.unitRegistry
+        .getByPlayer(enemy)
+        .filter((unit: Unit) => unit.tile() === setupTile(unit, 9, 4))
+        .forEach((unit: Unit) => unit.destroy());
+      // As Civ2's: spent in its attack, 1 turn of fuel.
+      game.rules.register(
+        ...unitTraits('test:nuclear', Nuclear, SingleUse),
+        new UnitYield(
+          new Criterion((unit: Unit): boolean => unit instanceof Nuclear),
+          new Criterion(
+            (unit: Unit, unitYield: Yield): boolean => unitYield instanceof Fuel
+          ),
+          new Effect((unit: Unit, unitYield: Yield): void => unitYield.set(1))
+        ),
+        ...fuelRules({ ruleRegistry: game.rules }, { countOn: 'out-of-moves' }),
+        refuelInOwnCity(game.cities)
+      );
       unitOf(player, Nuclear, 5, 5);
       first.action = (performed: any, ...args: any[]): void => {
-        taken.push(performed.constructor.name);
+        taken.push([performed.constructor.name, first.tile()]);
 
         return action(performed, ...args);
       };
       first.setActive(true);
+
+      const strategy = new AirWar(
+        dependencies,
+        withFuelKnowledge(civ1Knowledge)
+      );
 
       for (
         let i = 0;
         i < 6 &&
         first.active() &&
         !first.destroyed() &&
-        !taken.includes('NuclearAttack');
+        !taken.some(([name]) => name === 'NuclearAttack');
         i++
       ) {
         await strategy.attempt(new ActiveUnit(player, first));
       }
 
-      expect(taken).include('NuclearAttack');
-      // It fired from beside the city, not from a square it shuttled on to.
-      expect(taken.filter((name) => name === 'Move').length).below(6);
-      expect(target.tile()).not.equal(null);
+      const fired = taken.find(([name]) => name === 'NuclearAttack');
+
+      expect(fired).not.undefined;
+      // From a square beside the city, having flown straight there.
+      expect(fired![1].isNeighbourOf(target.tile())).true;
+      expect(taken.filter(([name]) => name === 'Move').length).at.most(5);
     });
 
     it('never go for a city destroyed since', async (): Promise<void> => {

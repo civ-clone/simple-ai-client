@@ -49,11 +49,12 @@ class AirWar extends AIStrategy_1.default {
         const dependencies = this.dependencies(), player = action.player(), unit = action.value(), memory = this.memoryFor(player);
         // A paratrooper drops when it has somewhere to drop; otherwise it's a land unit like any other.
         if ((0, airWar_1.isParatrooperType)(unit.constructor, dependencies.ruleRegistry)) {
-            const target = (0, airWar_1.paradropTarget)(dependencies, player, unit), drop = target === null
-                ? undefined
-                : unit
-                    .actions(target)
-                    .find((offered) => offered instanceof Paradrop_1.default);
+            // The first target the rules offer a drop onto (their measure of range may differ from ours).
+            const drop = (0, airWar_1.paradropTargets)(dependencies, player, unit)
+                .map((target) => unit
+                .actions(target)
+                .find((offered) => offered instanceof Paradrop_1.default))
+                .find((offered) => offered !== undefined);
             if (!drop) {
                 return false;
             }

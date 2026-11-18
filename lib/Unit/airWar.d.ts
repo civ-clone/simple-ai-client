@@ -59,6 +59,7 @@ export declare const raidTarget: (
   unit: Unit,
   home?: Tile[]
 ) => Tile | null;
+export declare const SDI_RANGE = 3;
 export declare const isNuclearTargetCity: (
   dependencies: Dependencies,
   player: Player,
@@ -72,6 +73,11 @@ export declare const nuclearTarget: (
   player: Player,
   unit: Unit
 ) => Tile | null;
+export declare const paradropTargets: (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+) => Tile[];
 export declare const paradropTarget: (
   dependencies: Dependencies,
   player: Player,

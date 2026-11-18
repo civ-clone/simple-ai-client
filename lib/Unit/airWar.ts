@@ -441,17 +441,31 @@ export const raidTarget = (
   return best;
 };
 
-// Whether `city` has an SDI Defence, which stops a nuclear attack near it.
-const hasSdi = (dependencies: Dependencies, city: City): boolean =>
-  dependencies.cityImprovementRegistry
-    .getByCity(city)
-    .some(
-      (improvement: CityImprovement): boolean =>
-        improvement instanceof SdiDefence
-    );
+// How far from a nuclear attack's target another player's city with an SDI Defence stops it (Civ2's 3).
+export const SDI_RANGE = 3;
+
+// Whether a nuclear attack on `target` by `player` would be stopped: a city of another player's with an SDI Defence
+//  within `SDI_RANGE` of it, as Civ2's rule stops one (the weapon is lost).
+const sdiProtected = (
+  dependencies: Dependencies,
+  player: Player,
+  target: Tile
+): boolean =>
+  liveCities(dependencies).some(
+    (city: City): boolean =>
+      city.player() !== player &&
+      city.tile().distanceFrom(target) <= SDI_RANGE &&
+      dependencies.cityImprovementRegistry
+        .getByCity(city)
+        .some(
+          (improvement: CityImprovement): boolean =>
+            improvement instanceof SdiDefence
+        )
+  );
 
 // Whether `city` could be a nuclear weapon's target for `player` (the original's `ai_nuke_pick_target`, short of the
-//  weapon's reach and the score around it): larger than 4, without an SDI Defence, of a player at war more than half as
+//  weapon's reach and the score around it): larger than 4, with no other player's SDI Defence within 3 of it (the
+//  original looks only at the city's own; Civ2's rule stops a strike near any), of a player at war more than half as
 //  strong as `player` (with no nuclear weapons) or half again as strong, or that `player` holds a vendetta against.
 export const isNuclearTargetCity = (
   dependencies: Dependencies,
@@ -474,7 +488,7 @@ export const isNuclearTargetCity = (
     owner === player ||
     !atWar(dependencies, player, owner) ||
     dependencies.cityGrowthRegistry.getByCity(city).size() <= 4 ||
-    hasSdi(dependencies, city)
+    sdiProtected(dependencies, player, city.tile())
   ) {
     return false;
   }
@@ -562,9 +576,12 @@ export const nuclearTarget = (
 
     [city.tile(), ...city.tile().getNeighbours()].forEach(
       (tile: Tile): void => {
+        // The weapon itself isn't counted: the original's isn't beside its target when it scores it.
         const units = dependencies.unitRegistry
           .getByTile(tile)
-          .filter((other: Unit): boolean => !other.destroyed());
+          .filter(
+            (other: Unit): boolean => !other.destroyed() && other !== unit
+          );
 
         if (units.length === 0) {
           return;
@@ -603,16 +620,16 @@ export const nuclearTarget = (
     : null;
 };
 
-// Where `unit`, a paratrooper in its player's city with all its moves, drops: onto an empty city of a player at war
+// Where `unit`, a paratrooper in its player's city with all its moves, could drop, best first: onto an empty city of a player at war
 //  within its range, the largest (the original's `ai_orders_paratrooper` takes the first in its list of cities),
 //  passing over one where a unit of its player's stands beside it already; `null` with none, or when it's the last unit that could defend its own
 //  city. (The original picks the city's square too, scoring it 500 against the squares around, so that's always where
 //  it lands.)
-export const paradropTarget = (
+export const paradropTargets = (
   dependencies: Dependencies,
   player: Player,
   unit: Unit
-): Tile | null => {
+): Tile[] => {
   const from = unit.tile(),
     city = dependencies.cityRegistry.getByTile(from),
     live = (tile: Tile): Unit[] =>
@@ -634,10 +651,10 @@ export const paradropTarget = (
         other.defence().value() > 0
     )
   ) {
-    return null;
+    return [];
   }
 
-  const [target] = liveCities(dependencies)
+  return liveCities(dependencies)
     .filter(
       (other: City): boolean =>
         atWar(dependencies, player, other.player()) &&
@@ -654,10 +671,16 @@ export const paradropTarget = (
       (a: City, b: City): number =>
         dependencies.cityGrowthRegistry.getByCity(b).size() -
         dependencies.cityGrowthRegistry.getByCity(a).size()
-    );
-
-  return target ? target.tile() : null;
+    )
+    .map((city: City): Tile => city.tile());
 };
+
+// The first of `paradropTargets`, or `null` with none.
+export const paradropTarget = (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit
+): Tile | null => paradropTargets(dependencies, player, unit)[0] ?? null;
 
 export interface AirTask {
   task: 'strike' | 'home' | 'stay' | 'paradrop';

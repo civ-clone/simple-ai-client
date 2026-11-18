@@ -5,7 +5,7 @@ import { Attack, NuclearAttack } from '@civ-clone/library-unit/Actions';
 import planAirTask, {
   airKindOf,
   isParatrooperType,
-  paradropTarget,
+  paradropTargets,
   planHome,
 } from '../../lib/Unit/airWar';
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
@@ -86,13 +86,14 @@ export class AirWar extends AIStrategy {
 
     // A paratrooper drops when it has somewhere to drop; otherwise it's a land unit like any other.
     if (isParatrooperType(unit.constructor, dependencies.ruleRegistry)) {
-      const target = paradropTarget(dependencies, player, unit),
-        drop =
-          target === null
-            ? undefined
-            : unit
-                .actions(target)
-                .find((offered): boolean => offered instanceof Paradrop);
+      // The first target the rules offer a drop onto (their measure of range may differ from ours).
+      const drop = paradropTargets(dependencies, player, unit)
+        .map((target) =>
+          unit
+            .actions(target)
+            .find((offered): boolean => offered instanceof Paradrop)
+        )
+        .find((offered) => offered !== undefined);
 
       if (!drop) {
         return false;

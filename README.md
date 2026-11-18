@@ -203,8 +203,8 @@ none, so none of this happens there). After the original Civ2's computer players
   A city builds them while a defended enemy city is in reach: one bomber or helicopter for each 3 cities, at most 4,
   and a cruise missile for each 4, at most 2.
 - **Nuclear weapons** (a type that `Detonates`) only for a leader whose attack trait is aggressive (base-leader-trait-
-  aggression's `Aggressive`), after `ai_nuke_pick_target`: a city larger than 4 of a player at war, without an SDI
-  Defence, whose owner is more than half as strong (with no nuclear weapons) or more than half again as strong, or holds
+  aggression's `Aggressive`), after `ai_nuke_pick_target`: a city larger than 4 of a player at war, with no other
+  player's SDI Defence within 3 of it (Civ2's rule stops a strike near one; the original's AI checks only the target), whose owner is more than half as strong (with no nuclear weapons) or more than half again as strong, or holds
   a vendetta, scored by the enemy units around it, fired only from a player with 2 or more. Such a player keeps 2 while
   a target is in reach.
 - **Paratroopers** (a type with a role that can `Paradrop`), unmoved in their city and not its last defender, drop into
