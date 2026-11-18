@@ -144,12 +144,25 @@ const sailFor = (
 
     if (path) {
       memory.unitPathData.set(unit, path);
+      navalPaths.add(unit);
 
       return true;
     }
   }
 
   return false;
+};
+
+// The warships whose path a naval task set, so that it's dropped once they have no task: another strategy would
+//  otherwise follow it to where a target was.
+const navalPaths = new WeakSet<Unit>();
+
+// Drops the path a naval task gave `unit`, if it has one.
+export const dropNavalPath = (memory: Memory, unit: Unit): void => {
+  if (navalPaths.has(unit)) {
+    navalPaths.delete(unit);
+    memory.unitPathData.delete(unit);
+  }
 };
 
 export interface NavalTask {
@@ -232,7 +245,8 @@ export const huntTargets = (
     .sort((a: Tile, b: Tile): number => weighed(a) - weighed(b));
 };
 
-// The coastal enemy cities `unit` could bombard: a surface ship's, within its reach, with a defender it would beat,
+// The coastal enemy cities `unit` could bombard (an enemy's, or one of its player's that an enemy holds): a surface
+//  ship's, within its reach, with a defender it would beat,
 //  nearest first, one with the player's own land units within 2 of it as if half as far.
 export const bombardTargets = (
   dependencies: Dependencies,
@@ -267,7 +281,10 @@ export const bombardTargets = (
       return weight.get(tile)!;
     };
 
-  return memory.targets.enemyCitiesToAttack
+  return [
+    ...memory.targets.enemyCitiesToAttack,
+    ...memory.targets.citiesToLiberate,
+  ]
     .filter((tile: Tile): boolean => {
       const city = dependencies.cityRegistry.getByTile(tile);
 
@@ -303,14 +320,18 @@ export const transportsToEscort = (
 
   return dependencies.unitRegistry
     .getByPlayer(player)
-    .filter(
-      (transport: Unit): boolean =>
+    .filter((transport: Unit): boolean => {
+      // Unclaimed, claimed by `unit`, or claimed by a warship since sunk.
+      const by = escorts.get(transport);
+
+      return (
         !transport.destroyed() &&
         transport.tile().isWater() &&
         isLoadedTransport(dependencies, transport) &&
         transport.tile().distanceFrom(unit.tile()) <= reach &&
-        (escorts.get(transport) ?? unit) === unit
-    )
+        (by === undefined || by === unit || by.destroyed())
+      );
+    })
     .sort(
       (a: Unit, b: Unit): number =>
         a.tile().distanceFrom(unit.tile()) - b.tile().distanceFrom(unit.tile())
@@ -323,14 +344,21 @@ export const strikeBeside = (
   player: Player,
   memory: Memory,
   unit: Unit
+): Tile | null =>
+  strikeBesideOf(
+    unit,
+    huntTargets(dependencies, player, memory, unit),
+    bombardTargets(dependencies, player, memory, unit)
+  );
+
+const strikeBesideOf = (
+  unit: Unit,
+  hunt: Tile[],
+  bombard: Tile[]
 ): Tile | null => {
   const beside = (tile: Tile): boolean => tile.isNeighbourOf(unit.tile());
 
-  return (
-    huntTargets(dependencies, player, memory, unit).find(beside) ??
-    bombardTargets(dependencies, player, memory, unit).find(beside) ??
-    null
-  );
+  return hunt.find(beside) ?? bombard.find(beside) ?? null;
 };
 
 // Gives `unit`, a warship, its task for the turn: a path for it (`memory.unitPathData`), or the tile beside it to strike
@@ -343,7 +371,9 @@ export const planNavalTask = (
 ): NavalTask | null => {
   // Next to its prey, or a city to bombard, it strikes, escorting or not (a claim it had stands: it sails on to it once
   //  it has struck).
-  const strike = strikeBeside(dependencies, player, memory, unit);
+  const hunt = huntTargets(dependencies, player, memory, unit),
+    bombard = bombardTargets(dependencies, player, memory, unit),
+    strike = strikeBesideOf(unit, hunt, bombard);
 
   if (strike !== null) {
     memory.unitPathData.delete(unit);
@@ -356,8 +386,6 @@ export const planNavalTask = (
       strike,
     };
   }
-
-  const hunt = huntTargets(dependencies, player, memory, unit);
 
   const escorts = escortsFor(dependencies, memory);
 
@@ -403,11 +431,13 @@ export const planNavalTask = (
     }
   }
 
-  for (const tile of bombardTargets(dependencies, player, memory, unit)) {
+  for (const tile of bombard) {
     if (sailFor(dependencies, memory, unit, waterBeside(unit, tile))) {
       return { task: 'bombard', strike: null };
     }
   }
+
+  dropNavalPath(memory, unit);
 
   return null;
 };
@@ -435,7 +465,10 @@ export const navalThreatsNear = (
               hostile(dependencies, player, other) && isA(other, Naval)
           )
     ),
-    cities: targets.enemyCitiesToAttack.filter((tile: Tile): boolean => {
+    cities: [
+      ...targets.enemyCitiesToAttack,
+      ...targets.citiesToLiberate,
+    ].filter((tile: Tile): boolean => {
       const other = dependencies.cityRegistry.getByTile(tile);
 
       return (

@@ -25,6 +25,7 @@ import buildItemInCity, {
 import planNavalTask, {
   bombardTargets,
   huntTargets,
+  navalThreatsNear,
   isWarshipType,
   transportsToEscort,
   warshipsWanted,
@@ -626,6 +627,62 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
           new ActiveUnit(player, cruiser)
         )
       ).false;
+    });
+
+    it('drops the path a task gave it once it has no task, and leaves other paths alone', async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, enemy, loaded, player, unitOf } = setup,
+        memory = dependencies.memoryRegistry.memoryFor(player),
+        cruiser = unitOf(player, Cruiser, 5, 4),
+        prey = loaded(enemy, 12, 4);
+
+      boardFor(setup);
+
+      expect(planNavalTask(dependencies, player, memory, cruiser)?.task).equal(
+        'hunt'
+      );
+      expect(memory.unitPathData.has(cruiser)).true;
+
+      // The prey is gone: no task, and the hunt's path goes with it.
+      prey.destroy();
+
+      expect(planNavalTask(dependencies, player, memory, cruiser)).null;
+      expect(memory.unitPathData.has(cruiser)).false;
+
+      // A path another strategy set (exploring, say) is kept.
+      const explorer = unitOf(player, Cruiser, 5, 6),
+        path = { end: () => null } as any;
+
+      memory.unitPathData.set(explorer, path);
+
+      expect(planNavalTask(dependencies, player, memory, explorer)).null;
+      expect(memory.unitPathData.get(explorer)).equal(path);
+    });
+  });
+
+  describe('cities taken from the player', (): void => {
+    it('bombards one an enemy holds, and counts it as a threat to a port', async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, enemy, game, memory, player, port, unitOf, world } =
+          setup,
+        city = new City(
+          enemy,
+          world.get(2, 8),
+          '',
+          game.rules,
+          game.workedTiles
+        ),
+        cruiser = unitOf(player, Cruiser, 5, 8);
+
+      unitOf(enemy, Warrior, 2, 8);
+      memory.targets.citiesToLiberate.push(city.tile());
+
+      expect(bombardTargets(dependencies, player, memory, cruiser)).eql([
+        city.tile(),
+      ]);
+      expect(
+        navalThreatsNear(dependencies, player, memory.targets, port).cities
+      ).eql([city.tile()]);
     });
   });
 });

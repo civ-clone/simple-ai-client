@@ -22,6 +22,7 @@ export declare const isSubmergedType: (
   UnitType: object,
   ruleRegistry: RuleRegistry
 ) => boolean;
+export declare const dropNavalPath: (memory: Memory, unit: Unit) => void;
 export interface NavalTask {
   task: 'hunt' | 'escort' | 'bombard';
   strike: Tile | null;

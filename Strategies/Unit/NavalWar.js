@@ -51,6 +51,7 @@ class NavalWar extends AIStrategy_1.default {
         //  its next action, to strike from there.
         await (0, moveUnit_2.default)(dependencies, player, memory, this.knowledge(), unit, {
             stopAtPathEnd: true,
+            stopIfBlocked: true,
             wander: false,
         });
         // Nothing more this turn once its path is over and it has nothing to strike, or where it couldn't take a step (a

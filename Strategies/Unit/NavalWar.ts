@@ -77,6 +77,7 @@ export class NavalWar extends AIStrategy {
     //  its next action, to strike from there.
     await moveUnit(dependencies, player, memory, this.knowledge(), unit, {
       stopAtPathEnd: true,
+      stopIfBlocked: true,
       wander: false,
     });
 
