@@ -62,11 +62,10 @@ import {
 } from '../Unit/envoys';
 import Yield from '@civ-clone/core-yield/Yield';
 import {
-  WARSHIPS_PER_THREATENED_CITY,
   WARSHIP_NEED,
   isSubmergedType,
   isWarshipType,
-  navalThreatsNear,
+  warshipsWanted,
 } from '../Unit/navalWar';
 import { isOnSea } from '../City/explorerShip';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
@@ -695,10 +694,7 @@ export const buildItemInCity = (
   addNeed(itemFor(getOffensiveUnit()), policy.needs.army, 0, 1);
 
   // Warships, only where the ruleset says which unit types are for war at sea (`lib/Unit/navalWar`, base-unit-role's
-  //  roles; never in Civ1, which declares none): in a coastal city on the sea with an enemy ship or an enemy's coastal
-  //  city within reach, as the original builds naval units only in a coastal city on open water
-  //  (`city_choose_production`, `city_production.cpp:1906-1911`). The player wants one for every two such cities; a
-  //  submarine only when there are ships to hunt, as it can't bombard a city.
+  //  roles; never in Civ1, which declares none), in a coastal city on the sea, as many as `warshipsWanted` says.
   const warshipItems = available.filter(
     (buildItem: BuildItem): boolean =>
       isUnitItem(buildItem) &&
@@ -707,33 +703,15 @@ export const buildItemInCity = (
   );
 
   if (warshipItems.length > 0 && city.tile().isCoast() && isOnSea(city)) {
-    const threats = navalThreatsNear(dependencies, player, targets, city);
+    const wanted = warshipsWanted(dependencies, player, targets, city);
 
-    if (threats.ships.length > 0 || threats.cities.length > 0) {
-      const threatened = dependencies.cityRegistry
-          .getByPlayer(player)
-          .filter((other: City): boolean => {
-            if (other === city) {
-              return true;
-            }
-
-            if (!other.tile().isCoast()) {
-              return false;
-            }
-
-            const near = navalThreatsNear(dependencies, player, targets, other);
-
-            return near.ships.length > 0 || near.cities.length > 0;
-          }).length,
-        isWarshipItem = (item: object): boolean =>
-          isWarshipType(item, dependencies.ruleRegistry);
-
+    if (wanted !== null) {
       addNeed(
         itemFor(
           chooseUnit(
             dependencies,
             city,
-            threats.ships.length > 0
+            wanted.submarines
               ? warshipItems
               : warshipItems.filter(
                   (buildItem: BuildItem): boolean =>
@@ -749,13 +727,8 @@ export const buildItemInCity = (
           )
         ),
         WARSHIP_NEED,
-        unitsAndOrders(
-          dependencies,
-          player,
-          (unit: Unit): boolean => isWarshipItem(unit.constructor),
-          isWarshipItem
-        ),
-        Math.ceil(threatened * WARSHIPS_PER_THREATENED_CITY)
+        wanted.have,
+        wanted.wanted
       );
     }
   }

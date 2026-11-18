@@ -21,6 +21,15 @@ class NavalWar extends AIStrategy_1.default {
         if (planned === null) {
             return false;
         }
+        // An escort sails once its transport has moved, so that it ends its turn alongside (as aircraft wait for carriers).
+        if (planned.escorting &&
+            !unit.waiting() &&
+            planned.escorting.active() &&
+            planned.escorting.moves().value() > 0) {
+            memory.unitPathData.delete(unit);
+            unit.setWaiting();
+            return true;
+        }
         if (planned.strike !== null) {
             const strike = (0, moveUnit_1.actionToTake)(dependencies, player, unit.actions(planned.strike));
             // Only the battle: anything else on offer there (a treaty partner's ship, say) isn't the task's.

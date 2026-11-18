@@ -25,6 +25,7 @@ export declare const isSubmergedType: (
 export interface NavalTask {
   task: 'hunt' | 'escort' | 'bombard';
   strike: Tile | null;
+  escorting?: Unit;
 }
 export declare const huntTargets: (
   dependencies: Dependencies,
@@ -59,4 +60,14 @@ export declare const navalThreatsNear: (
   ships: Tile[];
   cities: Tile[];
 };
+export declare const warshipsWanted: (
+  dependencies: Dependencies,
+  player: Player,
+  targets: TargetBoard,
+  city: City
+) => {
+  wanted: number;
+  have: number;
+  submarines: boolean;
+} | null;
 export default planNavalTask;

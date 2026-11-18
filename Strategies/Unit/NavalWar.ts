@@ -30,6 +30,19 @@ export class NavalWar extends AIStrategy {
       return false;
     }
 
+    // An escort sails once its transport has moved, so that it ends its turn alongside (as aircraft wait for carriers).
+    if (
+      planned.escorting &&
+      !unit.waiting() &&
+      planned.escorting.active() &&
+      planned.escorting.moves().value() > 0
+    ) {
+      memory.unitPathData.delete(unit);
+      unit.setWaiting();
+
+      return true;
+    }
+
     if (planned.strike !== null) {
       const strike = actionToTake(
         dependencies,

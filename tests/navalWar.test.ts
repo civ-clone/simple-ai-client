@@ -24,6 +24,7 @@ import planNavalTask, {
   huntTargets,
   isWarshipType,
   transportsToEscort,
+  warshipsWanted,
 } from '../lib/Unit/navalWar';
 import BasePathFinder from '@civ-clone/simple-world-path/BasePathFinder';
 import City from '@civ-clone/core-city/City';
@@ -56,10 +57,12 @@ import { unitRole } from '@civ-clone/base-unit-role/Rules/UnitRoles';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
 import worldRules from '@civ-clone/civ1-world/registerRules';
 
-// Land at x 0-2, sea at x 3-15, 10 rows: the player's port at (2, 4).
-const MAP = '3G13O'.repeat(10);
+// Land at x 0-2 and sea at x 3-15, 10 rows (or `height`): the player's port at (2, 4).
 
-const setUp = async ({ roles = true }: { roles?: boolean } = {}) => {
+const setUp = async ({
+  roles = true,
+  height = 10,
+}: { roles?: boolean; height?: number } = {}) => {
   const game = new Game();
 
   game.availableGovernments.register(Despotism, Monarchy);
@@ -113,8 +116,8 @@ const setUp = async ({ roles = true }: { roles?: boolean } = {}) => {
   }
 
   const world = await simpleRLELoader(game.rules, game.terrainFeatures)(
-      MAP,
-      10,
+      '3G13O'.repeat(height),
+      height,
       16
     ),
     player = new Player(game.rules),
@@ -347,6 +350,15 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(planNavalTask(dependencies, player, memory, second)).null;
     });
 
+    it('leaves the escorting to surface ships', async (): Promise<void> => {
+      const { dependencies, loaded, memory, player, unitOf } = await setUp(),
+        submarine = unitOf(player, Submarine, 5, 4);
+
+      loaded(player, 7, 4);
+
+      expect(transportsToEscort(dependencies, player, memory, submarine)).empty;
+    });
+
     it('leaves an empty transport, or one in port, alone', async (): Promise<void> => {
       const { dependencies, memory, player, port, unitOf } = await setUp(),
         cruiser = unitOf(player, Cruiser, 5, 4);
@@ -484,6 +496,41 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(
         isWarshipType(choose(setup) as object, setup.dependencies.ruleRegistry)
       ).false;
+    });
+    it('wants one more for each transport in use while any port is threatened, and a submarine only once surface ships outnumber them', async (): Promise<void> => {
+      const setup = await setUp({ height: 30 }),
+        { dependencies, enemy, loaded, player, port, unitOf, world, game } =
+          setup,
+        // A second port, out of reach of the enemy ship.
+        other = new City(
+          player,
+          world.get(2, 16),
+          '',
+          game.rules,
+          game.workedTiles
+        );
+
+      loaded(enemy, 8, 4);
+      setup.survey();
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 1, have: 0, submarines: false });
+      // The quiet port builds none while no transport is in use.
+      expect(warshipsWanted(dependencies, player, setup.memory.targets, other))
+        .null;
+
+      loaded(player, 3, 16);
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, other)
+      ).eql({ wanted: 2, have: 0, submarines: false });
+
+      unitOf(player, Cruiser, 3, 2);
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 2, have: 1, submarines: true });
     });
   });
 });
