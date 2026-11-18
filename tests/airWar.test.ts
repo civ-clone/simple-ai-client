@@ -595,6 +595,10 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
 
       unitOf(player, Musketman, 5, 5);
 
+      expect(paradropTarget(dependencies, player, paratrooper)).equal(
+        target.tile()
+      );
+
       // Not onto the ruins of a city destroyed since (still among the registry's entries).
       target.destroy();
 

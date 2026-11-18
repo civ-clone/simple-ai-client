@@ -53,6 +53,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import Trait from '@civ-clone/core-civilization/Trait';
 import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
+import { liveCities } from '../Barbarian/raid';
 import movesBetween from '../movesBetween';
 import { fuelFor } from './fuel';
 import { isEnemy } from '../Player/rivals';
@@ -157,12 +158,6 @@ const hostile = (
   player: Player,
   other: Player
 ): boolean => other !== player && isEnemy(dependencies, player, other);
-
-// Every city still standing: the registry's entries include destroyed ones.
-const liveCities = (dependencies: Dependencies): City[] =>
-  dependencies.cityRegistry
-    .entries()
-    .filter((city: City): boolean => !city.destroyed());
 
 // The squares `unit` can refuel on: its player's cities and the squares its player's other units are on (a carrier),
 //  wherever the ruleset's `Refuel` rules say it refuels.
