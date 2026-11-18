@@ -32,6 +32,7 @@ const MissionAndMove_1 = require("./Strategies/Unit/MissionAndMove");
 const NegotiationAnswers_1 = require("./Strategies/Diplomacy/NegotiationAnswers");
 const NoteDisorder_1 = require("./Strategies/City/NoteDisorder");
 const PreventDisorder_1 = require("./Strategies/City/PreventDisorder");
+const AirWar_1 = require("./Strategies/Unit/AirWar");
 const NavalWar_1 = require("./Strategies/Unit/NavalWar");
 const RetreatToHeal_1 = require("./Strategies/Unit/RetreatToHeal");
 const ReviewCities_1 = require("./Strategies/Turn/ReviewCities");
@@ -90,6 +91,8 @@ const createStrategies = (dependencies, civ1 = knowledge_1.default, victoryDepen
         new RetreatToHeal_1.default(dependencies, knowledge),
         // Warships hunt, escort and bombard, only where the ruleset's roles say which units are warships (not Civ1).
         new NavalWar_1.default(dependencies, knowledge),
+        // Aircraft, missiles, nuclear weapons and paratroopers, only where the ruleset's roles name them (not Civ1).
+        new AirWar_1.default(dependencies, knowledge),
         new Garrison_1.default(dependencies, knowledge),
         new MissionAndMove_1.default(dependencies, knowledge),
         // The attackers with nothing else to do gather for the campaign, if there is one.
