@@ -533,6 +533,19 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(isNuclearTargetCity(dependencies, player, other)).false;
     });
 
+    it('never go for a city destroyed since', async (): Promise<void> => {
+      const { dependencies, first, player, target, unitOf } =
+        await withTarget();
+
+      unitOf(player, Nuclear, 5, 5);
+
+      expect(nuclearTarget(dependencies, player, first)).equal(target.tile());
+
+      target.destroy();
+
+      expect(nuclearTarget(dependencies, player, first)).null;
+    });
+
     it("are never fired by a leader who isn't aggressive", async (): Promise<void> => {
       const { dependencies, first, player, unitOf } = await withTarget(
         AbrahamLincoln
@@ -581,6 +594,11 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(paradropTarget(dependencies, player, paratrooper)).null;
 
       unitOf(player, Musketman, 5, 5);
+
+      // Not onto the ruins of a city destroyed since (still among the registry's entries).
+      target.destroy();
+
+      expect(paradropTarget(dependencies, player, paratrooper)).null;
 
       paratrooper.moves().set(0.5);
 

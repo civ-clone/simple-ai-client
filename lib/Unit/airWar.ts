@@ -158,6 +158,12 @@ const hostile = (
   other: Player
 ): boolean => other !== player && isEnemy(dependencies, player, other);
 
+// Every city still standing: the registry's entries include destroyed ones.
+const liveCities = (dependencies: Dependencies): City[] =>
+  dependencies.cityRegistry
+    .entries()
+    .filter((city: City): boolean => !city.destroyed());
+
 // The squares `unit` can refuel on: its player's cities and the squares its player's other units are on (a carrier),
 //  wherever the ruleset's `Refuel` rules say it refuels.
 const refuellingTiles = (
@@ -539,7 +545,8 @@ export const nuclearTarget = (
   let best: Tile | null = null,
     bestScore = -1;
 
-  dependencies.cityRegistry.entries().forEach((city: City): void => {
+  // The registry's entries include destroyed cities; `getByTile` and `getByPlayer` don't.
+  liveCities(dependencies).forEach((city: City): void => {
     if (
       !isNuclearTargetCity(
         dependencies,
@@ -634,8 +641,7 @@ export const paradropTarget = (
     return null;
   }
 
-  const [target] = dependencies.cityRegistry
-    .entries()
+  const [target] = liveCities(dependencies)
     .filter(
       (other: City): boolean =>
         atWar(dependencies, player, other.player()) &&
