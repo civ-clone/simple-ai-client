@@ -15,7 +15,7 @@ import { isFerry, isFerryType } from './carriesUnits';
 import { defendersIn, defendersKept, isDefender } from '../City/defence';
 import {
   confidentPower,
-  knownEnemyCities,
+  isEnemy,
   powerOf,
   powerOfPlayer,
   rivalOf,
@@ -528,41 +528,54 @@ export const invasionTargets = (
   player: Player,
   unit: Unit
 ): Tile[] => {
+  // Only the rival's cities can be targets, so with no rival there's nothing to weigh, and the player's power (every
+  //  unit's attack and defence, each asked of the rules: civ-clone/web-renderer#1088) is worked out only once a city of
+  //  the rival's is in question. The cities are those `knownEnemyCities` gives, in its order.
+  const rival = rivalOf(dependencies, player);
+
+  if (rival === null || !isEnemy(dependencies, player, rival)) {
+    return [];
+  }
+
   const home = landmassOf(dependencies, unit.tile()),
-    power = powerOfPlayer(dependencies, player),
-    // Each owner's power on each landmass, worked out once: `continentOf` gives each landmass one set a turn.
-    defended = new Map<Player, Map<Set<Tile>, number>>(),
-    defenceOf = (owner: Player, landmass: Set<Tile>): number => {
-      if (!defended.has(owner)) {
-        defended.set(owner, new Map());
-      }
+    playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
+    candidates = dependencies.cityRegistry
+      .entries()
+      .filter(
+        (city: City): boolean =>
+          city.player() === rival &&
+          playerWorld.includes(city.tile()) &&
+          !home.has(city.tile())
+      );
 
-      const byLandmass = defended.get(owner)!;
+  if (candidates.length === 0) {
+    return [];
+  }
 
-      if (!byLandmass.has(landmass)) {
-        byLandmass.set(
+  const power = powerOfPlayer(dependencies, player),
+    // Each landmass's power of the rival's, worked out once: `continentOf` gives each landmass one set a turn.
+    defended = new Map<Set<Tile>, number>(),
+    defenceOf = (landmass: Set<Tile>): number => {
+      if (!defended.has(landmass)) {
+        defended.set(
           landmass,
           powerOf(
             dependencies,
             dependencies.unitRegistry
-              .getByPlayer(owner)
+              .getByPlayer(rival)
               .filter((other: Unit): boolean => landmass.has(other.tile()))
           )
         );
       }
 
-      return byLandmass.get(landmass)!;
+      return defended.get(landmass)!;
     };
 
-  const rival = rivalOf(dependencies, player);
-
-  return knownEnemyCities(dependencies, player)
+  return candidates
     .filter(
       (city: City): boolean =>
-        city.player() === rival &&
-        !home.has(city.tile()) &&
-        defenceOf(city.player(), landmassOf(dependencies, city.tile())) <
-          confidentPower(dependencies, player, city.player(), power)
+        defenceOf(landmassOf(dependencies, city.tile())) <
+        confidentPower(dependencies, player, rival, power)
     )
     .map((city: City): Tile => city.tile());
 };
