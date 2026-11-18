@@ -24,6 +24,18 @@ const towards = (knowledge, missile, target) => target === null || !missile.hasT
             (0, movesBetween_1.default)(action.to(), target) <= unit.moves().value() - 1) ||
             knowledge.canReturnAfter(dependencies, player, unit, action),
     };
+// Takes `action` for `unit`; one that changes nothing (not its square, its moves or whether it's active) would bring
+//  it back each time, so it then stands down.
+const takeOrStandDown = (dependencies, unit, action) => {
+    const tile = unit.tile(), moves = unit.moves().value();
+    unit.action(action);
+    if (unit.active() &&
+        !unit.destroyed() &&
+        unit.tile() === tile &&
+        unit.moves().value() === moves) {
+        (0, orders_1.noOrders)(dependencies, unit);
+    }
+};
 class AirWar extends AIStrategy_1.default {
     handles(action) {
         if (!(0, isUnitAction_1.default)(action)) {
@@ -45,7 +57,7 @@ class AirWar extends AIStrategy_1.default {
             if (!drop) {
                 return false;
             }
-            unit.action(drop);
+            takeOrStandDown(dependencies, unit, drop);
             return true;
         }
         const planned = (0, airWar_1.default)(dependencies, player, memory, unit);
@@ -63,7 +75,7 @@ class AirWar extends AIStrategy_1.default {
             const strike = (0, moveUnit_1.actionToTake)(dependencies, player, unit.actions(planned.target));
             if ((strike instanceof Actions_1.Attack || strike instanceof Actions_1.NuclearAttack) &&
                 knowledge.canReturnAfter(dependencies, player, unit, strike)) {
-                unit.action(strike);
+                takeOrStandDown(dependencies, unit, strike);
                 return true;
             }
             await this.goHome(player, unit, knowledge);

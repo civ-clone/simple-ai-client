@@ -25,6 +25,7 @@ import planAirTask, {
   canStrike,
   fighterTarget,
   isParatrooperType,
+  isNuclearTargetCity,
   nuclearTarget,
   paradropTarget,
   raidTarget,
@@ -37,6 +38,7 @@ import Criterion from '@civ-clone/core-rule/Criterion';
 import Effect from '@civ-clone/core-rule/Effect';
 import MilitaryStrength from '@civ-clone/core-power/Rules/MilitaryStrength';
 import Fuel from '@civ-clone/base-unit-fuel/lib/Fuel';
+import SdiDefence from '@civ-clone/base-city-improvement-sdidefence/SdiDefence';
 import Aloft from '@civ-clone/base-unit-fuel/lib/Aloft';
 import SingleUse from '@civ-clone/base-unit-trait-single-use/SingleUse';
 import { withFuel as withFuelKnowledge } from '../lib/Unit/fuel';
@@ -507,6 +509,28 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       unitOf(player, Nuclear, 5, 5);
 
       expect(nuclearTarget(dependencies, player, first)).equal(target.tile());
+    });
+
+    it('leave out a small city, one with an SDI Defence, and one of a much weaker player', async (): Promise<void> => {
+      const { dependencies, game, player, target, enemyCity, enemy, unitOf } =
+        await withTarget();
+
+      expect(isNuclearTargetCity(dependencies, player, target)).true;
+      expect(isNuclearTargetCity(dependencies, player, enemyCity(20, 20, 4)))
+        .false;
+
+      game.cityImprovements.register(new SdiDefence(target, game.rules));
+
+      expect(isNuclearTargetCity(dependencies, player, target)).false;
+
+      // The player's own army: now the enemy's 4 is less than half its 10.
+      for (let i = 0; i < 8; i++) {
+        unitOf(player, Musketman, 5, 5);
+      }
+
+      const other = enemyCity(20, 5, 8);
+
+      expect(isNuclearTargetCity(dependencies, player, other)).false;
     });
 
     it("are never fired by a leader who isn't aggressive", async (): Promise<void> => {

@@ -217,7 +217,7 @@ where the original raids regardless and judges a fighter's target by a formula o
 do (the original leaves them out, having no range); a nuclear weapon flies to its target, so it takes only one in reach
 this turn, where the original moves it straight beside any target in reach of one of its player's cities, and "at
 war" is a war in force, where the original's is no peace and a nuclear threat; a paratrooper never leaves its city
-without a defender; the original's moving paratroopers between cities to be in range (`ai_assess_paratroopers`),
+without a defender, and with nowhere to drop it's a land unit like any other (the original holds it in its city); the original's moving paratroopers between cities to be in range (`ai_assess_paratroopers`),
 interceptors waiting in another player's cities, and the diplomatic effects of a nuclear attack on persons are not here;
 air units cost two or three land units' shields, so a city may take twice the policy's turns over one. Firing a nuclear weapon at all is only for an
 aggressive leader here (the original's targeting has no such test); its targets and a paratrooper's are any cities in

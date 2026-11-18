@@ -10,6 +10,7 @@ import planAirTask, {
 } from '../../lib/Unit/airWar';
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import Action from '@civ-clone/core-unit/Action';
+import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Knowledge from '@civ-clone/base-strategy-ai/lib/Knowledge';
 import Paradrop from '@civ-clone/base-unit-action-paradrop/Paradrop';
 import Player from '@civ-clone/core-player/Player';
@@ -39,6 +40,28 @@ const towards = (
             movesBetween(action.to(), target) <= unit.moves().value() - 1) ||
           knowledge.canReturnAfter(dependencies, player, unit, action),
       };
+
+// Takes `action` for `unit`; one that changes nothing (not its square, its moves or whether it's active) would bring
+//  it back each time, so it then stands down.
+const takeOrStandDown = (
+  dependencies: Dependencies,
+  unit: Unit,
+  action: Action
+): void => {
+  const tile = unit.tile(),
+    moves = unit.moves().value();
+
+  unit.action(action);
+
+  if (
+    unit.active() &&
+    !unit.destroyed() &&
+    unit.tile() === tile &&
+    unit.moves().value() === moves
+  ) {
+    noOrders(dependencies, unit);
+  }
+};
 
 export class AirWar extends AIStrategy {
   handles(action: PlayerAction): boolean {
@@ -75,7 +98,7 @@ export class AirWar extends AIStrategy {
         return false;
       }
 
-      unit.action(drop);
+      takeOrStandDown(dependencies, unit, drop);
 
       return true;
     }
@@ -107,7 +130,7 @@ export class AirWar extends AIStrategy {
         (strike instanceof Attack || strike instanceof NuclearAttack) &&
         knowledge.canReturnAfter(dependencies, player, unit, strike)
       ) {
-        unit.action(strike);
+        takeOrStandDown(dependencies, unit, strike);
 
         return true;
       }

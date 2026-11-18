@@ -59,6 +59,14 @@ export declare const raidTarget: (
   unit: Unit,
   home?: Tile[]
 ) => Tile | null;
+export declare const isNuclearTargetCity: (
+  dependencies: Dependencies,
+  player: Player,
+  city: City,
+  ownPower?: number,
+  powerOf?: (other: Player) => number,
+  hasNuclear?: (other: Player) => boolean
+) => boolean;
 export declare const nuclearTarget: (
   dependencies: Dependencies,
   player: Player,

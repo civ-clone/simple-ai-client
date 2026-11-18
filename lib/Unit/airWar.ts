@@ -47,6 +47,8 @@ import Player from '@civ-clone/core-player/Player';
 import RuleRegistry from '@civ-clone/core-rule/RuleRegistry';
 import SdiDefence from '@civ-clone/base-city-improvement-sdidefence/SdiDefence';
 import SingleUse from '@civ-clone/base-unit-trait-single-use/SingleUse';
+import Terraforms from '@civ-clone/base-unit-trait-terraforms/Terraforms';
+import NonCombatant from '@civ-clone/base-unit-trait-non-combatant/NonCombatant';
 import Tile from '@civ-clone/core-world/Tile';
 import Trait from '@civ-clone/core-civilization/Trait';
 import Unit from '@civ-clone/core-unit/Unit';
@@ -207,8 +209,10 @@ export const strikeSquares = (
   const moves = unit.moves().value(),
     state = fuelFor(dependencies, unit),
     from = unit.tile(),
+    // Where it stands, if that's beside the target; a nuclear weapon only from an empty square that isn't a city, as
+    //  any other square it would strike from (`besideFor`).
     squares = (
-      target.isNeighbourOf(from)
+      target.isNeighbourOf(from) && !unit.hasTrait(Detonates)
         ? [from]
         : besideFor(dependencies, player, unit, target)
     ).filter(
@@ -365,7 +369,8 @@ export const fighterTarget = (
         : 0) -
       (units.length === 1 ? 1 : 0);
 
-    if (score < bestScore) {
+    // The last of equally good targets, as the original's `<=`.
+    if (score <= bestScore) {
       bestScore = score;
       best = tile;
     }
@@ -443,6 +448,44 @@ const hasSdi = (dependencies: Dependencies, city: City): boolean =>
         improvement instanceof SdiDefence
     );
 
+// Whether `city` could be a nuclear weapon's target for `player` (the original's `ai_nuke_pick_target`, short of the
+//  weapon's reach and the score around it): larger than 4, without an SDI Defence, of a player at war more than half as
+//  strong as `player` (with no nuclear weapons) or half again as strong, or that `player` holds a vendetta against.
+export const isNuclearTargetCity = (
+  dependencies: Dependencies,
+  player: Player,
+  city: City,
+  ownPower: number = powerOfPlayer(dependencies, player),
+  powerOf: (other: Player) => number = (other: Player): number =>
+    powerOfPlayer(dependencies, other),
+  hasNuclear: (other: Player) => boolean = (other: Player): boolean =>
+    dependencies.unitRegistry
+      .getByPlayer(other)
+      .some(
+        (otherUnit: Unit): boolean =>
+          !otherUnit.destroyed() && otherUnit.hasTrait(Detonates)
+      )
+): boolean => {
+  const owner = city.player();
+
+  if (
+    owner === player ||
+    !atWar(dependencies, player, owner) ||
+    dependencies.cityGrowthRegistry.getByCity(city).size() <= 4 ||
+    hasSdi(dependencies, city)
+  ) {
+    return false;
+  }
+
+  const theirPower = powerOf(owner);
+
+  return (
+    theirPower * 2 > ownPower * 3 ||
+    hasVendetta(player, owner, dependencies.interactionRegistry) ||
+    (!hasNuclear(owner) && theirPower * 2 > ownPower)
+  );
+};
+
 // The enemy city `unit`, a nuclear weapon, goes for, after the original's `ai_nuke_pick_target`; `null` with none, or
 //  when its player's leader isn't aggressive, or it has fewer than 2 such weapons.
 export const nuclearTarget = (
@@ -497,29 +540,20 @@ export const nuclearTarget = (
     bestScore = -1;
 
   dependencies.cityRegistry.entries().forEach((city: City): void => {
-    const owner = city.player(),
-      size = dependencies.cityGrowthRegistry.getByCity(city).size();
-
     if (
-      owner === player ||
-      !atWar(dependencies, player, owner) ||
-      size <= 4 ||
-      hasSdi(dependencies, city)
-    ) {
-      return;
-    }
-
-    const theirPower = powerOf(owner);
-
-    if (
-      !(
-        theirPower * 2 > ownPower * 3 ||
-        hasVendetta(player, owner, dependencies.interactionRegistry) ||
-        (!hasNuclear(owner) && theirPower * 2 > ownPower)
+      !isNuclearTargetCity(
+        dependencies,
+        player,
+        city,
+        ownPower,
+        powerOf,
+        hasNuclear
       )
     ) {
       return;
     }
+
+    const size = dependencies.cityGrowthRegistry.getByCity(city).size();
 
     let score = Math.floor(size / 2);
 
@@ -592,6 +626,8 @@ export const paradropTarget = (
         other !== unit &&
         other.player() === player &&
         isA(other, Land) &&
+        !other.hasTrait(Terraforms) &&
+        !other.hasTrait(NonCombatant) &&
         other.defence().value() > 0
     )
   ) {
@@ -732,7 +768,7 @@ export const airWanted = (
         return building !== null && isKind(building.item());
       }).length,
     near = (tile: Tile, distance: number): boolean =>
-      tile.distanceFrom(city.tile()) <= distance,
+      movesBetween(tile, city.tile()) <= distance,
     enemyCitiesNear = (distance: number, test: (other: City) => boolean) =>
       [...targets.enemyCitiesToAttack, ...targets.citiesToLiberate]
         .map((tile: Tile): City | null =>
@@ -798,12 +834,10 @@ export const airWanted = (
       return null;
     }
 
-    const targets = enemyCitiesNear(
-      reach,
-      (other: City): boolean =>
-        atWar(dependencies, player, other.player()) &&
-        dependencies.cityGrowthRegistry.getByCity(other).size() > 4
-    );
+    const ownPower = powerOfPlayer(dependencies, player),
+      targets = enemyCitiesNear(reach, (other: City): boolean =>
+        isNuclearTargetCity(dependencies, player, other, ownPower)
+      );
 
     return targets.length === 0 ? null : [NUCLEAR_WANTED, have];
   }
