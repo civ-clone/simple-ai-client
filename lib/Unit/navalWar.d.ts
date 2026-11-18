@@ -45,6 +45,12 @@ export declare const transportsToEscort: (
   memory: Memory,
   unit: Unit
 ) => Unit[];
+export declare const strikeBeside: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  unit: Unit
+) => Tile | null;
 export declare const planNavalTask: (
   dependencies: Dependencies,
   player: Player,

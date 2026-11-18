@@ -5,12 +5,14 @@ import {
   Battleship,
   Carrier,
   Cruiser,
+  Frigate,
   Musketman,
   Submarine,
   Transport,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
 import { ActiveUnit } from '@civ-clone/civ1-unit/PlayerActions';
+import { Attack } from '@civ-clone/library-unit/Actions';
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import { Firepower, HitPoints } from '@civ-clone/core-unit/Yields';
 import {
@@ -112,6 +114,8 @@ const setUp = async ({
       unitRole('test:role', Submarine, NavalSuperiorityRole),
       // A carrier is a naval superiority type in Civ2 too, but carries aircraft: no warship.
       unitRole('test:role', Carrier, NavalSuperiorityRole),
+      // A Frigate carries land units: a naval superiority type in Civ2 that ferries.
+      unitRole('test:role', Frigate, NavalSuperiorityRole),
       unitRole('test:role', Transport, TransportRole)
     );
   }
@@ -227,6 +231,7 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(isWarshipType(Cruiser, ruleRegistry)).true;
       expect(isWarshipType(Submarine, ruleRegistry)).true;
       expect(isWarshipType(Carrier, ruleRegistry)).false;
+      expect(isWarshipType(Frigate, ruleRegistry)).false;
       expect(isWarshipType(Transport, ruleRegistry)).false;
       expect(isWarshipType(Warrior, ruleRegistry)).false;
     });
@@ -575,7 +580,8 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(cruiser.waiting()).true;
       expect(cruiser.tile()).equal(setup.world.get(5, 4));
 
-      // The transport has moved.
+      // The transport has moved on.
+      transport.setTile(setup.world.get(10, 4));
       transport.moves().set(0);
 
       expect(await strategy.attempt(new ActiveUnit(player, cruiser))).true;
@@ -589,20 +595,22 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
         { dependencies, enemy, loaded, player, unitOf } = setup,
         cruiser = unitOf(player, Cruiser, 5, 4),
         prey = loaded(enemy, 6, 4),
-        strategy = new NavalWar(dependencies, civ1Knowledge);
+        strategy = new NavalWar(dependencies, civ1Knowledge),
+        taken: unknown[] = [],
+        action = cruiser.action.bind(cruiser);
 
       boardFor(setup);
       ready(cruiser);
+      cruiser.action = (performed: any, ...args: any[]): void => {
+        taken.push(performed);
 
-      const moves = cruiser.moves().value();
+        return action(performed, ...args);
+      };
 
       expect(await strategy.attempt(new ActiveUnit(player, cruiser))).true;
-      expect(
-        prey.destroyed() ||
-          cruiser.destroyed() ||
-          cruiser.moves().value() < moves
-      ).true;
-      expect(cruiser.tile()).equal(setup.world.get(5, 4));
+      expect(taken).length(1);
+      expect(taken[0]).instanceOf(Attack);
+      expect((taken[0] as Attack).to()).equal(prey.tile());
     });
 
     it('handles nothing with no task, leaving the ship to the other strategies', async (): Promise<void> => {

@@ -1,11 +1,12 @@
 // Generic: warships and submarines at war (civ-clone/web-renderer#1128). Only for a ruleset that says what each unit
 //  type is for with base-unit-role's `UnitRoles` (Civ2's `@UNITS` roles): a naval superiority type that carries no
 //  aircraft (a warship or a submarine, not a carrier) is a warship here. A ruleset that declares no roles (Civ1) has none,
-//  so its ships keep exploring and ferrying as they always have.
+//  so its ships keep exploring and ferrying as they always have. A naval superiority type that ferries land units (Civ2's
+//  Frigate) stays a ferry.
 //
 // After the original's computer players (OpenCiv2 `ai_orders_ship_goal_war`, `ai.cpp:3823`, and the transport's escort
 //  goal in `ai_orders_transport_unload`, `:3981`), in our own terms. Each turn a warship, in order:
-//  - **strikes** an enemy ship beside it that it would beat (`attackOdds`);
+//  - **strikes** an enemy ship beside it that it would beat (`attackOdds`), or else a city beside it it would bombard;
 //  - **escorts** one of its player's loaded transports at sea within its reach that no other warship escorts, sailing
 //    alongside it (to defend its square) or, failing that, for where it's going;
 //  - **hunts** the nearest enemy ship within its reach that it would beat, a loaded transport counting as half as far;
@@ -35,7 +36,7 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { hasRole } from '@civ-clone/base-unit-role/roleOf';
 import { isEnemy } from '../Player/rivals';
 import { reachableTiles } from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
-import { isFerry } from './carriesUnits';
+import { isFerry, isFerryType } from './carriesUnits';
 import { isFerrying } from './overseas';
 
 // How many turns of its moves away a warship looks for a ship to hunt or a city to bombard.
@@ -55,7 +56,8 @@ export const WARSHIPS_PER_THREATENED_CITY = 0.5;
 //  (`ProductionPolicy#needs`): under a reinforcement (3), over a Caravan (1).
 export const WARSHIP_NEED = 2;
 
-// Whether `UnitType` (a class) is a warship: a naval superiority type, by the ruleset's roles, that carries no aircraft.
+// Whether `UnitType` (a class) is a warship: a naval superiority type, by the ruleset's roles, that carries no aircraft
+//  and no passengers.
 export const isWarshipType = (
   UnitType: object,
   ruleRegistry: RuleRegistry
@@ -64,7 +66,10 @@ export const isWarshipType = (
   hasRole(UnitType as typeof Unit, NavalSuperiorityRole, ruleRegistry) &&
   !traitsOf(UnitType as typeof Unit, Carries, ruleRegistry).some(
     (carries: Carries): boolean => carries.carries(Air, ruleRegistry)
-  );
+  ) &&
+  // A ship that ferries land units (Civ2's Frigate) is a ferry first, as it always was: as a warship it would hold on
+  //  to its passengers to escort itself.
+  !isFerryType(UnitType, ruleRegistry);
 
 export const isWarship = (unit: Unit, ruleRegistry: RuleRegistry): boolean =>
   isWarshipType(unit.constructor, ruleRegistry);
@@ -312,6 +317,22 @@ export const transportsToEscort = (
     );
 };
 
+// The tile beside `unit` it would strike now, if any: an enemy ship to hunt, or else an enemy city to bombard. Reads only.
+export const strikeBeside = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  unit: Unit
+): Tile | null => {
+  const beside = (tile: Tile): boolean => tile.isNeighbourOf(unit.tile());
+
+  return (
+    huntTargets(dependencies, player, memory, unit).find(beside) ??
+    bombardTargets(dependencies, player, memory, unit).find(beside) ??
+    null
+  );
+};
+
 // Gives `unit`, a warship, its task for the turn: a path for it (`memory.unitPathData`), or the tile beside it to strike
 //  now. `null` when it has none of its own, leaving it to the missions every unit has.
 export const planNavalTask = (
@@ -320,17 +341,23 @@ export const planNavalTask = (
   memory: Memory,
   unit: Unit
 ): NavalTask | null => {
-  const hunt = huntTargets(dependencies, player, memory, unit),
-    [beside] = hunt.filter((tile: Tile): boolean =>
-      tile.isNeighbourOf(unit.tile())
-    );
+  // Next to its prey, or a city to bombard, it strikes, escorting or not (a claim it had stands: it sails on to it once
+  //  it has struck).
+  const strike = strikeBeside(dependencies, player, memory, unit);
 
-  // Next to its prey, it strikes, escorting or not (a claim it had stands: it'll sail on to it once it has struck).
-  if (beside) {
+  if (strike !== null) {
     memory.unitPathData.delete(unit);
 
-    return { task: 'hunt', strike: beside };
+    return {
+      task:
+        dependencies.cityRegistry.getByTile(strike) === null
+          ? 'hunt'
+          : 'bombard',
+      strike,
+    };
   }
+
+  const hunt = huntTargets(dependencies, player, memory, unit);
 
   const escorts = escortsFor(dependencies, memory);
 
@@ -377,12 +404,6 @@ export const planNavalTask = (
   }
 
   for (const tile of bombardTargets(dependencies, player, memory, unit)) {
-    if (tile.isNeighbourOf(unit.tile())) {
-      memory.unitPathData.delete(unit);
-
-      return { task: 'bombard', strike: tile };
-    }
-
     if (sailFor(dependencies, memory, unit, waterBeside(unit, tile))) {
       return { task: 'bombard', strike: null };
     }
@@ -434,8 +455,10 @@ export const navalThreatsNear = (
 //  its transports in use (`isFerrying`), to escort them. It wants one for every two such cities, and one for each
 //  transport in use. A submarine can neither bombard nor keep up with a transport, so it builds one only for ships to
 //  hunt and only while it has more surface warships than submarines.
-// The number of `player`'s coastal cities with an enemy ship or an enemy's coastal city within reach, worked out once a
-//  turn for each target board (production runs it for every city that chooses).
+// The number of `player`'s coastal cities with an enemy ship or an enemy's coastal city within reach. Production runs it
+//  for every city that chooses, so it's kept for the rest of the turn once the player's own survey has filled the board
+//  this turn (`Memory#surveyedTurn`), and never from a board left from an earlier turn (a choice made during another
+//  player's turn, from `unitDestroyed`).
 const threatenedCounts = new WeakMap<
   TargetBoard,
   { turn: number; count: number }
@@ -447,7 +470,9 @@ const threatenedPorts = (
   targets: TargetBoard
 ): number => {
   const turn = dependencies.turn.value(),
-    known = threatenedCounts.get(targets);
+    memory = dependencies.memoryRegistry.memoryFor(player),
+    surveyed = memory.targets === targets && memory.surveyedTurn === turn,
+    known = surveyed ? threatenedCounts.get(targets) : undefined;
 
   if (known && known.turn === turn) {
     return known.count;
@@ -465,7 +490,9 @@ const threatenedPorts = (
       return near.ships.length > 0 || near.cities.length > 0;
     }).length;
 
-  threatenedCounts.set(targets, { turn, count });
+  if (surveyed) {
+    threatenedCounts.set(targets, { turn, count });
+  }
 
   return count;
 };
@@ -490,7 +517,11 @@ export const warshipsWanted = (
     return null;
   }
 
-  const threatened = threatenedPorts(dependencies, player, targets);
+  // This city counts whatever was kept, as it may have become threatened since.
+  const threatened = Math.max(
+    threatenedPorts(dependencies, player, targets),
+    here ? 1 : 0
+  );
 
   if (threatened === 0) {
     return null;

@@ -1,7 +1,10 @@
 // Generic: a warship hunts enemy ships, escorts its player's loaded transports and bombards enemy coastal cities
 //  (`lib/Unit/navalWar`, civ-clone/web-renderer#1128). Only a unit the ruleset's roles make a warship is handled, and
 //  only when it has one of those tasks: in a ruleset that declares no roles (Civ1) this strategy never handles a unit.
-import planNavalTask, { isWarship } from '../../lib/Unit/navalWar';
+import planNavalTask, {
+  isWarship,
+  strikeBeside,
+} from '../../lib/Unit/navalWar';
 import AIStrategy from '@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy';
 import { Attack } from '@civ-clone/library-unit/Actions';
 import PlayerAction from '@civ-clone/core-player/PlayerAction';
@@ -85,7 +88,7 @@ export class NavalWar extends AIStrategy {
       (unit.tile() === tile ||
         unit.moves().value() === moves ||
         (!memory.unitPathData.has(unit) &&
-          planNavalTask(dependencies, player, memory, unit)?.strike == null))
+          strikeBeside(dependencies, player, memory, unit) === null))
     ) {
       memory.unitPathData.delete(unit);
       noOrders(dependencies, unit);

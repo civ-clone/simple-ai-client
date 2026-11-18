@@ -17,7 +17,6 @@ class NavalWar extends AIStrategy_1.default {
             (0, navalWar_1.isWarship)(action.value(), this.dependencies().ruleRegistry));
     }
     async attempt(action) {
-        var _a;
         const dependencies = this.dependencies(), player = action.player(), unit = action.value(), memory = this.memoryFor(player), planned = (0, navalWar_1.default)(dependencies, player, memory, unit);
         if (planned === null) {
             return false;
@@ -61,7 +60,7 @@ class NavalWar extends AIStrategy_1.default {
             (unit.tile() === tile ||
                 unit.moves().value() === moves ||
                 (!memory.unitPathData.has(unit) &&
-                    ((_a = (0, navalWar_1.default)(dependencies, player, memory, unit)) === null || _a === void 0 ? void 0 : _a.strike) == null))) {
+                    (0, navalWar_1.strikeBeside)(dependencies, player, memory, unit) === null))) {
             memory.unitPathData.delete(unit);
             (0, orders_1.noOrders)(dependencies, unit);
         }
