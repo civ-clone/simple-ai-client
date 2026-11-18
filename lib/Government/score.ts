@@ -11,7 +11,13 @@
 // Each term is in trade: a citizen counts `CITIZEN`, a shield `SHIELD` and a point of food `FOOD`. The leader's `ScienceBias` (civilize in
 //  Civ2) scales the research lost by (bias + 3) / 4, as the original's `(civilize + 3) × science / 4`, so a militaristic
 //  leader minds half as much: Fundamentalism mostly wins for them, and where luxuries and content outweigh science.
-import { Food, Production, Trade } from '@civ-clone/library-city/Yields';
+import {
+  CityImprovementContent,
+  Food,
+  PopulationUnhappiness,
+  Production,
+  Trade,
+} from '@civ-clone/library-city/Yields';
 import {
   Terms,
   governmentTerms,
@@ -29,9 +35,9 @@ import ScienceBias from '@civ-clone/base-leader-personality/Rules/Player/Science
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import WorkedTile from '@civ-clone/core-city/WorkedTile';
+import Yield from '@civ-clone/core-yield/Yield';
 import { governmentOf } from './terms';
 import { isCapital } from '../Civ1/defence';
-import rulesBornContent from '@civ-clone/base-city-happiness/lib/bornContent';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 import { sum } from '@civ-clone/base-leader-personality/lib/combine';
 
@@ -39,8 +45,6 @@ import { sum } from '@civ-clone/base-leader-personality/lib/combine';
 export const CITIZEN = 2;
 export const SHIELD = 1;
 export const FOOD = 1;
-// A city's citizens beyond these are born unhappy where the rule set doesn't say (Civ1's computer players').
-const BORN_CONTENT = 3;
 // How far a city with no capital to measure from counts, for corruption.
 const NO_CAPITAL = 32;
 
@@ -76,7 +80,9 @@ const factsOf = (
       }),
     units = dependencies.unitRegistry.getByCity(city),
     size = dependencies.cityGrowthRegistry.getByCity(city).size(),
-    content = rulesBornContent(city, dependencies.ruleRegistry) ?? BORN_CONTENT,
+    // The citizens born unhappy that the city's improvements leave unhappy, by its own rules: what a government's
+    //  martial law, or one with no unhappiness at all, would otherwise have to calm, or luxuries.
+    cityYields = city.yields(),
     tile: Tile = city.tile();
 
   return {
@@ -97,7 +103,14 @@ const factsOf = (
         (unit: Unit): boolean =>
           unit.player() === city.player() && unit.attack().value() > 0
       ).length,
-    unhappy: Math.max(0, size - content),
+    unhappy: Math.max(
+      0,
+      reduceYield(cityYields, PopulationUnhappiness) +
+        reduceYield(
+          cityYields,
+          CityImprovementContent as unknown as typeof Yield
+        )
+    ),
     distance: capital === null ? NO_CAPITAL : capital.tile().distanceFrom(tile),
     size,
   };
@@ -204,14 +217,14 @@ export const governmentScore = (
   }, 0);
 };
 
-// The share of trade the player puts into research, or a half where it has no rates.
+// The share of trade the player puts into research (a rate is a percentage), or a half where it has no rates.
 const researchShare = (dependencies: Dependencies, player: Player): number => {
   try {
     return (
-      dependencies.playerTradeRatesRegistry
+      (dependencies.playerTradeRatesRegistry
         .getByPlayer(player)
         .get(Research)
-        ?.value() ?? 0.5
+        ?.value() ?? 50) / 100
     );
   } catch (e) {
     return 0.5;

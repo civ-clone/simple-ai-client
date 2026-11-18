@@ -4,7 +4,12 @@ import {
   Monarchy,
   Republic,
 } from '@civ-clone/civ1-government/Governments';
-import { Food, Production, Trade } from '@civ-clone/library-city/Yields';
+import {
+  Food,
+  PopulationUnhappiness,
+  Production,
+  Trade,
+} from '@civ-clone/library-city/Yields';
 import { bestGovernment, governmentScore } from '../lib/Government/score';
 import BornContent from '@civ-clone/base-city-happiness/Rules/BornContent';
 import City from '@civ-clone/core-city/City';
@@ -111,7 +116,7 @@ const setUp = ({
   units = 2,
   away = 0,
   distance = 6,
-  research = 0.6,
+  research = 60,
   bias = 0,
   civ2 = true,
 } = {}) => {
@@ -134,6 +139,7 @@ const setUp = ({
         player: () => player,
         tile: () => (index === 0 ? capitalTile : tile),
         tileYieldRules: () => [],
+        yields: () => [new PopulationUnhappiness(Math.max(0, size - content))],
         tileYields: (square: number) => squareYields[square],
         index,
       } as unknown as City;
@@ -258,13 +264,13 @@ describe('governments by what they do (governmentScore)', (): void => {
         [2, 1, 3],
         [2, 1, 3],
       ],
-      civilized = setUp({ squares, size: 7, units: 3, bias: 1, research: 0.7 }),
+      civilized = setUp({ squares, size: 7, units: 3, bias: 1, research: 70 }),
       militaristic = setUp({
         squares,
         size: 7,
         units: 3,
         bias: -1,
-        research: 0.7,
+        research: 70,
       });
 
     expect(
