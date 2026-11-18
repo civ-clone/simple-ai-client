@@ -219,7 +219,13 @@ this turn, where the original moves it straight beside any target in reach of on
 war" is a war in force, where the original's is no peace and a nuclear threat; a paratrooper never leaves its city
 without a defender; the original's moving paratroopers between cities to be in range (`ai_assess_paratroopers`),
 interceptors waiting in another player's cities, and the diplomatic effects of a nuclear attack on persons are not here;
-air units cost two or three land units' shields, so a city may take twice the policy's turns over one.
+air units cost two or three land units' shields, so a city may take twice the policy's turns over one. Firing a nuclear weapon at all is only for an
+aggressive leader here (the original's targeting has no such test); its targets and a paratrooper's are any cities in
+reach, as the original's, seen or not. Distances an aircraft flies are counted in moves (`movesBetween`).
+
+An aircraft that can neither strike nor get home stands down where it is (`NoOrders`); base-unit-fuel counts a turn
+aloft when its moves run out on a step, not when it stands down, so it isn't lost for that, and flies home on its next
+turn.
 
 ## Adding to or overriding the pack
 

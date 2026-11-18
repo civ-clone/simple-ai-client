@@ -12,6 +12,7 @@ const SingleUse_1 = require("@civ-clone/base-unit-trait-single-use/SingleUse");
 const moveUnit_1 = require("../../lib/Unit/moveUnit");
 const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
 const moveUnit_2 = require("../../lib/Unit/moveUnit");
+const movesBetween_1 = require("../../lib/movesBetween");
 const orders_1 = require("@civ-clone/base-strategy-ai/lib/Unit/orders");
 // `knowledge`, letting a missile (`SingleUse`) on its way to `target` take any step that leaves the target within its
 //  moves: it's spent in the attack, so it needs no way back. Every other unit, and step, is asked of `knowledge`.
@@ -20,7 +21,7 @@ const towards = (knowledge, missile, target) => target === null || !missile.hasT
     : {
         ...knowledge,
         canReturnAfter: (dependencies, player, unit, action) => (unit === missile &&
-            action.to().distanceFrom(target) <= unit.moves().value() - 1) ||
+            (0, movesBetween_1.default)(action.to(), target) <= unit.moves().value() - 1) ||
             knowledge.canReturnAfter(dependencies, player, unit, action),
     };
 class AirWar extends AIStrategy_1.default {

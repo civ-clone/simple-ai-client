@@ -51,6 +51,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import Trait from '@civ-clone/core-civilization/Trait';
 import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
+import movesBetween from '../movesBetween';
 import { fuelFor } from './fuel';
 import { isEnemy } from '../Player/rivals';
 import hasVendetta from '@civ-clone/library-diplomacy/lib/holds';
@@ -186,7 +187,7 @@ const homeDistance = (
 ): number =>
   home.reduce(
     (nearest: number, other: Tile): number =>
-      Math.min(nearest, tile.distanceFrom(other)),
+      Math.min(nearest, movesBetween(tile, other)),
     Infinity
   );
 
@@ -210,7 +211,9 @@ export const strikeSquares = (
       target.isNeighbourOf(from)
         ? [from]
         : besideFor(dependencies, player, unit, target)
-    ).filter((square: Tile): boolean => square.distanceFrom(from) + 1 <= moves);
+    ).filter(
+      (square: Tile): boolean => movesBetween(square, from) + 1 <= moves
+    );
 
   if (state === null) {
     return squares;
@@ -218,14 +221,14 @@ export const strikeSquares = (
 
   if (unit.hasTrait(SingleUse)) {
     return squares.filter(
-      (square: Tile): boolean => square.distanceFrom(from) + 1 <= state.reach
+      (square: Tile): boolean => movesBetween(square, from) + 1 <= state.reach
     );
   }
 
   return squares.filter((square: Tile): boolean => {
     const left = unit.hasTrait(AttackEndsTurn)
       ? state.reach - moves
-      : state.reach - square.distanceFrom(from) - 1;
+      : state.reach - movesBetween(square, from) - 1;
 
     return homeDistance(dependencies, player, unit, square, home) <= left;
   });
@@ -272,25 +275,43 @@ const flyTo = (
   return false;
 };
 
-// The squares beside `target` `unit` could strike from, nearest it first: a square with another player's units on it
-//  can't be moved to.
+// The squares beside `target` `unit` could strike from, nearest it first (in moves): not one with another player's
+//  units on it, which can't be moved to, nor one it would land on to refuel (a city of its player's, a carrier), which
+//  ends its turn there, unless it stands on it already; for a nuclear weapon, only an empty square that isn't a city,
+//  as the original's (it would be caught in its own blast).
 const besideFor = (
   dependencies: Dependencies,
   player: Player,
   unit: Unit,
   target: Tile
-): Tile[] =>
-  target
+): Tile[] => {
+  const nuclear = unit.hasTrait(Detonates);
+
+  return target
     .getNeighbours()
-    .filter((tile: Tile): boolean =>
-      dependencies.unitRegistry
+    .filter((tile: Tile): boolean => {
+      const units = dependencies.unitRegistry
         .getByTile(tile)
-        .every((other: Unit): boolean => other.player() === player)
-    )
+        .filter((other: Unit): boolean => !other.destroyed());
+
+      if (nuclear) {
+        return (
+          units.length === 0 &&
+          dependencies.cityRegistry.getByTile(tile) === null
+        );
+      }
+
+      return (
+        units.every((other: Unit): boolean => other.player() === player) &&
+        (tile === unit.tile() ||
+          !refuels(dependencies.ruleRegistry, unit, tile))
+      );
+    })
     .sort(
       (a: Tile, b: Tile): number =>
-        a.distanceFrom(unit.tile()) - b.distanceFrom(unit.tile())
+        movesBetween(a, unit.tile()) - movesBetween(b, unit.tile())
     );
+};
 
 // The enemy unit `unit`, a fighter, goes for: on the target board, a unit in the air or alone on its square, that it
 //  would beat and can strike and get back from (`canStrike`), the nearest by the original's score (twice the distance, 1 less for one with a range, 1 less again for
@@ -307,7 +328,7 @@ export const fighterTarget = (
     bestScore = Infinity;
 
   memory.targets.enemyUnitsToAttack.forEach((tile: Tile): void => {
-    if (tile.distanceFrom(unit.tile()) > moves) {
+    if (movesBetween(tile, unit.tile()) > moves) {
       return;
     }
 
@@ -329,14 +350,14 @@ export const fighterTarget = (
     }
 
     if (
-      attackOdds(dependencies, unit, tile) < ATTACK_ODDS ||
-      !canStrike(dependencies, player, unit, tile, home)
+      !canStrike(dependencies, player, unit, tile, home) ||
+      attackOdds(dependencies, unit, tile) < ATTACK_ODDS
     ) {
       return;
     }
 
     const score =
-      tile.distanceFrom(unit.tile()) * 2 -
+      movesBetween(tile, unit.tile()) * 2 -
       (enemies.some(
         (other: Unit): boolean => fuelFor(dependencies, other) !== null
       )
@@ -388,9 +409,9 @@ export const raidTarget = (
       city === null ||
       !hostile(dependencies, player, city.player()) ||
       defenders.length === 0 ||
-      tile.distanceFrom(unit.tile()) > unit.moves().value() ||
-      attackOdds(dependencies, unit, tile) < ATTACK_ODDS ||
-      !canStrike(dependencies, player, unit, tile, home)
+      movesBetween(tile, unit.tile()) > unit.moves().value() ||
+      !canStrike(dependencies, player, unit, tile, home) ||
+      attackOdds(dependencies, unit, tile) < ATTACK_ODDS
     ) {
       return;
     }
@@ -456,13 +477,22 @@ export const nuclearTarget = (
       return powers.get(other)!;
     },
     home = refuellingTiles(dependencies, player, unit),
-    hasNuclear = (other: Player): boolean =>
-      dependencies.unitRegistry
-        .getByPlayer(other)
-        .some(
-          (otherUnit: Unit): boolean =>
-            !otherUnit.destroyed() && otherUnit.hasTrait(Detonates)
+    nuclearOwners = new Map<Player, boolean>(),
+    hasNuclear = (other: Player): boolean => {
+      if (!nuclearOwners.has(other)) {
+        nuclearOwners.set(
+          other,
+          dependencies.unitRegistry
+            .getByPlayer(other)
+            .some(
+              (otherUnit: Unit): boolean =>
+                !otherUnit.destroyed() && otherUnit.hasTrait(Detonates)
+            )
         );
+      }
+
+      return nuclearOwners.get(other)!;
+    };
   let best: Tile | null = null,
     bestScore = -1;
 
@@ -537,8 +567,8 @@ export const nuclearTarget = (
 };
 
 // Where `unit`, a paratrooper in its player's city with all its moves, drops: onto an empty city of a player at war
-//  within its range, the largest first, as the original's `ai_orders_paratrooper` does, passing over one where a unit
-//  of its player's stands beside it already; `null` with none, or when it's the last unit that could defend its own
+//  within its range, the largest (the original's `ai_orders_paratrooper` takes the first in its list of cities),
+//  passing over one where a unit of its player's stands beside it already; `null` with none, or when it's the last unit that could defend its own
 //  city. (The original picks the city's square too, scoring it 500 against the squares around, so that's always where
 //  it lands.)
 export const paradropTarget = (
@@ -658,7 +688,7 @@ export const planHome = (
       unit,
       [...home].sort(
         (a: Tile, b: Tile): number =>
-          a.distanceFrom(unit.tile()) - b.distanceFrom(unit.tile())
+          movesBetween(a, unit.tile()) - movesBetween(b, unit.tile())
       )
     )
   ) {

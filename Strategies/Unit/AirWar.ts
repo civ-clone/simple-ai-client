@@ -20,6 +20,7 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { actionToTake } from '../../lib/Unit/moveUnit';
 import isUnitAction from '@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction';
 import moveUnit from '../../lib/Unit/moveUnit';
+import movesBetween from '../../lib/movesBetween';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
 // `knowledge`, letting a missile (`SingleUse`) on its way to `target` take any step that leaves the target within its
@@ -35,7 +36,7 @@ const towards = (
         ...knowledge,
         canReturnAfter: (dependencies, player, unit, action: Action) =>
           (unit === missile &&
-            action.to().distanceFrom(target) <= unit.moves().value() - 1) ||
+            movesBetween(action.to(), target) <= unit.moves().value() - 1) ||
           knowledge.canReturnAfter(dependencies, player, unit, action),
       };
 

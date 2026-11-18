@@ -37,6 +37,9 @@ import Criterion from '@civ-clone/core-rule/Criterion';
 import Effect from '@civ-clone/core-rule/Effect';
 import MilitaryStrength from '@civ-clone/core-power/Rules/MilitaryStrength';
 import Fuel from '@civ-clone/base-unit-fuel/lib/Fuel';
+import Aloft from '@civ-clone/base-unit-fuel/lib/Aloft';
+import SingleUse from '@civ-clone/base-unit-trait-single-use/SingleUse';
+import { withFuel as withFuelKnowledge } from '../lib/Unit/fuel';
 import Leader from '@civ-clone/core-civilization/Leader';
 import { Monarchy } from '@civ-clone/civ1-government/Governments';
 import Never from '@civ-clone/core-diplomacy/Expiries/Never';
@@ -56,6 +59,10 @@ import registerTraits from '@civ-clone/civ1-civilization/registerTraits';
 import unitGame from './lib/unitGame';
 import { unitRole } from '@civ-clone/base-unit-role/Rules/UnitRoles';
 import { unitTraits } from '@civ-clone/core-unit/Rules/UnitTraits';
+
+// Moves `unit` to (`x`, `y`) on its own map, returning the tile.
+const setupTile = (unit: Unit, x: number, y: number) =>
+  unit.tile().map().get(x, y);
 
 // Grassland, 30 by 30, which the player knows all of; its city at (5, 5).
 const setUp = async ({
@@ -283,8 +290,13 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
 
       expect(canStrike(dependencies, player, fighter, target.tile())).false;
 
-      // With the moves to get back after the attack, it can.
-      fighter.moves().set(6);
+      // 4 moves back from where it strikes: 4 moves aren't enough after the attack, 5 are (from the target it would be
+      //  5 and 6).
+      fighter.moves().set(4);
+
+      expect(canStrike(dependencies, player, fighter, target.tile())).false;
+
+      fighter.moves().set(5);
 
       expect(canStrike(dependencies, player, fighter, target.tile())).true;
     });
@@ -350,6 +362,116 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
           unitOf(enemy, Warrior, 15, 5).tile()
         )
       ).false;
+    });
+  });
+
+  describe('fuel at its last turn, and missiles', (): void => {
+    it('a bomber on its last turn of fuel strikes only from where it refuels', async (): Promise<void> => {
+      const { dependencies, enemy, game, player, unitOf, withFuel } =
+          await setUp(),
+        bomber = unitOf(player, Bomber, 5, 5),
+        beside = unitOf(enemy, Warrior, 6, 5),
+        further = unitOf(enemy, Warrior, 9, 5);
+
+      withFuel();
+      game.unitImprovements.register(new Aloft(bomber, 1));
+      bomber.moves().set(8);
+
+      // From its city, beside the first; the second it would strike from the field, with no turn left to get back.
+      expect(canStrike(dependencies, player, bomber, beside.tile())).true;
+      expect(canStrike(dependencies, player, bomber, further.tile())).false;
+    });
+
+    it('a missile needs only to reach its target, and flies there and strikes', async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, enemy, game, player, survey, unitOf, enemyCity } =
+          setup,
+        missile = unitOf(player, Bomber, 5, 5),
+        target = enemyCity(15, 8, 3),
+        taken: string[] = [],
+        action = missile.action.bind(missile);
+
+      // A Bomber made a missile: spent in its attack, 1 turn of fuel, 12 moves.
+      game.rules.register(
+        ...unitTraits('test:missile', Bomber, SingleUse),
+        new UnitYield(
+          new Criterion((unit: Unit): boolean => unit === missile),
+          new Criterion(
+            (unit: Unit, unitYield: Yield): boolean => unitYield instanceof Fuel
+          ),
+          new Effect((unit: Unit, unitYield: Yield): void => unitYield.set(1))
+        ),
+        ...fuelRules({ ruleRegistry: game.rules }, { countOn: 'out-of-moves' }),
+        refuelInOwnCity(game.cities)
+      );
+      unitOf(enemy, Warrior, 15, 8);
+      survey();
+      missile.moves().set(12);
+      missile.setActive(true);
+      missile.action = (performed: any, ...args: any[]): void => {
+        taken.push(performed.constructor.name);
+
+        return action(performed, ...args);
+      };
+
+      // 10 moves out, off the straight line, and no way back: a fighter couldn't, a missile can.
+      expect(airKindOf(Bomber, dependencies.ruleRegistry)).equal('missile');
+      expect(canStrike(dependencies, player, missile, target.tile())).true;
+
+      const strategy = new AirWar(
+        dependencies,
+        withFuelKnowledge(civ1Knowledge)
+      );
+
+      for (let i = 0; i < 3 && missile.active() && !missile.destroyed(); i++) {
+        await strategy.attempt(new ActiveUnit(player, missile));
+      }
+
+      expect(taken).include('Attack');
+      expect(taken.filter((name) => name === 'NoOrders')).empty;
+    });
+  });
+
+  describe('the strategy with fuel', (): void => {
+    it('strikes beside its target with the moves to get back, and heads home without them', async (): Promise<void> => {
+      const { dependencies, enemy, player, survey, unitOf, withFuel } =
+          await setUp(),
+        fighter = unitOf(player, Fighter, 8, 5),
+        taken: string[] = [],
+        action = fighter.action.bind(fighter);
+
+      withFuel();
+      unitOf(enemy, Warrior, 9, 5);
+      survey();
+      fighter.action = (performed: any, ...args: any[]): void => {
+        taken.push(performed.constructor.name);
+
+        return action(performed, ...args);
+      };
+
+      const strategy = new AirWar(
+        dependencies,
+        withFuelKnowledge(civ1Knowledge)
+      );
+
+      // 3 from home: with 3 moves it can't strike and get back, so it turns for home.
+      fighter.moves().set(3);
+      fighter.setActive(true);
+
+      expect(await strategy.attempt(new ActiveUnit(player, fighter))).true;
+      expect(taken).not.include('Attack');
+      expect(taken[0]).equal('Move');
+      expect(fighter.tile().x()).below(8);
+
+      // Back beside it with 10 moves, it strikes.
+      taken.splice(0);
+      fighter.setTile(setupTile(fighter, 8, 5));
+      fighter.moves().set(10);
+      fighter.setActive(true);
+
+      await strategy.attempt(new ActiveUnit(player, fighter));
+
+      expect(taken).eql(['Attack']);
     });
   });
 
