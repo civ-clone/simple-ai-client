@@ -66,7 +66,8 @@ import worldRules from '@civ-clone/civ1-world/registerRules';
 const setUp = async ({
   roles = true,
   height = 10,
-}: { roles?: boolean; height?: number } = {}) => {
+  row = '3G13O',
+}: { roles?: boolean; height?: number; row?: string } = {}) => {
   const game = new Game();
 
   game.availableGovernments.register(Despotism, Monarchy);
@@ -122,7 +123,7 @@ const setUp = async ({
   }
 
   const world = await simpleRLELoader(game.rules, game.terrainFeatures)(
-      '3G13O'.repeat(height),
+      row.repeat(height),
       height,
       16
     ),
@@ -754,6 +755,132 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(
         navalThreatsNear(dependencies, player, memory.targets, port).cities
       ).eql([city.tile()]);
+    });
+  });
+
+  describe('warships per body of water (Copilot on civ-clone/web-renderer#1171)', (): void => {
+    it("counts only the warships on a port's own sea against its need", async (): Promise<void> => {
+      // Land x 0-2, sea A x 3-7, land x 8-10, sea B x 11-15: the port at (2, 4) is on sea A only.
+      const setup = await setUp({ row: '3G5O3G5O' }),
+        { dependencies, enemy, loaded, player, port, unitOf } = setup;
+
+      loaded(enemy, 5, 4);
+      setup.survey();
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 1, have: 0, submarines: false });
+
+      // A warship on the other sea is no use here.
+      unitOf(player, Cruiser, 13, 4);
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 1, have: 0, submarines: false });
+
+      // One on this sea is (and, a surface warship there, it lets a submarine be built for the hunting).
+      unitOf(player, Cruiser, 4, 2);
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, port)
+      ).eql({ wanted: 1, have: 1, submarines: true });
+    });
+
+    it("isn't threatened by an enemy ship on another sea", async (): Promise<void> => {
+      const setup = await setUp({ row: '3G5O3G5O' }),
+        { dependencies, enemy, loaded, player, port } = setup;
+
+      loaded(enemy, 12, 4);
+      setup.survey();
+
+      expect(warshipsWanted(dependencies, player, setup.memory.targets, port))
+        .null;
+    });
+
+    it('leaves a lake beside a port out of its seas', async (): Promise<void> => {
+      // Land x 0-2, a lake at x 3 (10 squares), land x 4, sea x 5-15: a city at (4, 4) is on both the lake and the sea.
+      const setup = await setUp({ row: '3G1O1G11O' }),
+        { dependencies, enemy, game, loaded, player, unitOf, world } = setup,
+        city = new City(
+          player,
+          world.get(4, 4),
+          '',
+          game.rules,
+          game.workedTiles
+        );
+
+      // An enemy ship on the lake is no threat to the sea.
+      loaded(enemy, 3, 6);
+      setup.survey();
+
+      expect(warshipsWanted(dependencies, player, setup.memory.targets, city))
+        .null;
+
+      // One on the sea is, and a warship on the lake is no use against it.
+      loaded(enemy, 7, 4);
+      unitOf(player, Cruiser, 3, 2);
+      setup.survey();
+
+      expect(
+        warshipsWanted(dependencies, player, setup.memory.targets, city)
+      ).eql({ wanted: 1, have: 0, submarines: false });
+    });
+
+    it('counts the ports on two seas the same whichever port asks first, from the kept counts', async (): Promise<void> => {
+      // Land x 0-2 and x 8 (an isthmus), sea A x 3-7, sea B x 9-15 (wrapping to x 0). The player's port at (2, 4) is on
+      //  sea A only, the isthmus city at (8, 4) on both, and a port at (0, 8) on sea B only.
+      const answers = async (order: 'isthmus first' | 'other first') => {
+        const setup = await setUp({ row: '3G5O1G7O' }),
+          { dependencies, enemy, game, loaded, player, port, world } = setup,
+          memory = dependencies.memoryRegistry.memoryFor(player),
+          isthmus = new City(
+            player,
+            world.get(8, 4),
+            '',
+            game.rules,
+            game.workedTiles
+          ),
+          other = new City(
+            player,
+            world.get(0, 8),
+            '',
+            game.rules,
+            game.workedTiles
+          );
+
+        loaded(enemy, 4, 4);
+        loaded(enemy, 12, 4);
+        setup.survey();
+        memory.targets.enemyUnitsToAttack.splice(
+          0,
+          Infinity,
+          ...setup.memory.targets.enemyUnitsToAttack
+        );
+        // The player's own survey this turn: the counts are kept.
+        memory.surveyedTurn = dependencies.turn.value();
+
+        const ask = (city: City) =>
+            warshipsWanted(dependencies, player, memory.targets, city)
+              ?.wanted ?? 0,
+          first = order === 'isthmus first' ? ask(isthmus) : ask(other),
+          second = order === 'isthmus first' ? ask(other) : ask(isthmus);
+
+        return order === 'isthmus first'
+          ? { isthmus: first, other: second, port: ask(port) }
+          : { isthmus: second, other: first, port: ask(port) };
+      };
+
+      // The isthmus: 3 threatened ports on its seas, so 2; the others: 2 each on theirs, so 1.
+      expect(await answers('isthmus first')).eql({
+        isthmus: 2,
+        other: 1,
+        port: 1,
+      });
+      expect(await answers('other first')).eql({
+        isthmus: 2,
+        other: 1,
+        port: 1,
+      });
     });
   });
 });

@@ -582,64 +582,69 @@ export const nuclearTarget = (
     bestScore = -1;
 
   // The registry's entries include destroyed cities; `getByTile` and `getByPlayer` don't.
-  liveCities(dependencies).forEach((city: City): void => {
-    if (
-      !isNuclearTargetCity(
-        dependencies,
-        player,
-        city,
-        ownPower,
-        powerOf,
-        hasNuclear
-      )
-    ) {
-      return;
-    }
+  // Only cities the player has seen (its world), as the target board's are.
+  const known = dependencies.playerWorldRegistry.getByPlayer(player);
 
-    const size = dependencies.cityGrowthRegistry.getByCity(city).size();
-
-    let score = Math.floor(size / 2);
-
-    [city.tile(), ...city.tile().getNeighbours()].forEach(
-      (tile: Tile): void => {
-        // The weapon itself isn't counted: the original's isn't beside its target when it scores it.
-        const units = dependencies.unitRegistry
-          .getByTile(tile)
-          .filter(
-            (other: Unit): boolean => !other.destroyed() && other !== unit
-          );
-
-        if (units.length === 0) {
-          return;
-        }
-
-        const tileOwner = units[0].player();
-
-        // The barbarians' squares count for nothing either way, as in the original.
-        if (isBarbarian(tileOwner)) {
-          return;
-        }
-
-        if (tileOwner === player) {
-          score -= 2;
-        } else if (atWar(dependencies, player, tileOwner)) {
-          score += units.length;
-        } else {
-          score -= 99;
-        }
+  liveCities(dependencies)
+    .filter((city: City): boolean => known.includes(city.tile()))
+    .forEach((city: City): void => {
+      if (
+        !isNuclearTargetCity(
+          dependencies,
+          player,
+          city,
+          ownPower,
+          powerOf,
+          hasNuclear
+        )
+      ) {
+        return;
       }
-    );
 
-    // In reach of this weapon this turn: the original moves it straight beside any target in reach of one of its
-    //  player's cities.
-    if (
-      score > bestScore &&
-      canStrike(dependencies, player, unit, city.tile(), home)
-    ) {
-      bestScore = score;
-      best = city.tile();
-    }
-  });
+      const size = dependencies.cityGrowthRegistry.getByCity(city).size();
+
+      let score = Math.floor(size / 2);
+
+      [city.tile(), ...city.tile().getNeighbours()].forEach(
+        (tile: Tile): void => {
+          // The weapon itself isn't counted: the original's isn't beside its target when it scores it.
+          const units = dependencies.unitRegistry
+            .getByTile(tile)
+            .filter(
+              (other: Unit): boolean => !other.destroyed() && other !== unit
+            );
+
+          if (units.length === 0) {
+            return;
+          }
+
+          const tileOwner = units[0].player();
+
+          // The barbarians' squares count for nothing either way, as in the original.
+          if (isBarbarian(tileOwner)) {
+            return;
+          }
+
+          if (tileOwner === player) {
+            score -= 2;
+          } else if (atWar(dependencies, player, tileOwner)) {
+            score += units.length;
+          } else {
+            score -= 99;
+          }
+        }
+      );
+
+      // In reach of this weapon this turn: the original moves it straight beside any target in reach of one of its
+      //  player's cities.
+      if (
+        score > bestScore &&
+        canStrike(dependencies, player, unit, city.tile(), home)
+      ) {
+        bestScore = score;
+        best = city.tile();
+      }
+    });
 
   return best !== null && bestScore >= 10 - Math.max(0, 5 - ownCities.length)
     ? best
@@ -680,9 +685,12 @@ export const paradropTargets = (
     return [];
   }
 
+  const known = dependencies.playerWorldRegistry.getByPlayer(player);
+
   return liveCities(dependencies)
     .filter(
       (other: City): boolean =>
+        known.includes(other.tile()) &&
         atWar(dependencies, player, other.player()) &&
         movesBetween(other.tile(), from) <= PARADROP_RANGE &&
         live(other.tile()).length === 0 &&
