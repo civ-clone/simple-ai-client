@@ -51,6 +51,7 @@ import { rechoiceKey } from '@civ-clone/base-government-change/lib/rechoice';
 import { revolutionTerms } from '@civ-clone/base-government-change/lib/terms';
 import { reduceYield } from '@civ-clone/core-yield/lib/reduceYields';
 import { sum } from '@civ-clone/base-leader-personality/lib/combine';
+import { bestGovernmentLately, scoresGovernments } from '../Government/score';
 
 export interface GovernmentPolicy {
   // The fewest turns between one revolution and the next, once out of Despotism.
@@ -116,6 +117,13 @@ export const preferredGovernment = (
 ): typeof Government => {
   const knows = (GovernmentType: typeof Government): boolean =>
     available.includes(GovernmentType);
+
+  // A rule set that numbers what its governments do (base-government-terms; Civ2's) is chosen from by that, for
+  //  revolutions, offers and the choice after a revolution alike (`lib/Government/score`). Civ1's numbers none, and
+  //  chooses as v474.05 does, below.
+  if (scoresGovernments(dependencies, available)) {
+    return bestGovernmentLately(dependencies, player, available) ?? Despotism;
+  }
 
   if (knows(Republic) && republicScore(dependencies, player) >= 0) {
     return Republic;

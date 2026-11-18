@@ -23,21 +23,35 @@ export const landReachableFrom = (start: Tile): Set<Tile> => {
 };
 
 // The continents found so far this turn, by each of their tiles.
-let continents: { turn: number; byTile: WeakMap<Tile, Set<Tile>> } | null =
-  null;
+let continents: {
+  turn: number;
+  byTile: WeakMap<Tile, Set<Tile>>;
+  bySea: WeakMap<Tile, Set<Tile>>;
+} | null = null;
 
 // `landReachableFrom` a land tile, found once a turn for each continent: every city the player has asks for its own as
 //  it chooses what to build, once or twice, and a player's cities mostly share a few continents
 //  (civ-clone/web-renderer#316). No rule turns land into sea or sea into land, but a continent is only kept for the
 //  turn all the same. Shared by every tile of the continent, so not for changing.
 export const continentOf = (turn: number, start: Tile): Set<Tile> => {
-  // From the sea, the land all around it, which isn't one continent.
-  if (!start.isLand()) {
-    return landReachableFrom(start);
+  if (continents === null || continents.turn !== turn) {
+    continents = { turn, byTile: new WeakMap(), bySea: new WeakMap() };
   }
 
-  if (continents === null || continents.turn !== turn) {
-    continents = { turn, byTile: new WeakMap() };
+  // From the sea, the land all around it, which isn't one continent: kept for the turn by the square it was found from,
+  //  as a Caravan or a ferry re-planned at sea asks again and again (civ-clone/web-renderer#1088).
+  if (!start.isLand()) {
+    const around = continents.bySea.get(start);
+
+    if (around) {
+      return around;
+    }
+
+    const found = landReachableFrom(start);
+
+    continents.bySea.set(start, found);
+
+    return found;
   }
 
   const known = continents.byTile.get(start);

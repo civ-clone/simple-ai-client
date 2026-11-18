@@ -15,6 +15,7 @@ import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
 import Terminate from '@civ-clone/core-diplomacy/Negotiation/Terminate';
 import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
+import personStep from './personTalks';
 
 // The steps a player answers in one negotiation before it leaves when it can: far more than any meeting needs (in
 //  1,752 meetings between computer players under Civ1's rules, each answered two; civ-clone/web-renderer#877).
@@ -51,6 +52,13 @@ export const chooseNegotiationStep = <Name extends keyof ChoiceMetaDataMap>(
 
   if (count(meta.data(), player) > MOST_NEGOTIATION_STEPS && leave) {
     return leave.value();
+  }
+
+  // Where the rule set leaves a choice to a person the AI speaks for (`personTalks`), its own.
+  const forPerson = personStep(dependencies, player, meta);
+
+  if (forPerson !== null) {
+    return forPerson;
   }
 
   const accept = choices.find((choice) => choice.value() instanceof Accept),
