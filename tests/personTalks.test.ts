@@ -1,4 +1,6 @@
 import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
+import Ceasefire from '@civ-clone/base-diplomacy-declaration-ceasefire/Ceasefire';
+import OfferCeasefire from '@civ-clone/library-diplomacy/Proposals/OfferCeasefire';
 import Alliance from '@civ-clone/base-diplomacy-declaration-alliance/Alliance';
 import { ChoiceMeta } from '@civ-clone/core-client/ChoiceMeta';
 import City from '@civ-clone/core-city/City';
@@ -12,6 +14,7 @@ import MilitaryStrength from '@civ-clone/core-power/Rules/MilitaryStrength';
 import Never from '@civ-clone/core-diplomacy/Expiries/Never';
 import OfferPeace from '@civ-clone/library-diplomacy/Proposals/OfferPeace';
 import Peace from '@civ-clone/base-diplomacy-declaration-peace/Peace';
+import War from '@civ-clone/base-diplomacy-declaration-war/War';
 import Player from '@civ-clone/core-player/Player';
 import PlayerWorld from '@civ-clone/core-player-world/PlayerWorld';
 import ProposalAvailable from '@civ-clone/base-diplomacy/Rules/ProposalAvailable';
@@ -89,14 +92,36 @@ const setUp = async ({ menu = true, warriors = 3 } = {}) => {
   return {
     ...setup,
     other,
-    sign: (Declaration: typeof Peace) =>
+    // Both at war with the third player.
+    warOnThird: () =>
+      [player, other].forEach((each) =>
+        game.interactions.register(
+          new War(each, third, new Never(), game.rules)
+        )
+      ),
+    sign: (Declaration: typeof Peace | typeof Ceasefire) =>
       game.interactions.register(
         new Declaration(player, other, new Never(), game.rules)
       ),
     choose: (...steps: object[]) =>
       chooseNegotiationStep(setup.dependencies, player, {
         choices: () => steps.map((value) => ({ value: () => value })),
-        data: () => ({ players: () => [other, player] }),
+        data: () => ({
+          players: () => [other, player],
+          interactions: () => [],
+        }),
+      } as unknown as ChoiceMeta<'negotiation.next-step'>),
+    // As `choose`, in talks where the player has already proposed `made`.
+    chooseAfter: (made: object[], ...steps: object[]) =>
+      chooseNegotiationStep(setup.dependencies, player, {
+        choices: () => steps.map((value) => ({ value: () => value })),
+        data: () => ({
+          players: () => [other, player],
+          interactions: () =>
+            made.map((proposal) =>
+              Object.assign(proposal, { by: () => player })
+            ),
+        }),
       } as unknown as ChoiceMeta<'negotiation.next-step'>),
   };
 };
@@ -142,7 +167,11 @@ describe('a person spoken for in talks with a menu (personTalks)', (): void => {
 
     atPeace.sign(Peace);
 
-    // The third player is an enemy of both.
+    // No enemy in common yet: the third player is one neither has met, let alone fought.
+    expect(atPeace.choose(alliance, peace, exchange, goodbye)).equal(exchange);
+
+    atPeace.warOnThird();
+
     expect(atPeace.choose(alliance, peace, exchange, goodbye)).equal(alliance);
 
     const allied = await setUp();
@@ -151,5 +180,30 @@ describe('a person spoken for in talks with a menu (personTalks)', (): void => {
 
     expect(allied.choose(alliance, peace, goodbye)).equal(goodbye);
     expect(allied.choose(alliance, exchange, goodbye)).equal(exchange);
+  });
+
+  it('offers peace under a ceasefire, and proposes nothing it has proposed already in the talks', async (): Promise<void> => {
+    const underCeasefire = await setUp(),
+      peace = step(OfferPeace),
+      ceasefire = step(OfferCeasefire),
+      goodbye = step(Terminate);
+
+    underCeasefire.sign(Ceasefire);
+
+    expect(underCeasefire.choose(ceasefire, peace, goodbye)).equal(peace);
+
+    const atWar = await setUp();
+
+    expect(
+      atWar.chooseAfter([step(OfferPeace)], peace, ceasefire, goodbye)
+    ).equal(ceasefire);
+    expect(
+      atWar.chooseAfter(
+        [step(OfferPeace), step(OfferCeasefire)],
+        peace,
+        ceasefire,
+        goodbye
+      )
+    ).equal(goodbye);
   });
 });

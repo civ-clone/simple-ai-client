@@ -22,13 +22,9 @@ import {
 import {
   TreatyLevel,
   hasTreatyLevel,
+  treatyLevel,
 } from '@civ-clone/base-diplomacy/lib/treatyLevel';
-import {
-  confidentPower,
-  isEnemy,
-  powerOfPlayer,
-  rivalOf,
-} from '../Player/rivals';
+import { confidentPower, powerOfPlayer, rivalOf } from '../Player/rivals';
 import Accept from '@civ-clone/core-diplomacy/Proposal/Accept';
 import AskAlly from '@civ-clone/library-diplomacy/Proposals/AskAlly';
 import AttackConfidence from '@civ-clone/base-leader-personality/Rules/Player/AttackConfidence';
@@ -75,7 +71,8 @@ const allied = (
   other: Player
 ): boolean => hasTreatyLevel(dependencies, player, other, TreatyLevel.Alliance);
 
-// Whether `player` and `other` have an enemy in common, a third player with a city that neither has a treaty with.
+// Whether `player` and `other` have an enemy in common: a third player with a city that both are at war with (a war in
+//  force, so not a player either has yet to meet).
 const commonEnemy = (
   dependencies: Dependencies,
   player: Player,
@@ -92,8 +89,8 @@ const commonEnemy = (
     (third: Player): boolean =>
       third !== player &&
       third !== other &&
-      isEnemy(dependencies, player, third) &&
-      isEnemy(dependencies, other, third)
+      treatyLevel(dependencies, player, third) === TreatyLevel.War &&
+      treatyLevel(dependencies, other, third) === TreatyLevel.War
   );
 
 /** Whether `player` accepts `proposal`, made by `other`. */
@@ -134,19 +131,30 @@ export const acceptsProposal = (
   return true;
 };
 
-/** What `player` proposes to `other` from `menu`, or `null` to leave. */
+/**
+ * What `player` proposes to `other` from `menu`, or `null` to leave. Nothing it has proposed already in these talks
+ *  (`made`, by class) is proposed again: what was refused once is left.
+ */
 export const proposalFrom = (
   dependencies: Dependencies,
   player: Player,
   other: Player,
-  menu: unknown[]
+  menu: unknown[],
+  made: Set<Function> = new Set()
 ): unknown | null => {
   const find = (Type: Function): unknown | null =>
-    menu.find((step: unknown): boolean => step instanceof Type) ?? null;
-
-  if (!hasTreatyLevel(dependencies, player, other, TreatyLevel.Ceasefire)) {
-    return meansWar(dependencies, player, other)
+    made.has(Type)
       ? null
+      : menu.find((step: unknown): boolean => step instanceof Type) ?? null;
+
+  // At war, peace or failing that a ceasefire; under a ceasefire, which lapses, peace.
+  if (!hasTreatyLevel(dependencies, player, other, TreatyLevel.Peace)) {
+    if (meansWar(dependencies, player, other)) {
+      return null;
+    }
+
+    return hasTreatyLevel(dependencies, player, other, TreatyLevel.Ceasefire)
+      ? find(OfferPeace)
       : find(OfferPeace) ?? find(OfferCeasefire);
   }
 
@@ -198,13 +206,27 @@ export const personStep = <Name extends keyof ChoiceMetaDataMap>(
   if (accept !== undefined && decline !== undefined) {
     const proposal = (accept as Resolution).proposal() as Proposal;
 
-    return (
-      acceptsProposal(dependencies, player, other, proposal) ? accept : decline
-    ) as DataForChoiceMeta<ChoiceMeta<Name>>;
+    return (acceptsProposal(dependencies, player, other, proposal)
+      ? accept
+      : decline) as unknown as DataForChoiceMeta<ChoiceMeta<Name>>;
   }
 
   const leave = values.find((value) => value instanceof Terminate),
-    proposed = proposalFrom(dependencies, player, other, talking);
+    made = new Set<Function>(
+      (
+        (negotiation as { interactions?: () => unknown[] }).interactions?.() ??
+        []
+      )
+        .filter(
+          (interaction: unknown): boolean =>
+            interaction instanceof Proposal && interaction.by() === player
+        )
+        .map(
+          (interaction: unknown): Function =>
+            (interaction as object).constructor
+        )
+    ),
+    proposed = proposalFrom(dependencies, player, other, talking, made);
 
   if (proposed === null && leave === undefined) {
     return null;

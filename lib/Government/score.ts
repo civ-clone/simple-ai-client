@@ -134,11 +134,14 @@ const squareTrade = (
         : value,
     penalised = (value: number): number =>
       penalty !== null && raw(value) > penalty.threshold ? penalty.amount : 0,
-    trade = raw(square.trade) - (square.trade > 0 ? currentBonus : 0);
+    // Trade without the current government's bonus, which is added after any penalty.
+    trade = raw(square.trade) - (square.trade > 0 ? currentBonus : 0),
+    penalisedTrade =
+      penalty !== null && trade > penalty.threshold ? penalty.amount : 0;
 
   return (
     (trade > 0 ? bonus : 0) -
-    penalised(square.trade) -
+    penalisedTrade -
     SHIELD * penalised(square.shields) -
     FOOD * penalised(square.food)
   );
@@ -283,13 +286,17 @@ export const bestGovernment = (
           -Infinity) - (GovernmentType === CurrentType ? 0 : margin),
     }));
 
-  return (
-    scored.reduce(
+  const best = scored.reduce(
       (best, entry) =>
         best === null || entry.score >= best.score ? entry : best,
       null as { GovernmentType: typeof Government; score: number } | null
-    )?.GovernmentType ?? null
-  );
+    ),
+    current = scored.find((entry) => entry.GovernmentType === CurrentType);
+
+  // A tie with the government it has (a player with no cities, say) is no reason for a revolution.
+  return current !== undefined && best !== null && current.score >= best.score
+    ? current.GovernmentType
+    : best?.GovernmentType ?? null;
 };
 
 // The original scores its governments every eighth turn (`ai.cpp:1559`); so does this, unless the governments the player

@@ -12,12 +12,16 @@ export declare const acceptsProposal: (
   other: Player,
   proposal: unknown
 ) => boolean;
-/** What `player` proposes to `other` from `menu`, or `null` to leave. */
+/**
+ * What `player` proposes to `other` from `menu`, or `null` to leave. Nothing it has proposed already in these talks
+ *  (`made`, by class) is proposed again: what was refused once is left.
+ */
 export declare const proposalFrom: (
   dependencies: Dependencies,
   player: Player,
   other: Player,
-  menu: unknown[]
+  menu: unknown[],
+  made?: Set<Function>
 ) => unknown | null;
 /**
  * The AI's step in a meeting where it speaks for a person and the rule set leaves it a choice (see above), or `null`

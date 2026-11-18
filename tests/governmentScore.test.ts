@@ -5,6 +5,7 @@ import {
   Republic,
 } from '@civ-clone/civ1-government/Governments';
 import {
+  CityImprovementContent,
   Food,
   PopulationUnhappiness,
   Production,
@@ -119,6 +120,7 @@ const setUp = ({
   research = 60,
   bias = 0,
   civ2 = true,
+  buildings = 0,
 } = {}) => {
   const ruleRegistry = new RuleRegistry(),
     player = new Player(ruleRegistry),
@@ -139,7 +141,16 @@ const setUp = ({
         player: () => player,
         tile: () => (index === 0 ? capitalTile : tile),
         tileYieldRules: () => [],
-        yields: () => [new PopulationUnhappiness(Math.max(0, size - content))],
+        yields: () => [
+          new PopulationUnhappiness(Math.max(0, size - content)),
+          ...(buildings > 0
+            ? [
+                new CityImprovementContent(buildings, {
+                  id: () => 'temple',
+                } as never),
+              ]
+            : []),
+        ],
         tileYields: (square: number) => squareYields[square],
         index,
       } as unknown as City;
@@ -310,5 +321,31 @@ describe('governments by what they do (governmentScore)', (): void => {
       governmentScore(dependencies, player, Monarchy)! -
         governmentScore(dependencies, player, Communism)!
     ).within(0, 2);
+  });
+
+  it("should count only the unhappy citizens the city's improvements leave", (): void => {
+    const options = {
+        squares: [
+          [2, 2, 0],
+          [2, 1, 0],
+        ] as Square[],
+        size: 9,
+        units: 6,
+        away: 3,
+        bias: -1,
+      },
+      bare = setUp(options),
+      built = setUp({ ...options, buildings: 4 });
+
+    expect(
+      governmentScore(bare.dependencies, bare.player, Fundamentalism)! -
+        governmentScore(built.dependencies, built.player, Fundamentalism)!
+    ).equal(4 * 2 * 4);
+  });
+
+  it('should keep the government it has on a tie, as with no cities', (): void => {
+    const { dependencies, player } = setUp({ cities: 0 });
+
+    expect(bestGovernment(dependencies, player, available)).equal(Monarchy);
   });
 });
