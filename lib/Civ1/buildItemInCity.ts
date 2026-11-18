@@ -19,7 +19,7 @@ import rivalOf, { isEnemy } from '../Player/rivals';
 import BuildWeight from '@civ-clone/base-leader-personality/Rules/Player/BuildWeight';
 import Expansion from '@civ-clone/base-leader-personality/Rules/Player/Expansion';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
-import { Attack, Defence } from '@civ-clone/core-unit/Yields';
+import { Attack, Defence, Movement } from '@civ-clone/core-unit/Yields';
 import { BaseYield } from '@civ-clone/core-unit/Rules/Yield';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import Buildable from '@civ-clone/core-city-build/Buildable';
@@ -61,6 +61,21 @@ import {
   wantsTrader,
 } from '../Unit/envoys';
 import Yield from '@civ-clone/core-yield/Yield';
+import {
+  WARSHIP_NEED,
+  isSubmergedType,
+  isWarshipType,
+  warshipsWanted,
+} from '../Unit/navalWar';
+import { isOnSea } from '../City/explorerShip';
+import {
+  AIR_NEEDS,
+  AirKind,
+  airKindOf,
+  airWanted,
+  isParatrooperType,
+} from '../Unit/airWar';
+import BuildPriority from '@civ-clone/core-city-build/Rules/BuildPriority';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import { changeLosesShields, hasChangeRules } from '../City/productionChange';
 import { isCapitalization } from '@civ-clone/base-city-improvement-capitalization/lib/capitalizationRules';
@@ -335,6 +350,17 @@ const shouldBuildWonder = (
     )
   );
 };
+
+// What the ruleset's `BuildPriority` rules add up to for `buildItem` in `cityBuild`'s city, unweighed.
+const ruleRegistryScore = (
+  dependencies: Dependencies,
+  cityBuild: CityBuild,
+  buildItem: BuildItem,
+  yields: Yield[]
+): number =>
+  dependencies.ruleRegistry
+    .process(BuildPriority, cityBuild, buildItem.item(), yields)
+    .reduce((total: number, value: number): number => total + value, 0);
 
 // Improvements only worth building on purpose: the fallback leaves them until last.
 const onPurposeOnly: (typeof Barracks)[] = [Barracks, CityWalls];
@@ -686,6 +712,105 @@ export const buildItemInCity = (
   // An army, however peaceful the world.
   addNeed(itemFor(getOffensiveUnit()), policy.needs.army, 0, 1);
 
+  // Warships, only where the ruleset says which unit types are for war at sea (`lib/Unit/navalWar`, base-unit-role's
+  //  roles; never in Civ1, which declares none), in a coastal city on the sea, as many as `warshipsWanted` says.
+  const warshipItems = available.filter(
+    (buildItem: BuildItem): boolean =>
+      isUnitItem(buildItem) &&
+      isWarshipType(buildItem.item(), dependencies.ruleRegistry) &&
+      affordable(buildItem)
+  );
+
+  if (warshipItems.length > 0 && city.tile().isCoast() && isOnSea(city)) {
+    const wanted = warshipsWanted(dependencies, player, targets, city);
+
+    if (wanted !== null) {
+      addNeed(
+        itemFor(
+          chooseUnit(
+            dependencies,
+            city,
+            wanted.submarines
+              ? warshipItems
+              : warshipItems.filter(
+                  (buildItem: BuildItem): boolean =>
+                    !isSubmergedType(
+                      buildItem.item(),
+                      dependencies.ruleRegistry
+                    )
+                ),
+            Attack,
+            policy,
+            false,
+            turnsToBuild
+          )
+        ),
+        WARSHIP_NEED,
+        wanted.have,
+        wanted.wanted
+      );
+    }
+  }
+
+  // Aircraft, missiles, nuclear weapons and paratroopers, only where the ruleset's roles name them (`lib/Unit/airWar`;
+  //  never in Civ1, which declares none), as many as `airWanted` says for each kind. They cost two or three times a
+  //  land unit, so a city may take twice the policy's turns over one.
+  const airPolicy: ProductionPolicy = {
+    ...policy,
+    buildTurns: { ...policy.buildTurns, unit: policy.buildTurns.unit * 2 },
+  };
+
+  (
+    ['fighter', 'striker', 'missile', 'nuclear', 'paratrooper'] as const
+  ).forEach((kind: AirKind | 'paratrooper'): void => {
+    const items = available.filter(
+      (buildItem: BuildItem): boolean =>
+        isUnitItem(buildItem) &&
+        (kind === 'paratrooper'
+          ? isParatrooperType(buildItem.item(), dependencies.ruleRegistry)
+          : airKindOf(buildItem.item(), dependencies.ruleRegistry) === kind) &&
+        affordable(buildItem)
+    );
+
+    if (items.length === 0) {
+      return;
+    }
+
+    const wanted = airWanted(
+      dependencies,
+      player,
+      targets,
+      city,
+      kind,
+      Math.max(
+        ...items.map((buildItem: BuildItem): number =>
+          baseYield(dependencies, buildItem.item(), Movement)
+        )
+      )
+    );
+
+    if (wanted === null) {
+      return;
+    }
+
+    addNeed(
+      itemFor(
+        chooseUnit(
+          dependencies,
+          city,
+          items,
+          Attack,
+          airPolicy,
+          false,
+          turnsToBuild
+        )
+      ),
+      AIR_NEEDS[kind],
+      wanted[1],
+      wanted[0]
+    );
+  });
+
   // A Caravan and a Diplomat or Spy, only where the ruleset makes them worth it (`lib/Unit/envoys`): Civ1's ruleset
   //  registers neither `TradeRouteLimit` nor `MissionChoice`, so nothing here is asked there.
   if (tradeRoutesMatter(dependencies.ruleRegistry)) {
@@ -791,7 +916,10 @@ export const buildItemInCity = (
               dependencies,
               player,
               buildItem.item() as unknown as typeof Wonder
-            )
+            ) &&
+            // A Wonder the ruleset scores below nothing for this city (Civ2's Manhattan Project, for a leader who
+            //  isn't aggressive) isn't wanted at all. Civ1's rules never score one below nothing.
+            ruleRegistryScore(dependencies, cityBuild, buildItem, yields) >= 0
         )
       : [];
 

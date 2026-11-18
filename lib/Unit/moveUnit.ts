@@ -132,6 +132,9 @@ export interface MoveOptions {
   // Whether to stop, moves to spare and orders left to the caller, once the unit's path ends or fails, rather than
   //  carrying on with the greedy step: for a unit that has something to do where its path ends.
   stopAtPathEnd?: boolean;
+  // Whether to stop as well, moves to spare and orders left to the caller, where the path is blocked, rather than taking
+  //  the greedy step there: for a unit whose caller plans what it does next (`NavalWar`).
+  stopIfBlocked?: boolean;
   // With no path and no step worth taking, a chance to give the unit something else to do with the moves it has left,
   //  such as a new mission once the last one's path has ended: returns whether it set the unit a new path. Asked at
   //  most `IDLE_CHECKS` times a turn.
@@ -165,7 +168,12 @@ export const moveUnit = async (
   memory: Memory,
   knowledge: Knowledge,
   unit: Unit,
-  { stopAtPathEnd = false, wander = true, onIdle }: MoveOptions = {}
+  {
+    stopAtPathEnd = false,
+    stopIfBlocked = false,
+    wander = true,
+    onIdle,
+  }: MoveOptions = {}
 ): Promise<void> => {
   let loopCheck = 0,
     idleChecks = 0,
@@ -273,6 +281,10 @@ export const moveUnit = async (
       }
 
       memory.unitPathData.delete(unit);
+
+      if (stopIfBlocked) {
+        return;
+      }
     }
 
     // The step straight on from the unit's last one. Among steps that score the same, a unit carries straight on, and
