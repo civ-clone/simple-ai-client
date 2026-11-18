@@ -778,17 +778,32 @@ export const buildItemInCity = (
 
     // Only the types that reach a target from here: each is asked with its own moves, so a shorter-ranged type is never
     //  chosen for a target only a longer-ranged one reaches.
+    //  Fighters and paratroopers don't depend on reach, so they're asked once.
+    const reachOf = (buildItem: BuildItem): number =>
+        baseYield(dependencies, buildItem.item(), Movement),
+      longest = Math.max(...items.map(reachOf)),
+      anyWanted = airWanted(dependencies, player, targets, city, kind, longest);
+
+    if (anyWanted === null) {
+      return;
+    }
+
     const reaching = items
         .map((buildItem: BuildItem) => ({
           buildItem,
-          wanted: airWanted(
-            dependencies,
-            player,
-            targets,
-            city,
-            kind,
-            baseYield(dependencies, buildItem.item(), Movement)
-          ),
+          wanted:
+            kind === 'fighter' ||
+            kind === 'paratrooper' ||
+            reachOf(buildItem) === longest
+              ? anyWanted
+              : airWanted(
+                  dependencies,
+                  player,
+                  targets,
+                  city,
+                  kind,
+                  reachOf(buildItem)
+                ),
         }))
         .filter(({ wanted }) => wanted !== null),
       [first] = reaching;

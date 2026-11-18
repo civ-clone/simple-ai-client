@@ -539,7 +539,7 @@ export const seasOf = (dependencies: Dependencies, city: City): Set<Tile>[] => [
   ),
 ];
 
-// Whether `tile` is on one of `seas`, or is a city's (a port) beside one.
+// Whether `tile` is on one of `seas`, or is a land square beside one (a port, for the units and cities asked about).
 const onSeas = (tile: Tile, seas: Set<Tile>[]): boolean =>
   seas.some(
     (sea: Set<Tile>): boolean =>
@@ -566,60 +566,74 @@ const threatsOnSeas = (
   };
 };
 
-// The number of `player`'s coastal cities on `seas` with an enemy ship or an enemy's coastal city within reach on them.
-//  Production runs it for every city that chooses, so it's kept for the rest of the turn for each body of water once the
-//  player's own survey has filled the board this turn (`Memory#surveyedTurn`), and never from a board left from an
-//  earlier turn (a choice made during another player's turn, from `unitDestroyed`).
-const threatenedCounts = new WeakMap<
+// The player's ports beside `sea` with an enemy ship on it, or an enemy's coastal city beside it, within reach.
+//  Production runs it for every city that chooses, so it's kept for the rest of the turn for each sea once the player's
+//  own survey has filled the board this turn (`Memory#surveyedTurn`), and never from a board left from an earlier turn
+//  (a choice made during another player's turn, from `unitDestroyed`).
+const threatenedBySea = new WeakMap<
   TargetBoard,
-  { turn: number; bySea: Map<Set<Tile>, number> }
+  { turn: number; bySea: Map<Set<Tile>, Set<City>> }
 >();
 
-const threatenedPorts = (
+const threatenedPortsOn = (
   dependencies: Dependencies,
   player: Player,
   targets: TargetBoard,
-  seas: Set<Tile>[]
-): number => {
+  sea: Set<Tile>
+): Set<City> => {
   const turn = dependencies.turn.value(),
     memory = dependencies.memoryRegistry.memoryFor(player),
     surveyed = memory.targets === targets && memory.surveyedTurn === turn;
-  let known = surveyed ? threatenedCounts.get(targets) : undefined;
+  let known = surveyed ? threatenedBySea.get(targets) : undefined;
 
   if (known && known.turn !== turn) {
     known = undefined;
   }
 
-  const key = seas[0],
-    kept = known?.bySea.get(key);
+  const kept = known?.bySea.get(sea);
 
   if (kept !== undefined) {
     return kept;
   }
 
-  const count = dependencies.cityRegistry
-    .getByPlayer(player)
-    .filter((other: City): boolean => {
-      if (!other.tile().isCoast() || !onSeas(other.tile(), seas)) {
-        return false;
-      }
+  const ports = new Set<City>(
+    dependencies.cityRegistry
+      .getByPlayer(player)
+      .filter((other: City): boolean => {
+        if (!other.tile().isCoast() || !onSeas(other.tile(), [sea])) {
+          return false;
+        }
 
-      const near = threatsOnSeas(dependencies, player, targets, other, seas);
+        const near = threatsOnSeas(dependencies, player, targets, other, [sea]);
 
-      return near.ships.length > 0 || near.cities.length > 0;
-    }).length;
+        return near.ships.length > 0 || near.cities.length > 0;
+      })
+  );
 
   if (surveyed) {
     if (!known) {
       known = { turn, bySea: new Map() };
-      threatenedCounts.set(targets, known);
+      threatenedBySea.set(targets, known);
     }
 
-    known.bySea.set(key, count);
+    known.bySea.set(sea, ports);
   }
 
-  return count;
+  return ports;
 };
+
+// The number of the player's ports threatened on any of `seas` (each port once), whichever port asks first.
+const threatenedPorts = (
+  dependencies: Dependencies,
+  player: Player,
+  targets: TargetBoard,
+  seas: Set<Tile>[]
+): number =>
+  new Set<City>(
+    seas.flatMap((sea: Set<Tile>): City[] => [
+      ...threatenedPortsOn(dependencies, player, targets, sea),
+    ])
+  ).size;
 
 // How many warships `player` wants on `city`'s seas, how many it has there (and has on order in ports on them), and
 //  whether `city` may build a submarine, when `city` (a coastal city on the sea) should build one; otherwise `null`. A

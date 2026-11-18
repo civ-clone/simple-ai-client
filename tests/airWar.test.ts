@@ -799,7 +799,7 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
   });
 
   describe('what the player knows, and the reach of each type (Copilot on civ-clone/web-renderer#1171)', (): void => {
-    it("doesn't drop on, or aim a nuclear weapon at, a city the player hasn't seen", async (): Promise<void> => {
+    it("doesn't drop on a city the player hasn't seen", async (): Promise<void> => {
       const hidden = (tile: Tile): boolean =>
           !(tile.x() === 12 && tile.y() === 5) &&
           !(tile.x() === 10 && tile.y() === 5),
@@ -821,6 +821,38 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(paradropTarget(dependencies, player, paratrooper)).equal(
         setup.world.get(12, 5)
       );
+    });
+
+    it("doesn't aim a nuclear weapon at a city the player hasn't seen", async (): Promise<void> => {
+      const hidden = (tile: Tile): boolean =>
+          !(tile.x() === 10 && tile.y() === 5),
+        setup = await setUp({ known: hidden }),
+        { declareWar, dependencies, enemy, enemyCity, game, player, unitOf } =
+          setup,
+        target = enemyCity(10, 5, 8);
+
+      declareWar();
+      game.rules.register(
+        new MilitaryStrength(new Effect(() => ({ attack: 1, defence: 0 })))
+      );
+      [
+        [10, 5],
+        [11, 5],
+        [11, 6],
+        [9, 4],
+      ].forEach(([x, y]) => unitOf(enemy, Musketman, x, y));
+
+      const first = unitOf(player, Nuclear, 5, 5);
+
+      unitOf(player, Nuclear, 5, 5);
+
+      expect(nuclearTarget(dependencies, player, first)).null;
+
+      dependencies.playerWorldRegistry
+        .getByPlayer(player)
+        .register(target.tile());
+
+      expect(nuclearTarget(dependencies, player, first)).equal(target.tile());
     });
 
     it('builds only a type that reaches the target from the city', async (): Promise<void> => {
