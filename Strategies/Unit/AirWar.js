@@ -49,12 +49,17 @@ class AirWar extends AIStrategy_1.default {
         const dependencies = this.dependencies(), player = action.player(), unit = action.value(), memory = this.memoryFor(player);
         // A paratrooper drops when it has somewhere to drop; otherwise it's a land unit like any other.
         if ((0, airWar_1.isParatrooperType)(unit.constructor, dependencies.ruleRegistry)) {
-            // The first target the rules offer a drop onto (their measure of range may differ from ours).
-            const drop = (0, airWar_1.paradropTargets)(dependencies, player, unit)
-                .map((target) => unit
-                .actions(target)
-                .find((offered) => offered instanceof Paradrop_1.default))
-                .find((offered) => offered !== undefined);
+            // The first target the rules offer a drop onto (their measure of range may differ from ours), asked one at a
+            //  time: each asks for the actions on a distant square.
+            let drop;
+            for (const target of (0, airWar_1.paradropTargets)(dependencies, player, unit)) {
+                drop = unit
+                    .actions(target)
+                    .find((offered) => offered instanceof Paradrop_1.default);
+                if (drop) {
+                    break;
+                }
+            }
             if (!drop) {
                 return false;
             }
@@ -79,7 +84,7 @@ class AirWar extends AIStrategy_1.default {
                 takeOrStandDown(dependencies, unit, strike);
                 return true;
             }
-            await this.goHome(player, unit, knowledge);
+            await this.goHome(player, unit, this.knowledge());
             return true;
         }
         const tile = unit.tile(), moves = unit.moves().value();
@@ -100,7 +105,7 @@ class AirWar extends AIStrategy_1.default {
         }
         // Otherwise (home already, blocked, or a step its fuel wouldn't allow): back to where it refuels, once, then
         //  nothing more this turn.
-        await this.goHome(player, unit, knowledge, planned.task === 'home' && unit.tile() === tile);
+        await this.goHome(player, unit, this.knowledge(), planned.task === 'home' && unit.tile() === tile);
         return true;
     }
     // Flies `unit` back to where it refuels (`planHome`), unless `tried` already, and then ends its turn wherever it is.

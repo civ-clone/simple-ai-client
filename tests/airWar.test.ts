@@ -524,9 +524,10 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(isNuclearTargetCity(dependencies, player, enemyCity(20, 20, 4)))
         .false;
 
-      // Another of the enemy's cities with an SDI Defence, 2 away, stops a strike on it too (Civ2's rule).
+      // Another of the enemy's cities with an SDI Defence, 3 moves away off the axis (3.6 squares as the crow flies),
+      //  stops a strike on it too (Civ2's rule counts moves).
       game.cityImprovements.register(
-        new SdiDefence(enemyCity(12, 5, 2), game.rules)
+        new SdiDefence(enemyCity(13, 7, 2), game.rules)
       );
 
       expect(isNuclearTargetCity(dependencies, player, target)).false;

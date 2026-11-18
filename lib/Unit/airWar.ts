@@ -249,12 +249,14 @@ export const canStrike = (
 ): boolean =>
   strikeSquares(dependencies, player, unit, target, home).length > 0;
 
-// Sets `unit` off for the first of `ranked` it has a path to. Returns whether there was one.
+// Sets `unit` off for the first of `ranked` it has a path to, costing no more than `budget` says for that square (a
+//  path round other players' units or cities can cost more than the moves between). Returns whether there was one.
 const flyTo = (
   dependencies: Dependencies,
   memory: Memory,
   unit: Unit,
-  ranked: Tile[]
+  ranked: Tile[],
+  budget: (tile: Tile) => number = (): number => Infinity
 ): boolean => {
   for (const tile of ranked) {
     if (tile === unit.tile()) {
@@ -270,7 +272,7 @@ const flyTo = (
       dependencies.pathFinderRegistry
     );
 
-    if (path) {
+    if (path && path.movementCost() <= budget(tile)) {
       memory.unitPathData.set(unit, path);
 
       return true;
@@ -278,6 +280,28 @@ const flyTo = (
   }
 
   return false;
+};
+
+// The most a path to `square`, beside `unit`'s target, may cost: a move to spare for the attack, and for a fuelled
+//  unit whose attack doesn't end its turn (a fighter), the way home after it too.
+const strikeBudget = (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit,
+  home: Tile[]
+): ((square: Tile) => number) => {
+  const moves = unit.moves().value(),
+    state = fuelFor(dependencies, unit);
+
+  return (square: Tile): number =>
+    state === null || unit.hasTrait(SingleUse) || unit.hasTrait(AttackEndsTurn)
+      ? moves - 1
+      : Math.min(
+          moves - 1,
+          state.reach -
+            1 -
+            homeDistance(dependencies, player, unit, square, home)
+        );
 };
 
 // The squares beside `target` `unit` could strike from, nearest it first (in moves): not one with another player's
@@ -303,7 +327,9 @@ const besideFor = (
       if (nuclear) {
         return (
           units.every((other: Unit): boolean => other === unit) &&
-          dependencies.cityRegistry.getByTile(tile) === null
+          dependencies.cityRegistry.getByTile(tile) === null &&
+          (tile === unit.tile() ||
+            !refuels(dependencies.ruleRegistry, unit, tile))
         );
       }
 
@@ -454,7 +480,7 @@ const sdiProtected = (
   liveCities(dependencies).some(
     (city: City): boolean =>
       city.player() !== player &&
-      city.tile().distanceFrom(target) <= SDI_RANGE &&
+      movesBetween(city.tile(), target) <= SDI_RANGE &&
       dependencies.cityImprovementRegistry
         .getByCity(city)
         .some(
@@ -658,7 +684,7 @@ export const paradropTargets = (
     .filter(
       (other: City): boolean =>
         atWar(dependencies, player, other.player()) &&
-        other.tile().distanceFrom(from) <= PARADROP_RANGE &&
+        movesBetween(other.tile(), from) <= PARADROP_RANGE &&
         live(other.tile()).length === 0 &&
         !other
           .tile()
@@ -719,7 +745,15 @@ export const planAirTask = (
       return { task: 'strike', target };
     }
 
-    if (flyTo(dependencies, memory, unit, squares)) {
+    if (
+      flyTo(
+        dependencies,
+        memory,
+        unit,
+        squares,
+        strikeBudget(dependencies, player, unit, home)
+      )
+    ) {
       return { task: 'strike', target };
     }
   }

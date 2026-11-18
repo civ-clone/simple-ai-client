@@ -86,14 +86,21 @@ export class AirWar extends AIStrategy {
 
     // A paratrooper drops when it has somewhere to drop; otherwise it's a land unit like any other.
     if (isParatrooperType(unit.constructor, dependencies.ruleRegistry)) {
-      // The first target the rules offer a drop onto (their measure of range may differ from ours).
-      const drop = paradropTargets(dependencies, player, unit)
-        .map((target) =>
-          unit
-            .actions(target)
-            .find((offered): boolean => offered instanceof Paradrop)
-        )
-        .find((offered) => offered !== undefined);
+      // The first target the rules offer a drop onto (their measure of range may differ from ours), asked one at a
+      //  time: each asks for the actions on a distant square.
+      let drop: Paradrop | undefined;
+
+      for (const target of paradropTargets(dependencies, player, unit)) {
+        drop = unit
+          .actions(target)
+          .find((offered): boolean => offered instanceof Paradrop) as
+          | Paradrop
+          | undefined;
+
+        if (drop) {
+          break;
+        }
+      }
 
       if (!drop) {
         return false;
@@ -136,7 +143,7 @@ export class AirWar extends AIStrategy {
         return true;
       }
 
-      await this.goHome(player, unit, knowledge);
+      await this.goHome(player, unit, this.knowledge());
 
       return true;
     }
@@ -169,7 +176,7 @@ export class AirWar extends AIStrategy {
     await this.goHome(
       player,
       unit,
-      knowledge,
+      this.knowledge(),
       planned.task === 'home' && unit.tile() === tile
     );
 
