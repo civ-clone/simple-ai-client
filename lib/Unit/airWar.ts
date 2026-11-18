@@ -11,12 +11,16 @@
 //    of its player's units beside it (`ai_air_raid_city`, `:2490`), then flies back to refuel;
 //  - a **nuclear weapon** (a type that `Detonates`), only for a leader whose attack trait is aggressive, goes for the
 //    enemy city the original's `ai_nuke_pick_target` (`:2335`) would: larger than 4, without an SDI Defence, of a
-//    player at war whose military is half its own or more (and has no nuclear weapons), or half again as large, scored
-//    by the enemy units around it, less 2 for each square of its own and 99 for each of a third player not at war, plus
-//    half its size; only from a player with two or more, and only once the score reaches 10 (less for a player with
-//    fewer than 5 cities);
-//  - a **paratrooper** (a type that can `Paradrop`), unmoved in its player's city, drops into an empty enemy city at war
-//    within its range, or beside it (`ai_orders_paratrooper`, `:3315`); otherwise it stays.
+//    player at war whose military is more than half its own (and has no nuclear weapons), or more than half again as
+//    large, or that it holds a vendetta against; scored by the enemy units around it, less 2 for each square of its own
+//    and 99 for each of a third player not at war (the barbarians' count for nothing), plus half its size; only from a
+//    player with two or more, and only once the score reaches 10 (less for a player with fewer than 5 cities). The
+//    original's "at war" is no peace and a nuclear threat; here it's a war in force. The original moves the weapon
+//    straight beside a target in reach of any of its player's cities; here it flies, so it takes only targets it can
+//    reach this turn from where it is;
+//  - a **paratrooper** (a type that can `Paradrop`), unmoved in its player's city and not its last defender, drops into
+//    an empty enemy city at war within its range (`ai_orders_paratrooper`, `:3315`); otherwise it's a land unit like
+//    any other.
 // An enemy is a player with no treaty (`isEnemy`), barbarians included; nuclear weapons and paratroopers want a war.
 import { Air, Land } from '@civ-clone/library-unit/Types';
 import {
@@ -49,6 +53,8 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
 import { fuelFor } from './fuel';
 import { isEnemy } from '../Player/rivals';
+import hasVendetta from '@civ-clone/library-diplomacy/lib/holds';
+import isBarbarian from '@civ-clone/base-civilization-barbarian/isBarbarian';
 import leaderTraits from '@civ-clone/base-leader-personality/lib/leaderTraits';
 import { powerOfPlayer } from '../Player/rivals';
 import { refuels } from '@civ-clone/base-unit-fuel/lib/fuelRules';
@@ -184,35 +190,56 @@ const homeDistance = (
     Infinity
   );
 
-// Whether `unit` could strike `target` this turn and still get back to refuel before its fuel runs out: a missile only
-//  needs to reach it; a unit whose attack ends its turn (a bomber) has its later turns' moves; another (a fighter) the
-//  moves it has left after the strike. A unit with no fuel (a helicopter) can always.
+// The squares `unit` could strike `target` from this turn and still get back to refuel before its fuel runs out,
+//  nearest it first: where it stands, if that's beside the target, or a square beside the target it can reach with a
+//  move to spare for the attack (none with another player's units on it). A missile (`SingleUse`) only needs to reach
+//  it; a unit whose attack ends its turn (a bomber) gets home on its later turns' moves; another (a fighter) on the
+//  moves it has left after the attack. A unit with no fuel (a helicopter) only needs to reach it. `home` is the squares
+//  it refuels on.
+export const strikeSquares = (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit,
+  target: Tile,
+  home: Tile[] = refuellingTiles(dependencies, player, unit)
+): Tile[] => {
+  const moves = unit.moves().value(),
+    state = fuelFor(dependencies, unit),
+    from = unit.tile(),
+    squares = (
+      target.isNeighbourOf(from)
+        ? [from]
+        : besideFor(dependencies, player, unit, target)
+    ).filter((square: Tile): boolean => square.distanceFrom(from) + 1 <= moves);
+
+  if (state === null) {
+    return squares;
+  }
+
+  if (unit.hasTrait(SingleUse)) {
+    return squares.filter(
+      (square: Tile): boolean => square.distanceFrom(from) + 1 <= state.reach
+    );
+  }
+
+  return squares.filter((square: Tile): boolean => {
+    const left = unit.hasTrait(AttackEndsTurn)
+      ? state.reach - moves
+      : state.reach - square.distanceFrom(from) - 1;
+
+    return homeDistance(dependencies, player, unit, square, home) <= left;
+  });
+};
+
+// Whether `unit` could strike `target` this turn and get back to refuel (`strikeSquares`).
 export const canStrike = (
   dependencies: Dependencies,
   player: Player,
   unit: Unit,
-  target: Tile
-): boolean => {
-  const distance = target.distanceFrom(unit.tile()),
-    moves = Math.floor(unit.moves().value());
-
-  if (distance > moves) {
-    return false;
-  }
-
-  const state = fuelFor(dependencies, unit);
-
-  if (state === null || unit.hasTrait(SingleUse)) {
-    return true;
-  }
-
-  const left = unit.hasTrait(AttackEndsTurn)
-    ? state.reach - unit.moves().value()
-    : state.reach - distance;
-
-  // From beside the target, where it strikes from.
-  return homeDistance(dependencies, player, unit, target) - 1 <= left;
-};
+  target: Tile,
+  home?: Tile[]
+): boolean =>
+  strikeSquares(dependencies, player, unit, target, home).length > 0;
 
 // Sets `unit` off for the first of `ranked` it has a path to. Returns whether there was one.
 const flyTo = (
@@ -266,18 +293,24 @@ const besideFor = (
     );
 
 // The enemy unit `unit`, a fighter, goes for: on the target board, a unit in the air or alone on its square, that it
-//  would beat, the nearest by the original's score (twice the distance, 1 less for one with a range, 1 less again for
+//  would beat and can strike and get back from (`canStrike`), the nearest by the original's score (twice the distance, 1 less for one with a range, 1 less again for
 //  one alone). `null` with none.
 export const fighterTarget = (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
-  unit: Unit
+  unit: Unit,
+  home: Tile[] = refuellingTiles(dependencies, player, unit)
 ): Tile | null => {
+  const moves = unit.moves().value();
   let best: Tile | null = null,
     bestScore = Infinity;
 
   memory.targets.enemyUnitsToAttack.forEach((tile: Tile): void => {
+    if (tile.distanceFrom(unit.tile()) > moves) {
+      return;
+    }
+
     const units = dependencies.unitRegistry
         .getByTile(tile)
         .filter((other: Unit): boolean => !other.destroyed()),
@@ -295,7 +328,10 @@ export const fighterTarget = (
       return;
     }
 
-    if (attackOdds(dependencies, unit, tile) < ATTACK_ODDS) {
+    if (
+      attackOdds(dependencies, unit, tile) < ATTACK_ODDS ||
+      !canStrike(dependencies, player, unit, tile, home)
+    ) {
       return;
     }
 
@@ -324,12 +360,15 @@ export const raidTarget = (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
-  unit: Unit
+  unit: Unit,
+  home: Tile[] = refuellingTiles(dependencies, player, unit)
 ): Tile | null => {
-  const own = dependencies.unitRegistry
-      .getByPlayer(player)
-      .filter((other: Unit): boolean => !other.destroyed())
-      .map((other: Unit): Tile => other.tile()),
+  const own = new Set<Tile>(
+      dependencies.unitRegistry
+        .getByPlayer(player)
+        .filter((other: Unit): boolean => !other.destroyed())
+        .map((other: Unit): Tile => other.tile())
+    ),
     over = unit.tile().isLand()
       ? continentOf(dependencies.turn.value(), unit.tile())
       : null;
@@ -349,8 +388,9 @@ export const raidTarget = (
       city === null ||
       !hostile(dependencies, player, city.player()) ||
       defenders.length === 0 ||
-      !canStrike(dependencies, player, unit, tile) ||
-      attackOdds(dependencies, unit, tile) < ATTACK_ODDS
+      tile.distanceFrom(unit.tile()) > unit.moves().value() ||
+      attackOdds(dependencies, unit, tile) < ATTACK_ODDS ||
+      !canStrike(dependencies, player, unit, tile, home)
     ) {
       return;
     }
@@ -362,7 +402,7 @@ export const raidTarget = (
       60 *
         tile
           .getNeighbours()
-          .filter((neighbour: Tile): boolean => own.includes(neighbour)).length;
+          .filter((neighbour: Tile): boolean => own.has(neighbour)).length;
 
     if (score >= bestScore) {
       bestScore = score;
@@ -407,7 +447,15 @@ export const nuclearTarget = (
 
   const ownCities = dependencies.cityRegistry.getByPlayer(player),
     ownPower = powerOfPlayer(dependencies, player),
-    reach = Math.floor(unit.movement().value()),
+    powers = new Map<Player, number>(),
+    powerOf = (other: Player): number => {
+      if (!powers.has(other)) {
+        powers.set(other, powerOfPlayer(dependencies, other));
+      }
+
+      return powers.get(other)!;
+    },
+    home = refuellingTiles(dependencies, player, unit),
     hasNuclear = (other: Player): boolean =>
       dependencies.unitRegistry
         .getByPlayer(other)
@@ -431,12 +479,13 @@ export const nuclearTarget = (
       return;
     }
 
-    const theirPower = powerOfPlayer(dependencies, owner);
+    const theirPower = powerOf(owner);
 
     if (
       !(
-        theirPower * 2 >= ownPower * 3 ||
-        (!hasNuclear(owner) && theirPower * 2 >= ownPower)
+        theirPower * 2 > ownPower * 3 ||
+        hasVendetta(player, owner, dependencies.interactionRegistry) ||
+        (!hasNuclear(owner) && theirPower * 2 > ownPower)
       )
     ) {
       return;
@@ -456,6 +505,11 @@ export const nuclearTarget = (
 
         const tileOwner = units[0].player();
 
+        // The barbarians' squares count for nothing either way, as in the original.
+        if (isBarbarian(tileOwner)) {
+          return;
+        }
+
         if (tileOwner === player) {
           score -= 2;
         } else if (atWar(dependencies, player, tileOwner)) {
@@ -466,40 +520,50 @@ export const nuclearTarget = (
       }
     );
 
+    // In reach of this weapon this turn: the original moves it straight beside any target in reach of one of its
+    //  player's cities.
     if (
       score > bestScore &&
-      ownCities.some(
-        (own: City): boolean => own.tile().distanceFrom(city.tile()) <= reach
-      )
+      canStrike(dependencies, player, unit, city.tile(), home)
     ) {
       bestScore = score;
       best = city.tile();
     }
   });
 
-  return best !== null &&
-    bestScore >= 10 - Math.max(0, 5 - ownCities.length) &&
-    canStrike(dependencies, player, unit, best)
+  return best !== null && bestScore >= 10 - Math.max(0, 5 - ownCities.length)
     ? best
     : null;
 };
 
-// Where `unit`, a paratrooper in its player's city with all its moves, drops: an empty city of a player at war within
-//  its range, the largest, onto the city itself or, failing that, the empty square beside it furthest from where it
-//  stands (the original also counts the square's defence and a fortress there, which aren't read here); `null` with
-//  none, or where one of its player's units is beside the city already, as the original.
+// Where `unit`, a paratrooper in its player's city with all its moves, drops: onto an empty city of a player at war
+//  within its range, the largest first, as the original's `ai_orders_paratrooper` does, passing over one where a unit
+//  of its player's stands beside it already; `null` with none, or when it's the last unit that could defend its own
+//  city. (The original picks the city's square too, scoring it 500 against the squares around, so that's always where
+//  it lands.)
 export const paradropTarget = (
   dependencies: Dependencies,
   player: Player,
   unit: Unit
 ): Tile | null => {
   const from = unit.tile(),
-    city = dependencies.cityRegistry.getByTile(from);
+    city = dependencies.cityRegistry.getByTile(from),
+    live = (tile: Tile): Unit[] =>
+      dependencies.unitRegistry
+        .getByTile(tile)
+        .filter((other: Unit): boolean => !other.destroyed());
 
   if (
     city === null ||
     city.player() !== player ||
-    unit.moves().value() < unit.movement().value()
+    unit.moves().value() < unit.movement().value() ||
+    !live(from).some(
+      (other: Unit): boolean =>
+        other !== unit &&
+        other.player() === player &&
+        isA(other, Land) &&
+        other.defence().value() > 0
+    )
   ) {
     return null;
   }
@@ -510,9 +574,13 @@ export const paradropTarget = (
       (other: City): boolean =>
         atWar(dependencies, player, other.player()) &&
         other.tile().distanceFrom(from) <= PARADROP_RANGE &&
-        dependencies.unitRegistry
-          .getByTile(other.tile())
-          .every((other: Unit): boolean => other.destroyed())
+        live(other.tile()).length === 0 &&
+        !other
+          .tile()
+          .getNeighbours()
+          .some((tile: Tile): boolean =>
+            live(tile).some((own: Unit): boolean => own.player() === player)
+          )
     )
     .sort(
       (a: City, b: City): number =>
@@ -520,41 +588,7 @@ export const paradropTarget = (
         dependencies.cityGrowthRegistry.getByCity(a).size()
     );
 
-  if (!target) {
-    return null;
-  }
-
-  const around = [target.tile(), ...target.tile().getNeighbours()].filter(
-    (tile: Tile): boolean =>
-      tile.isLand() && tile.distanceFrom(from) <= PARADROP_RANGE
-  );
-
-  if (
-    around.some((tile: Tile): boolean =>
-      dependencies.unitRegistry
-        .getByTile(tile)
-        .some(
-          (other: Unit): boolean =>
-            other.player() === player && !other.destroyed()
-        )
-    )
-  ) {
-    return null;
-  }
-
-  const [best] = around
-    .filter((tile: Tile): boolean =>
-      dependencies.unitRegistry
-        .getByTile(tile)
-        .every((other: Unit): boolean => other.destroyed())
-    )
-    .map((tile: Tile): [Tile, number] => [
-      tile,
-      (tile === target.tile() ? 500 : 0) + tile.distanceFrom(from),
-    ])
-    .sort(([, a], [, b]): number => b - a);
-
-  return best ? best[0] : null;
+  return target ? target.tile() : null;
 };
 
 export interface AirTask {
@@ -577,39 +611,41 @@ export const planAirTask = (
     return null;
   }
 
-  const target =
-    kind === 'fighter'
-      ? fighterTarget(dependencies, player, memory, unit)
-      : kind === 'nuclear'
-      ? nuclearTarget(dependencies, player, unit)
-      : raidTarget(dependencies, player, memory, unit);
+  const home = refuellingTiles(dependencies, player, unit),
+    target =
+      kind === 'fighter'
+        ? fighterTarget(dependencies, player, memory, unit, home)
+        : kind === 'nuclear'
+        ? nuclearTarget(dependencies, player, unit)
+        : raidTarget(dependencies, player, memory, unit, home);
 
-  if (
-    target !== null &&
-    (kind !== 'fighter' || canStrike(dependencies, player, unit, target))
-  ) {
-    if (target.isNeighbourOf(unit.tile())) {
+  if (target !== null) {
+    const squares = strikeSquares(dependencies, player, unit, target, home);
+
+    if (squares.includes(unit.tile())) {
       memory.unitPathData.delete(unit);
 
       return { task: 'strike', target };
     }
 
-    if (
-      flyTo(
-        dependencies,
-        memory,
-        unit,
-        besideFor(dependencies, player, unit, target)
-      )
-    ) {
+    if (flyTo(dependencies, memory, unit, squares)) {
       return { task: 'strike', target };
     }
   }
 
-  // Nothing to strike: where it refuels, or back to the nearest such square.
-  const home = refuellingTiles(dependencies, player, unit);
+  return planHome(dependencies, player, memory, unit, home);
+};
 
-  if (home.includes(unit.tile()) || (kind !== 'fighter' && home.length === 0)) {
+// Where `unit` goes with nothing to strike: stays where it refuels (or heals, for one with no fuel, a helicopter), or
+//  flies back to the nearest such square. With nowhere to go, it stays.
+export const planHome = (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  unit: Unit,
+  home: Tile[] = refuellingTiles(dependencies, player, unit)
+): AirTask => {
+  if (home.includes(unit.tile()) || home.length === 0) {
     memory.unitPathData.delete(unit);
 
     return { task: 'stay', target: null };
@@ -639,8 +675,7 @@ export const planAirTask = (
 //  - a bomber or helicopter while a defended enemy city is in reach: one for each 3 cities, at most 4; a cruise
 //    missile the same, one for each 4 cities, at most 2;
 //  - a nuclear weapon, for an aggressive leader, while a city larger than 4 of a player at war is in reach: 2;
-//  - a paratrooper while a city of a player at war with at most one unit in it is in drop range: one for each 4
-//    cities, at most 2.
+//  - a paratrooper while an empty city of a player at war is in drop range: one for each 4 cities, at most 2.
 export const airWanted = (
   dependencies: Dependencies,
   player: Player,
@@ -714,7 +749,7 @@ export const airWanted = (
         atWar(dependencies, player, other.player()) &&
         dependencies.unitRegistry
           .getByTile(other.tile())
-          .filter((unit: Unit): boolean => !unit.destroyed()).length <= 1
+          .filter((unit: Unit): boolean => !unit.destroyed()).length === 0
     );
 
     return weak.length === 0

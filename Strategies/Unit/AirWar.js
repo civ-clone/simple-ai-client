@@ -8,10 +8,21 @@ const Actions_1 = require("@civ-clone/library-unit/Actions");
 const airWar_1 = require("../../lib/Unit/airWar");
 const AIStrategy_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/AIStrategy");
 const Paradrop_1 = require("@civ-clone/base-unit-action-paradrop/Paradrop");
+const SingleUse_1 = require("@civ-clone/base-unit-trait-single-use/SingleUse");
 const moveUnit_1 = require("../../lib/Unit/moveUnit");
 const isUnitAction_1 = require("@civ-clone/base-strategy-ai/Strategies/lib/isUnitAction");
 const moveUnit_2 = require("../../lib/Unit/moveUnit");
 const orders_1 = require("@civ-clone/base-strategy-ai/lib/Unit/orders");
+// `knowledge`, letting a missile (`SingleUse`) on its way to `target` take any step that leaves the target within its
+//  moves: it's spent in the attack, so it needs no way back. Every other unit, and step, is asked of `knowledge`.
+const towards = (knowledge, missile, target) => target === null || !missile.hasTrait(SingleUse_1.default)
+    ? knowledge
+    : {
+        ...knowledge,
+        canReturnAfter: (dependencies, player, unit, action) => (unit === missile &&
+            action.to().distanceFrom(target) <= unit.moves().value() - 1) ||
+            knowledge.canReturnAfter(dependencies, player, unit, action),
+    };
 class AirWar extends AIStrategy_1.default {
     handles(action) {
         if (!(0, isUnitAction_1.default)(action)) {
@@ -40,40 +51,59 @@ class AirWar extends AIStrategy_1.default {
         if (planned === null) {
             return false;
         }
+        const knowledge = towards(this.knowledge(), unit, planned.target);
         if (planned.task === 'stay') {
             (0, orders_1.noOrders)(dependencies, unit);
             return true;
         }
-        if (planned.target !== null && planned.target.isNeighbourOf(unit.tile())) {
+        // Beside its target, with a path to none: it strikes, if the attack is on offer and it could still get back after
+        //  it (`canReturnAfter`, base-unit-fuel's count), and otherwise heads home.
+        if (planned.target !== null && !memory.unitPathData.has(unit)) {
             const strike = (0, moveUnit_1.actionToTake)(dependencies, player, unit.actions(planned.target));
-            // Only the attack (a nuclear weapon's, for a nuclear weapon): anything else on offer there isn't the task's.
-            if (strike instanceof Actions_1.Attack || strike instanceof Actions_1.NuclearAttack) {
+            if ((strike instanceof Actions_1.Attack || strike instanceof Actions_1.NuclearAttack) &&
+                knowledge.canReturnAfter(dependencies, player, unit, strike)) {
                 unit.action(strike);
+                return true;
             }
-            else {
-                (0, orders_1.noOrders)(dependencies, unit);
-            }
+            await this.goHome(player, unit, knowledge);
             return true;
         }
         const tile = unit.tile(), moves = unit.moves().value();
-        await (0, moveUnit_2.default)(dependencies, player, memory, this.knowledge(), unit, {
+        await (0, moveUnit_2.default)(dependencies, player, memory, knowledge, unit, {
             stopAtPathEnd: true,
             stopIfBlocked: true,
             wander: false,
         });
-        // Once there: home, it stays; beside its target, it strikes on its next action. Otherwise (blocked, or its fuel
-        //  kept it from a step) it does nothing more this turn.
-        if (unit.active() &&
-            unit.moves().value() > 0 &&
-            (unit.tile() === tile ||
-                unit.moves().value() === moves ||
-                planned.task === 'home' ||
-                planned.target === null ||
-                !planned.target.isNeighbourOf(unit.tile()))) {
+        if (!unit.active() || unit.moves().value() <= 0) {
+            return true;
+        }
+        // Beside its target, having moved: it strikes on its next action.
+        if (planned.task === 'strike' &&
+            planned.target !== null &&
+            planned.target.isNeighbourOf(unit.tile()) &&
+            (unit.tile() !== tile || unit.moves().value() !== moves)) {
+            return true;
+        }
+        // Otherwise (home already, blocked, or a step its fuel wouldn't allow): back to where it refuels, once, then
+        //  nothing more this turn.
+        await this.goHome(player, unit, knowledge, planned.task === 'home' && unit.tile() === tile);
+        return true;
+    }
+    // Flies `unit` back to where it refuels (`planHome`), unless `tried` already, and then ends its turn wherever it is.
+    async goHome(player, unit, knowledge, tried = false) {
+        const dependencies = this.dependencies(), memory = this.memoryFor(player);
+        if (!tried &&
+            (0, airWar_1.planHome)(dependencies, player, memory, unit).task === 'home') {
+            await (0, moveUnit_2.default)(dependencies, player, memory, knowledge, unit, {
+                stopAtPathEnd: true,
+                stopIfBlocked: true,
+                wander: false,
+            });
+        }
+        if (unit.active() && unit.moves().value() > 0) {
             memory.unitPathData.delete(unit);
             (0, orders_1.noOrders)(dependencies, unit);
         }
-        return true;
     }
 }
 exports.AirWar = AirWar;

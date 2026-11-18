@@ -35,6 +35,7 @@ import City from '@civ-clone/core-city/City';
 import Civilization from '@civ-clone/core-civilization/Civilization';
 import Criterion from '@civ-clone/core-rule/Criterion';
 import Effect from '@civ-clone/core-rule/Effect';
+import MilitaryStrength from '@civ-clone/core-power/Rules/MilitaryStrength';
 import Fuel from '@civ-clone/base-unit-fuel/lib/Fuel';
 import Leader from '@civ-clone/core-civilization/Leader';
 import { Monarchy } from '@civ-clone/civ1-government/Governments';
@@ -271,6 +272,23 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(canStrike(dependencies, player, fighter, far.tile())).false;
     });
 
+    it('measure the way home from where they strike, not from the target', async (): Promise<void> => {
+      const { dependencies, enemy, player, unitOf, withFuel } = await setUp(),
+        // 4 from home, its last move left, and the target on the far side.
+        fighter = unitOf(player, Fighter, 9, 5),
+        target = unitOf(enemy, Warrior, 10, 5);
+
+      withFuel();
+      fighter.moves().set(1);
+
+      expect(canStrike(dependencies, player, fighter, target.tile())).false;
+
+      // With the moves to get back after the attack, it can.
+      fighter.moves().set(6);
+
+      expect(canStrike(dependencies, player, fighter, target.tile())).true;
+    });
+
     it('wait in their city with nothing to strike', async (): Promise<void> => {
       const { dependencies, memory, player, unitOf } = await setUp(),
         fighter = unitOf(player, Fighter, 5, 5);
@@ -311,6 +329,30 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
     });
   });
 
+  describe('bombers and missiles (fuel)', (): void => {
+    it('a bomber, whose attack ends its turn, strikes what it can get home from on its next turn', async (): Promise<void> => {
+      const { dependencies, enemy, player, unitOf, withFuel } = await setUp(),
+        bomber = unitOf(player, Bomber, 5, 5),
+        near = unitOf(enemy, Warrior, 12, 5);
+
+      withFuel();
+      bomber.moves().set(8);
+
+      // Beside it at 6 from home, with next turn's 8 moves to get back.
+      expect(canStrike(dependencies, player, bomber, near.tile())).true;
+
+      // Out of this turn's moves.
+      expect(
+        canStrike(
+          dependencies,
+          player,
+          bomber,
+          unitOf(enemy, Warrior, 15, 5).tile()
+        )
+      ).false;
+    });
+  });
+
   describe('nuclear weapons', (): void => {
     const withTarget = async (leader: typeof Leader = NapoleonI) => {
       const setup = await setUp({ leader }),
@@ -318,7 +360,11 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
         target = enemyCity(10, 5, 8);
 
       declareWar();
-      // The enemy's army is as strong as the player's, and has no nuclear weapons.
+      // Each unit counts 1 towards its player's military: the enemy's 4 against the player's 2 weapons.
+      setup.game.rules.register(
+        new MilitaryStrength(new Effect(() => ({ attack: 1, defence: 0 })))
+      );
+      // The enemy's army has no nuclear weapons.
       unitOf(enemy, Musketman, 10, 5);
       unitOf(enemy, Musketman, 11, 5);
       unitOf(enemy, Musketman, 11, 6);
@@ -369,6 +415,8 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
         paratrooper = unitOf(player, Rifleman, 5, 5),
         target = enemyCity(12, 5, 3);
 
+      unitOf(player, Musketman, 5, 5);
+
       // Not without a war.
       expect(paradropTarget(dependencies, player, paratrooper)).null;
 
@@ -377,6 +425,16 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(paradropTarget(dependencies, player, paratrooper)).equal(
         target.tile()
       );
+
+      // Not as its city's last defender.
+      dependencies.unitRegistry
+        .getByTile(paratrooper.tile())
+        .filter((unit: Unit) => unit instanceof Musketman)
+        .forEach((unit: Unit) => unit.destroy());
+
+      expect(paradropTarget(dependencies, player, paratrooper)).null;
+
+      unitOf(player, Musketman, 5, 5);
 
       paratrooper.moves().set(0.5);
 

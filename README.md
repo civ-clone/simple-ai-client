@@ -194,7 +194,9 @@ none, so none of this happens there). After the original Civ2's computer players
   A coastal city on the sea builds them while an enemy ship or coastal city is within 12: one for every two such ports,
   and one for each transport in use, a submarine only for ships to hunt.
 - **Fighters** (an air superiority type that flies, `lib/Unit/airWar`) go for the nearest enemy unit alone or in the air
-  that they would beat, when they can get back to refuel (`ai_air_pick_target`), and otherwise wait in a city. A city
+  that they would beat, when they can get back to refuel from where they'd strike (`strikeSquares`,
+  `ai_air_pick_target`), and otherwise wait in a city. Every strike is also asked of base-unit-fuel's count
+  (`canReturnAfter`) as it's made, and an aircraft that can't go on flies home rather than stopping in the air. A city
   builds one more than the enemy aircraft in reach while enemy aircraft or land units come near.
 - **Bombers, helicopters and cruise missiles** (an attack type that flies) raid the enemy city in reach this turn that
   scores best by `ai_air_raid_city` (size, defenders, landmass, the player's units beside it), then fly back to refuel.
@@ -202,19 +204,22 @@ none, so none of this happens there). After the original Civ2's computer players
   and a cruise missile for each 4, at most 2.
 - **Nuclear weapons** (a type that `Detonates`) only for a leader whose attack trait is aggressive (base-leader-trait-
   aggression's `Aggressive`), after `ai_nuke_pick_target`: a city larger than 4 of a player at war, without an SDI
-  Defence, scored by the enemy units around it, fired only from a player with 2 or more. Such a player keeps 2 while a
-  target is in reach.
-- **Paratroopers** (a type with a role that can `Paradrop`), unmoved in their city, drop into an empty enemy city at war
-  within 10, or beside it (`ai_orders_paratrooper`).
+  Defence, whose owner is more than half as strong (with no nuclear weapons) or more than half again as strong, or holds
+  a vendetta, scored by the enemy units around it, fired only from a player with 2 or more. Such a player keeps 2 while
+  a target is in reach.
+- **Paratroopers** (a type with a role that can `Paradrop`), unmoved in their city and not its last defender, drop into
+  an empty enemy city at war within 10 (`ai_orders_paratrooper`); a city builds them while one is in range.
 - A Wonder whose `BuildPriority` rules add up to less than nothing for a city (Civ2's Manhattan Project for a leader who
   isn't aggressive) is never built. Civ1's rules never score one below nothing.
 
 **Departures from the original:** a bomber, fighter or missile attacks only at the odds the AI wants (`attackOdds`),
 where the original raids regardless and judges a fighter's target by a formula of its own; helicopters raid as bombers
-do (the original leaves them out, having no range); a paratrooper's landing square ignores its defence and a fortress
-there; the original's moving paratroopers between cities to be in range (`ai_assess_paratroopers`), interceptors
-waiting in another player's cities, and the diplomatic effects of a nuclear attack on persons are not here; air units
-cost two or three land units' shields, so a city may take twice the policy's turns over one.
+do (the original leaves them out, having no range); a nuclear weapon flies to its target, so it takes only one in reach
+this turn, where the original moves it straight beside any target in reach of one of its player's cities, and "at
+war" is a war in force, where the original's is no peace and a nuclear threat; a paratrooper never leaves its city
+without a defender; the original's moving paratroopers between cities to be in range (`ai_assess_paratroopers`),
+interceptors waiting in another player's cities, and the diplomatic effects of a nuclear attack on persons are not here;
+air units cost two or three land units' shields, so a city may take twice the policy's turns over one.
 
 ## Adding to or overriding the pack
 

@@ -4,5 +4,6 @@ import Unit from '@civ-clone/core-unit/Unit';
 export declare class AirWar extends AIStrategy {
   handles(action: PlayerAction): boolean;
   attempt(action: PlayerAction<Unit>): Promise<boolean>;
+  private goHome;
 }
 export default AirWar;

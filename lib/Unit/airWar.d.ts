@@ -31,23 +31,33 @@ export declare const isAggressive: (
   dependencies: Dependencies,
   player: Player
 ) => boolean;
+export declare const strikeSquares: (
+  dependencies: Dependencies,
+  player: Player,
+  unit: Unit,
+  target: Tile,
+  home?: Tile[]
+) => Tile[];
 export declare const canStrike: (
   dependencies: Dependencies,
   player: Player,
   unit: Unit,
-  target: Tile
+  target: Tile,
+  home?: Tile[]
 ) => boolean;
 export declare const fighterTarget: (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
-  unit: Unit
+  unit: Unit,
+  home?: Tile[]
 ) => Tile | null;
 export declare const raidTarget: (
   dependencies: Dependencies,
   player: Player,
   memory: Memory,
-  unit: Unit
+  unit: Unit,
+  home?: Tile[]
 ) => Tile | null;
 export declare const nuclearTarget: (
   dependencies: Dependencies,
@@ -69,6 +79,13 @@ export declare const planAirTask: (
   memory: Memory,
   unit: Unit
 ) => AirTask | null;
+export declare const planHome: (
+  dependencies: Dependencies,
+  player: Player,
+  memory: Memory,
+  unit: Unit,
+  home?: Tile[]
+) => AirTask;
 export declare const airWanted: (
   dependencies: Dependencies,
   player: Player,
