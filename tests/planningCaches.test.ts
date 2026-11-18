@@ -190,14 +190,16 @@ describe('planning caches', (): void => {
       expect(tile.getNeighbours).to.have.been.called.twice;
     });
 
-    it('should find the land around a sea tile afresh each time, as it is no one continent', async (): Promise<void> => {
+    it('should keep the land around a sea tile for the turn by that tile, apart from any continent (civ-clone/web-renderer#1088)', async (): Promise<void> => {
       const { world } = await continents(),
         sea = world.get(2, 1),
         around = continentOf(1, sea);
 
       expect(at(around)).to.include.members(['1,1', '3,1', '2,1']);
-      expect(continentOf(1, sea)).not.to.equal(around);
+      expect(continentOf(1, sea)).to.equal(around);
       expect(continentOf(1, world.get(1, 1))).not.to.equal(around);
+      expect(continentOf(2, sea)).not.to.equal(around);
+      expect(at(continentOf(2, sea))).to.have.members(at(around));
     });
 
     it('should count the same land to explore from a city as finding its continent afresh does', async (): Promise<void> => {
