@@ -1,5 +1,6 @@
 import { LayoutRegistry } from '@civ-clone/core-spaceship/LayoutRegistry';
 import { RequirementRegistry } from '@civ-clone/core-requirement/RequirementRegistry';
+import { RuleRegistry } from '@civ-clone/core-rule/RuleRegistry';
 import Advance from '@civ-clone/core-science/Advance';
 import City from '@civ-clone/core-city/City';
 import { IBuildable } from '@civ-clone/core-city-build/Buildable';
@@ -25,15 +26,20 @@ export type SpaceRaceData = {
 export declare const buildsOnDefaultLayout: (
   layoutRegistry: LayoutRegistry
 ) => boolean;
+export declare const rulesPlaySpaceRace: (
+  ruleRegistry?: RuleRegistry
+) => boolean;
 /**
  * What the rule set says the ship needs, from its `requirements`, when this policy plays the space race: `null` unless
- * the game's layout is Civ1's (`buildsOnDefaultLayout`), every part this policy builds requires an advance and every
- * part requires something built by anyone (`range: 'world'`). Read afresh each time: the entries are a few hundred, and
- * a replaced entry changes no count.
+ * the game's layout is Civ1's (`buildsOnDefaultLayout`) or the rule set has its computer players' own rules
+ * (`rulesPlaySpaceRace`), every part this policy builds requires an advance and every part requires something built by
+ * anyone (`range: 'world'`). Read afresh each time: the entries are a few hundred, and a replaced entry changes no
+ * count.
  */
 export declare const spaceRaceData: (
   requirementRegistry: RequirementRegistry,
-  layoutRegistry?: LayoutRegistry
+  layoutRegistry?: LayoutRegistry,
+  ruleRegistry?: RuleRegistry
 ) => SpaceRaceData | null;
 export declare const playsSpaceRace: (
   requirementRegistry: RequirementRegistry,
@@ -47,13 +53,16 @@ export declare const wantedPart: (
 ) => typeof Part | null;
 /**
  * Civ1's space race, with what the ship needs from `requirementRegistry`, the layouts from `layoutRegistry` (the
- * game's) and the final year from `finalYear`. Where the game's ship isn't Civ1's (`spaceRaceData` is `null`), it never
- * plays for space: it wants no advance and no enabler, and never launches, as it has no ship.
+ * game's) and the final year from `finalYear`. Where the game's ship isn't Civ1's and the rule set has no computer
+ * players' rules of its own (`spaceRaceData` is `null`), it never plays for space: it wants no advance and no enabler,
+ * and never launches, as it has no ship. Where the rule set has them (`rulesPlaySpaceRace`, read from `ruleRegistry`
+ * for the enablers and from the game's rules otherwise), the part and the launch are theirs.
  */
 export declare const createCiv1SpaceRacePolicy: (
   requirementRegistry?: RequirementRegistry,
   finalYear?: FinalYear,
-  layoutRegistry?: LayoutRegistry
+  layoutRegistry?: LayoutRegistry,
+  ruleRegistry?: RuleRegistry
 ) => SpaceRacePolicy;
 export declare const civ1SpaceRacePolicy: SpaceRacePolicy;
 export declare const withSpaceshipDefence: (

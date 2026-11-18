@@ -16,6 +16,11 @@
 //  `MUSTER_ADVANTAGE` times the attack of the city's defence (tripled behind its walls, as Civ1's are), or with the
 //  `MUSTER_ATTACKERS` alone once the campaign has waited `MUSTER_WAIT` turns. Only attackers within `MARCH_TURNS`
 //  of it join in.
+//
+// Where a rule set's own computer players race for space (`rulesPlaySpaceRace`, Civilization II's), an enemy's capital
+//  whose player has a ship in flight is the target as soon as there's one on a landmass where the player has a city,
+//  and conquest weighs `CONQUEST_WEIGHT` while it is: taking the capital loses the ship (as `ai_spaceship_race_behind`
+//  turns the original's computer players on a ship in flight). Civ1's own space race is left as v474.05 plays it.
 import {
   Automobile,
   HorsebackRiding,
@@ -34,7 +39,11 @@ import Dependencies from '@civ-clone/base-strategy-ai/lib/Dependencies';
 import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
+import Spaceship from '@civ-clone/core-spaceship/Spaceship';
+import VictoryDependencies from '@civ-clone/base-strategy-victory/lib/VictoryDependencies';
 import { continentOf } from '../City/explorers';
+import { isCapital } from './defence';
+import { rulesPlaySpaceRace } from './spaceRace';
 import { defendersIn, defendersKept, keepsOrder } from '../City/defence';
 import { directPrerequisites } from '@civ-clone/base-strategy-victory/lib/research';
 import {
@@ -122,6 +131,60 @@ const expanding = (dependencies: Dependencies, player: Player): boolean => {
   return sites;
 };
 
+// An enemy's capital whose player has a ship in flight, on a landmass where `player` has a city, nearest first: only
+//  where the rule set's own computer players race for space. Worked out once a turn.
+const shipCapitals = new WeakMap<Player, { turn: number; cities: City[] }>();
+
+const shipCapitalsOf = (
+  dependencies: Dependencies,
+  victoryDependencies: VictoryDependencies,
+  player: Player
+): City[] => {
+  if (!rulesPlaySpaceRace(dependencies.ruleRegistry)) {
+    return [];
+  }
+
+  const turn = dependencies.turn.value(),
+    known = shipCapitals.get(player);
+
+  if (known && known.turn === turn) {
+    return known.cities;
+  }
+
+  const own = dependencies.cityRegistry.getByPlayer(player),
+    landmasses = own.map(
+      (city: City): Set<Tile> => continentOf(turn, city.tile())
+    ),
+    inFlight = (other: Player): boolean =>
+      victoryDependencies.spaceshipRegistry
+        .getBy('player', other)
+        .some(
+          (spaceship: Spaceship): boolean =>
+            spaceship.launched() !== false && spaceship.successful() === null
+        ),
+    distance = (city: City): number =>
+      Math.min(
+        ...own.map((ownCity: City): number =>
+          ownCity.tile().distanceFrom(city.tile())
+        )
+      ),
+    cities = knownEnemyCities(dependencies, player)
+      .filter(
+        (city: City): boolean =>
+          !city.destroyed() &&
+          inFlight(city.player()) &&
+          isCapital(dependencies, city) &&
+          landmasses.some((landmass: Set<Tile>): boolean =>
+            landmass.has(city.tile())
+          )
+      )
+      .sort((a: City, b: City): number => distance(a) - distance(b));
+
+  shipCapitals.set(player, { turn, cities });
+
+  return cities;
+};
+
 const weights = new WeakMap<Player, { turn: number; weight: number }>();
 
 // Worked out once a turn: every strategy asks.
@@ -197,7 +260,9 @@ const musters = new WeakMap<
 
 export const civ1ConquestPolicy: ConquestPolicy = {
   weight: (dependencies, victoryDependencies, player) =>
-    weightOf(dependencies, player),
+    shipCapitalsOf(dependencies, victoryDependencies, player).length > 0
+      ? CONQUEST_WEIGHT
+      : weightOf(dependencies, player),
 
   // The next better attacker, once it's the next advance away.
   advances: (dependencies, victoryDependencies, player) => {
@@ -219,6 +284,7 @@ export const civ1ConquestPolicy: ConquestPolicy = {
   },
 
   target: (dependencies, victoryDependencies, player) =>
+    shipCapitalsOf(dependencies, victoryDependencies, player)[0] ??
     targetOf(dependencies, player),
 
   musterCity: (dependencies, victoryDependencies, player, target) => {

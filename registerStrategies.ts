@@ -85,11 +85,13 @@ export const createStrategies = (
       victoryDependencies,
       isCapital
     ),
-    // What the ship needs comes from the game's requirements; where its ship isn't Civ1's, it never plays for space.
+    // What the ship needs comes from the game's requirements; where its ship isn't Civ1's, it plays for space only on the
+    //  rule set's own computer players' terms (`rulesPlaySpaceRace`), and otherwise never.
     civ1SpaceRacePolicy = createCiv1SpaceRacePolicy(
       dependencies.requirementRegistry,
       undefined,
-      layoutRegistry
+      layoutRegistry,
+      dependencies.ruleRegistry
     ),
     spaceRace = spaceRaceGoal(civ1SpaceRacePolicy),
     conquest = conquestGoal(civ1ConquestPolicy),
