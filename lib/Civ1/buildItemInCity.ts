@@ -812,7 +812,8 @@ export const buildItemInCity = (
       return;
     }
 
-    // `have` is the same for every type of a kind; `wanted` grows with the reach, so the most any type wants.
+    // `have` is the same for every type of a kind; reach decides only whether a type is wanted at all, so take the most any
+    //  reaching type wants.
     const wanted: [number, number] = [
       Math.max(...reaching.map(({ wanted }) => wanted![0])),
       first.wanted![1],
