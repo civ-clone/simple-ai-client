@@ -54,6 +54,11 @@ import { TargetBoard } from '@civ-clone/base-strategy-ai/lib/Memory';
 import { Temple } from '@civ-clone/civ1-city-improvement/CityImprovements';
 import BuildItem from '@civ-clone/core-city-build/BuildItem';
 import { Pyramids } from '@civ-clone/civ1-wonder/Wonders';
+import wonderCosts from '@civ-clone/civ1-wonder/Rules/City/build-cost';
+import BronzeWorking from '@civ-clone/base-science-advance-bronzeworking/BronzeWorking';
+import BuildPriority from '@civ-clone/core-city-build/Rules/BuildPriority';
+import Criterion from '@civ-clone/core-rule/Criterion';
+import Effect from '@civ-clone/core-rule/Effect';
 import { autoBuildable } from '@civ-clone/civ1-city/lib/autoBuild';
 import rankBuildItems from '@civ-clone/core-city-build/lib/rankBuildItems';
 import wonderPriorities from '@civ-clone/civ1-wonder/Rules/City/build-priority';
@@ -825,6 +830,30 @@ describe('buildItemInCity', (): void => {
       setup.city.yields = () => [new Production(3), new Food(4), new Gold(2)];
 
       expect(setup.choose()).equal(Temple);
+    });
+
+    it('should never build a Wonder its ruleset scores below nothing for the city (civ-clone/web-renderer#1124)', async (): Promise<void> => {
+      const setup = await starving(),
+        wantPyramids = (score: number) =>
+          new BuildPriority(
+            new Criterion(
+              (cityBuild: unknown, item: unknown): boolean => item === Pyramids
+            ),
+            new Effect((): number => score)
+          );
+
+      setup.game.playerResearch
+        .getByPlayer(setup.player)
+        .addAdvance(BronzeWorking);
+      setup.city.yields = () => [new Production(30), new Food(4), new Gold(2)];
+      setup.game.rules.register(...wonderCosts(), wantPyramids(100));
+
+      expect(setup.choose()).equal(Pyramids);
+
+      // Civ2's Manhattan Project for a leader who isn't aggressive, say.
+      setup.game.rules.register(wantPyramids(-1000));
+
+      expect(setup.choose()).not.equal(Pyramids);
     });
 
     const ranked = (setup: SetUp, items: BuildItem[]): unknown[] =>

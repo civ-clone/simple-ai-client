@@ -44,6 +44,7 @@ import MissionAndMove from './Strategies/Unit/MissionAndMove';
 import NegotiationAnswers from './Strategies/Diplomacy/NegotiationAnswers';
 import NoteDisorder from './Strategies/City/NoteDisorder';
 import PreventDisorder from './Strategies/City/PreventDisorder';
+import AirWar from './Strategies/Unit/AirWar';
 import NavalWar from './Strategies/Unit/NavalWar';
 import RetreatToHeal from './Strategies/Unit/RetreatToHeal';
 import ReviewCities from './Strategies/Turn/ReviewCities';
@@ -127,6 +128,8 @@ export const createStrategies = (
     new RetreatToHeal(dependencies, knowledge),
     // Warships hunt, escort and bombard, only where the ruleset's roles say which units are warships (not Civ1).
     new NavalWar(dependencies, knowledge),
+    // Aircraft, missiles, nuclear weapons and paratroopers, only where the ruleset's roles name them (not Civ1).
+    new AirWar(dependencies, knowledge),
     new Garrison(dependencies, knowledge),
     new MissionAndMove(dependencies, knowledge),
     // The attackers with nothing else to do gather for the campaign, if there is one.
