@@ -61,6 +61,14 @@ import {
   wantsTrader,
 } from '../Unit/envoys';
 import Yield from '@civ-clone/core-yield/Yield';
+import {
+  WARSHIPS_PER_THREATENED_CITY,
+  WARSHIP_NEED,
+  isSubmergedType,
+  isWarshipType,
+  navalThreatsNear,
+} from '../Unit/navalWar';
+import { isOnSea } from '../City/explorerShip';
 import CityBuild from '@civ-clone/core-city-build/CityBuild';
 import { changeLosesShields, hasChangeRules } from '../City/productionChange';
 import { isCapitalization } from '@civ-clone/base-city-improvement-capitalization/lib/capitalizationRules';
@@ -685,6 +693,72 @@ export const buildItemInCity = (
 
   // An army, however peaceful the world.
   addNeed(itemFor(getOffensiveUnit()), policy.needs.army, 0, 1);
+
+  // Warships, only where the ruleset says which unit types are for war at sea (`lib/Unit/navalWar`, base-unit-role's
+  //  roles; never in Civ1, which declares none): in a coastal city on the sea with an enemy ship or an enemy's coastal
+  //  city within reach, as the original builds naval units only in a coastal city on open water
+  //  (`city_choose_production`, `city_production.cpp:1906-1911`). The player wants one for every two such cities; a
+  //  submarine only when there are ships to hunt, as it can't bombard a city.
+  const warshipItems = available.filter(
+    (buildItem: BuildItem): boolean =>
+      isUnitItem(buildItem) &&
+      isWarshipType(buildItem.item(), dependencies.ruleRegistry) &&
+      affordable(buildItem)
+  );
+
+  if (warshipItems.length > 0 && city.tile().isCoast() && isOnSea(city)) {
+    const threats = navalThreatsNear(dependencies, player, targets, city);
+
+    if (threats.ships.length > 0 || threats.cities.length > 0) {
+      const threatened = dependencies.cityRegistry
+          .getByPlayer(player)
+          .filter((other: City): boolean => {
+            if (other === city) {
+              return true;
+            }
+
+            if (!other.tile().isCoast()) {
+              return false;
+            }
+
+            const near = navalThreatsNear(dependencies, player, targets, other);
+
+            return near.ships.length > 0 || near.cities.length > 0;
+          }).length,
+        isWarshipItem = (item: object): boolean =>
+          isWarshipType(item, dependencies.ruleRegistry);
+
+      addNeed(
+        itemFor(
+          chooseUnit(
+            dependencies,
+            city,
+            threats.ships.length > 0
+              ? warshipItems
+              : warshipItems.filter(
+                  (buildItem: BuildItem): boolean =>
+                    !isSubmergedType(
+                      buildItem.item(),
+                      dependencies.ruleRegistry
+                    )
+                ),
+            Attack,
+            policy,
+            false,
+            turnsToBuild
+          )
+        ),
+        WARSHIP_NEED,
+        unitsAndOrders(
+          dependencies,
+          player,
+          (unit: Unit): boolean => isWarshipItem(unit.constructor),
+          isWarshipItem
+        ),
+        Math.ceil(threatened * WARSHIPS_PER_THREATENED_CITY)
+      );
+    }
+  }
 
   // A Caravan and a Diplomat or Spy, only where the ruleset makes them worth it (`lib/Unit/envoys`): Civ1's ruleset
   //  registers neither `TradeRouteLimit` nor `MissionChoice`, so nothing here is asked there.
