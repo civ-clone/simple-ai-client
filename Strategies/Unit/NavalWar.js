@@ -17,6 +17,7 @@ class NavalWar extends AIStrategy_1.default {
             (0, navalWar_1.isWarship)(action.value(), this.dependencies().ruleRegistry));
     }
     async attempt(action) {
+        var _a;
         const dependencies = this.dependencies(), player = action.player(), unit = action.value(), memory = this.memoryFor(player), planned = (0, navalWar_1.default)(dependencies, player, memory, unit);
         if (planned === null) {
             return false;
@@ -46,9 +47,24 @@ class NavalWar extends AIStrategy_1.default {
             (0, orders_1.noOrders)(dependencies, unit);
             return true;
         }
+        const tile = unit.tile(), moves = unit.moves().value();
+        // To where its path ends, and no further: an escort stays alongside, and a hunter or bombarder is planned again on
+        //  its next action, to strike from there.
         await (0, moveUnit_2.default)(dependencies, player, memory, this.knowledge(), unit, {
+            stopAtPathEnd: true,
             wander: false,
         });
+        // Nothing more this turn once its path is over and it has nothing to strike, or where it couldn't take a step (a
+        //  blocked path, which planning again would only find again).
+        if (unit.active() &&
+            unit.moves().value() > 0 &&
+            (unit.tile() === tile ||
+                unit.moves().value() === moves ||
+                (!memory.unitPathData.has(unit) &&
+                    ((_a = (0, navalWar_1.default)(dependencies, player, memory, unit)) === null || _a === void 0 ? void 0 : _a.strike) == null))) {
+            memory.unitPathData.delete(unit);
+            (0, orders_1.noOrders)(dependencies, unit);
+        }
         return true;
     }
 }

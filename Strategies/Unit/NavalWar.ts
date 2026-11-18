@@ -67,9 +67,29 @@ export class NavalWar extends AIStrategy {
       return true;
     }
 
+    const tile = unit.tile(),
+      moves = unit.moves().value();
+
+    // To where its path ends, and no further: an escort stays alongside, and a hunter or bombarder is planned again on
+    //  its next action, to strike from there.
     await moveUnit(dependencies, player, memory, this.knowledge(), unit, {
+      stopAtPathEnd: true,
       wander: false,
     });
+
+    // Nothing more this turn once its path is over and it has nothing to strike, or where it couldn't take a step (a
+    //  blocked path, which planning again would only find again).
+    if (
+      unit.active() &&
+      unit.moves().value() > 0 &&
+      (unit.tile() === tile ||
+        unit.moves().value() === moves ||
+        (!memory.unitPathData.has(unit) &&
+          planNavalTask(dependencies, player, memory, unit)?.strike == null))
+    ) {
+      memory.unitPathData.delete(unit);
+      noOrders(dependencies, unit);
+    }
 
     return true;
   }

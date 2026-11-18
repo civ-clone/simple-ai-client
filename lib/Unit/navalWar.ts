@@ -190,17 +190,26 @@ export const huntTargets = (
   unit: Unit
 ): Tile[] => {
   const reach = reachOf(unit, NAVAL_REACH_TURNS),
-    weighed = (tile: Tile): number =>
-      tile.distanceFrom(unit.tile()) /
-      (dependencies.unitRegistry
-        .getByTile(tile)
-        .some(
-          (other: Unit): boolean =>
-            hostile(dependencies, player, other) &&
-            isLoadedTransport(dependencies, other)
-        )
-        ? 2
-        : 1);
+    weight = new Map<Tile, number>(),
+    weighed = (tile: Tile): number => {
+      if (!weight.has(tile)) {
+        weight.set(
+          tile,
+          tile.distanceFrom(unit.tile()) /
+            (dependencies.unitRegistry
+              .getByTile(tile)
+              .some(
+                (other: Unit): boolean =>
+                  hostile(dependencies, player, other) &&
+                  isLoadedTransport(dependencies, other)
+              )
+              ? 2
+              : 1)
+        );
+      }
+
+      return weight.get(tile)!;
+    };
 
   return memory.targets.enemyUnitsToAttack
     .filter(
@@ -231,18 +240,27 @@ export const bombardTargets = (
   }
 
   const reach = reachOf(unit, NAVAL_REACH_TURNS),
-    ownLandNear = (tile: Tile): boolean =>
-      dependencies.unitRegistry
-        .getByPlayer(player)
-        .some(
-          (own: Unit): boolean =>
-            isA(own, Land) &&
-            !own.destroyed() &&
-            own.tile().isLand() &&
-            own.tile().distanceFrom(tile) <= 2
-        ),
-    weighed = (tile: Tile): number =>
-      tile.distanceFrom(unit.tile()) / (ownLandNear(tile) ? 2 : 1);
+    ownLand = dependencies.unitRegistry
+      .getByPlayer(player)
+      .filter(
+        (own: Unit): boolean =>
+          isA(own, Land) && !own.destroyed() && own.tile().isLand()
+      )
+      .map((own: Unit): Tile => own.tile()),
+    weight = new Map<Tile, number>(),
+    weighed = (tile: Tile): number => {
+      if (!weight.has(tile)) {
+        weight.set(
+          tile,
+          tile.distanceFrom(unit.tile()) /
+            (ownLand.some((own: Tile): boolean => own.distanceFrom(tile) <= 2)
+              ? 2
+              : 1)
+        );
+      }
+
+      return weight.get(tile)!;
+    };
 
   return memory.targets.enemyCitiesToAttack
     .filter((tile: Tile): boolean => {
@@ -307,7 +325,7 @@ export const planNavalTask = (
       tile.isNeighbourOf(unit.tile())
     );
 
-  // Next to its prey, it strikes, escorting or not.
+  // Next to its prey, it strikes, escorting or not (a claim it had stands: it'll sail on to it once it has struck).
   if (beside) {
     memory.unitPathData.delete(unit);
 
@@ -315,6 +333,13 @@ export const planNavalTask = (
   }
 
   const escorts = escortsFor(dependencies, memory);
+
+  // A warship escorts one transport at a time: whatever it had claimed before this plan is let go.
+  escorts.forEach((escort: Unit, transport: Unit): void => {
+    if (escort === unit) {
+      escorts.delete(transport);
+    }
+  });
 
   for (const transport of transportsToEscort(
     dependencies,
@@ -409,6 +434,42 @@ export const navalThreatsNear = (
 //  its transports in use (`isFerrying`), to escort them. It wants one for every two such cities, and one for each
 //  transport in use. A submarine can neither bombard nor keep up with a transport, so it builds one only for ships to
 //  hunt and only while it has more surface warships than submarines.
+// The number of `player`'s coastal cities with an enemy ship or an enemy's coastal city within reach, worked out once a
+//  turn for each target board (production runs it for every city that chooses).
+const threatenedCounts = new WeakMap<
+  TargetBoard,
+  { turn: number; count: number }
+>();
+
+const threatenedPorts = (
+  dependencies: Dependencies,
+  player: Player,
+  targets: TargetBoard
+): number => {
+  const turn = dependencies.turn.value(),
+    known = threatenedCounts.get(targets);
+
+  if (known && known.turn === turn) {
+    return known.count;
+  }
+
+  const count = dependencies.cityRegistry
+    .getByPlayer(player)
+    .filter((other: City): boolean => {
+      if (!other.tile().isCoast()) {
+        return false;
+      }
+
+      const near = navalThreatsNear(dependencies, player, targets, other);
+
+      return near.ships.length > 0 || near.cities.length > 0;
+    }).length;
+
+  threatenedCounts.set(targets, { turn, count });
+
+  return count;
+};
+
 export const warshipsWanted = (
   dependencies: Dependencies,
   player: Player,
@@ -416,35 +477,22 @@ export const warshipsWanted = (
   city: City
 ): { wanted: number; have: number; submarines: boolean } | null => {
   const threatenedHere = navalThreatsNear(dependencies, player, targets, city),
-    threatened = dependencies.cityRegistry
-      .getByPlayer(player)
-      .filter((other: City): boolean => {
-        if (!other.tile().isCoast()) {
-          return false;
-        }
-
-        const near =
-          other === city
-            ? threatenedHere
-            : navalThreatsNear(dependencies, player, targets, other);
-
-        return near.ships.length > 0 || near.cities.length > 0;
-      }).length;
-
-  if (threatened === 0) {
-    return null;
-  }
-
-  const memory = dependencies.memoryRegistry.memoryFor(player),
+    here = threatenedHere.ships.length > 0 || threatenedHere.cities.length > 0,
+    memory = dependencies.memoryRegistry.memoryFor(player),
     units = dependencies.unitRegistry.getByPlayer(player),
     ferrying = units.filter(
       (unit: Unit): boolean =>
         isFerry(unit, dependencies.ruleRegistry) &&
         isFerrying(dependencies, memory, unit)
-    ).length,
-    here = threatenedHere.ships.length > 0 || threatenedHere.cities.length > 0;
+    ).length;
 
   if (!here && ferrying === 0) {
+    return null;
+  }
+
+  const threatened = threatenedPorts(dependencies, player, targets);
+
+  if (threatened === 0) {
     return null;
   }
 
@@ -456,6 +504,7 @@ export const warshipsWanted = (
     submerged = warships.filter((unit: Unit): boolean =>
       isSubmergedType(unit.constructor, dependencies.ruleRegistry)
     ).length,
+    surface = warships.length - submerged,
     onOrder = dependencies.cityRegistry
       .getByPlayer(player)
       .filter((other: City): boolean => {
@@ -469,9 +518,12 @@ export const warshipsWanted = (
   return {
     wanted: Math.ceil(threatened * WARSHIPS_PER_THREATENED_CITY) + ferrying,
     have: warships.length + onOrder,
+    // Only for ships to hunt, while surface warships outnumber submarines and there are enough of them to escort the
+    //  transports in use, as submarines don't.
     submarines:
       threatenedHere.ships.length > 0 &&
-      warships.length - submerged > submerged,
+      surface > submerged &&
+      surface >= ferrying,
   };
 };
 

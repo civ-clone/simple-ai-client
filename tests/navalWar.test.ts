@@ -10,6 +10,7 @@ import {
   Transport,
   Warrior,
 } from '@civ-clone/civ1-unit/Units';
+import { ActiveUnit } from '@civ-clone/civ1-unit/PlayerActions';
 import { Despotism, Monarchy } from '@civ-clone/civ1-government/Governments';
 import { Firepower, HitPoints } from '@civ-clone/core-unit/Yields';
 import {
@@ -531,6 +532,92 @@ describe('naval war (civ-clone/web-renderer#1128)', (): void => {
       expect(
         warshipsWanted(dependencies, player, setup.memory.targets, port)
       ).eql({ wanted: 2, have: 1, submarines: true });
+    });
+  });
+
+  describe('the strategy', (): void => {
+    // The player's memory as the strategy reads it, with the enemy on its board.
+    const boardFor = (setup: Awaited<ReturnType<typeof setUp>>) => {
+      const memory = setup.dependencies.memoryRegistry.memoryFor(setup.player);
+
+      setup.survey();
+      memory.targets.enemyUnitsToAttack.splice(
+        0,
+        Infinity,
+        ...setup.memory.targets.enemyUnitsToAttack
+      );
+      memory.targets.enemyCitiesToAttack.splice(
+        0,
+        Infinity,
+        ...setup.memory.targets.enemyCitiesToAttack
+      );
+
+      return memory;
+    };
+
+    const ready = (unit: Unit): void => {
+      unit.moves().set(unit.movement().value());
+      unit.setActive(true);
+    };
+
+    it('waits for its transport to move, then sails alongside it and stays there', async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, loaded, player, unitOf } = setup,
+        cruiser = unitOf(player, Cruiser, 5, 4),
+        transport = loaded(player, 8, 4),
+        strategy = new NavalWar(dependencies, civ1Knowledge);
+
+      boardFor(setup);
+      ready(cruiser);
+      ready(transport);
+
+      expect(await strategy.attempt(new ActiveUnit(player, cruiser))).true;
+      expect(cruiser.waiting()).true;
+      expect(cruiser.tile()).equal(setup.world.get(5, 4));
+
+      // The transport has moved.
+      transport.moves().set(0);
+
+      expect(await strategy.attempt(new ActiveUnit(player, cruiser))).true;
+      expect(cruiser.tile()).equal(transport.tile());
+      // Stood down there for the turn (`NoOrders`), rather than sailing on with its moves to spare.
+      expect(cruiser.moves().value()).equal(0);
+    });
+
+    it('strikes an enemy ship beside it', async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, enemy, loaded, player, unitOf } = setup,
+        cruiser = unitOf(player, Cruiser, 5, 4),
+        prey = loaded(enemy, 6, 4),
+        strategy = new NavalWar(dependencies, civ1Knowledge);
+
+      boardFor(setup);
+      ready(cruiser);
+
+      const moves = cruiser.moves().value();
+
+      expect(await strategy.attempt(new ActiveUnit(player, cruiser))).true;
+      expect(
+        prey.destroyed() ||
+          cruiser.destroyed() ||
+          cruiser.moves().value() < moves
+      ).true;
+      expect(cruiser.tile()).equal(setup.world.get(5, 4));
+    });
+
+    it('handles nothing with no task, leaving the ship to the other strategies', async (): Promise<void> => {
+      const setup = await setUp(),
+        { dependencies, player, unitOf } = setup,
+        cruiser = unitOf(player, Cruiser, 5, 4);
+
+      boardFor(setup);
+      ready(cruiser);
+
+      expect(
+        await new NavalWar(dependencies, civ1Knowledge).attempt(
+          new ActiveUnit(player, cruiser)
+        )
+      ).false;
     });
   });
 });
