@@ -753,7 +753,13 @@ export const buildItemInCity = (
   }
 
   // Aircraft, missiles, nuclear weapons and paratroopers, only where the ruleset's roles name them (`lib/Unit/airWar`;
-  //  never in Civ1, which declares none), as many as `airWanted` says for each kind.
+  //  never in Civ1, which declares none), as many as `airWanted` says for each kind. They cost two or three times a
+  //  land unit, so a city may take twice the policy's turns over one.
+  const airPolicy: ProductionPolicy = {
+    ...policy,
+    buildTurns: { ...policy.buildTurns, unit: policy.buildTurns.unit * 2 },
+  };
+
   (
     ['fighter', 'striker', 'missile', 'nuclear', 'paratrooper'] as const
   ).forEach((kind: AirKind | 'paratrooper'): void => {
@@ -794,7 +800,7 @@ export const buildItemInCity = (
           city,
           items,
           Attack,
-          policy,
+          airPolicy,
           false,
           turnsToBuild
         )

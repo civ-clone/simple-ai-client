@@ -47,6 +47,8 @@ knowledge)` builds the pack and `register(game)` registers it. In registration o
 | `Strategies/Unit/FoundCapital`            | a `Worker`'s action                          | from turn 5, founds a player's first city where it stands (handles it only then) | generic |
 | `TerrainWork` (`base-strategy-terrain-work`) | a `Worker`'s action                          | goes to and does its terrain job, or takes one if it has no city site to settle (handles it only then) | generic |
 | `Strategies/Unit/WorkerTurn`              | a `Worker`'s action                          | founds a city, irrigates, mines, builds a road or heads for a city site, then moves; with none of that, joins a city | generic |
+| `Strategies/Unit/NavalWar`                | a warship's action                           | hunts enemy ships, escorts its player's loaded transports and bombards enemy coastal cities, only where the ruleset's roles name warships (handles it only then) | generic |
+| `Strategies/Unit/AirWar`                  | an aircraft's, missile's, nuclear weapon's or paratrooper's action | strikes, raids and returns to refuel; fires nuclear weapons for an aggressive leader; drops paratroopers into empty enemy cities, only where the ruleset's roles name these kinds | generic |
 | `Strategies/Unit/Garrison`                | a unit's action                              | fortifies in an under-defended city, which becomes its home (handles it only then) | generic |
 | `Strategies/Unit/MissionAndMove`          | a unit's action                              | takes a mission if the unit has no target, then moves; handles it unless the unit has nothing to do | generic |
 | `Strategies/Unit/StandDown`               | a unit's action                              | goes to a city that wants it, is disbanded if not worth its upkeep, or waits in or heads for a city; always handles it | generic |
@@ -179,6 +181,40 @@ however many strategies look at it.
 
 Generic files import only `core-*`, `base-*` and `library-*` packages and other generic files. Everything Civ1 is in a
 `Civ1/` folder.
+
+## Warships, aircraft and nuclear weapons (civ-clone/web-renderer#1128, #1124)
+
+Only where the ruleset says what each unit type is for, with base-unit-role's `UnitRoles` (Civ2 does; Civ1 declares
+none, so none of this happens there). After the original Civ2's computer players (OpenCiv2 `ai.cpp`), in our own terms:
+
+- **Warships** (`lib/Unit/navalWar`): a naval superiority type that carries neither aircraft nor land units. It strikes
+  an enemy ship or a city beside it it would beat; escorts one of its player's loaded transports at sea within 2 turns,
+  sailing once the transport has moved and ending alongside; hunts the nearest enemy ship within 3 turns it would beat,
+  a loaded transport as if half as far; bombards an enemy's defended coastal city it would beat (a surface ship only).
+  A coastal city on the sea builds them while an enemy ship or coastal city is within 12: one for every two such ports,
+  and one for each transport in use, a submarine only for ships to hunt.
+- **Fighters** (an air superiority type that flies, `lib/Unit/airWar`) go for the nearest enemy unit alone or in the air
+  that they would beat, when they can get back to refuel (`ai_air_pick_target`), and otherwise wait in a city. A city
+  builds one more than the enemy aircraft in reach while enemy aircraft or land units come near.
+- **Bombers, helicopters and cruise missiles** (an attack type that flies) raid the enemy city in reach this turn that
+  scores best by `ai_air_raid_city` (size, defenders, landmass, the player's units beside it), then fly back to refuel.
+  A city builds them while a defended enemy city is in reach: one bomber or helicopter for each 3 cities, at most 4,
+  and a cruise missile for each 4, at most 2.
+- **Nuclear weapons** (a type that `Detonates`) only for a leader whose attack trait is aggressive (base-leader-trait-
+  aggression's `Aggressive`), after `ai_nuke_pick_target`: a city larger than 4 of a player at war, without an SDI
+  Defence, scored by the enemy units around it, fired only from a player with 2 or more. Such a player keeps 2 while a
+  target is in reach.
+- **Paratroopers** (a type with a role that can `Paradrop`), unmoved in their city, drop into an empty enemy city at war
+  within 10, or beside it (`ai_orders_paratrooper`).
+- A Wonder whose `BuildPriority` rules add up to less than nothing for a city (Civ2's Manhattan Project for a leader who
+  isn't aggressive) is never built. Civ1's rules never score one below nothing.
+
+**Departures from the original:** a bomber, fighter or missile attacks only at the odds the AI wants (`attackOdds`),
+where the original raids regardless and judges a fighter's target by a formula of its own; helicopters raid as bombers
+do (the original leaves them out, having no range); a paratrooper's landing square ignores its defence and a fortress
+there; the original's moving paratroopers between cities to be in range (`ai_assess_paratroopers`), interceptors
+waiting in another player's cities, and the diplomatic effects of a nuclear attack on persons are not here; air units
+cost two or three land units' shields, so a city may take twice the policy's turns over one.
 
 ## Adding to or overriding the pack
 

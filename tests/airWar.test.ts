@@ -383,4 +383,62 @@ describe('air war (civ-clone/web-renderer#1124)', (): void => {
       expect(paradropTarget(dependencies, player, paratrooper)).null;
     });
   });
+
+  describe('the strategy', (): void => {
+    const spy = (unit: Unit): string[] => {
+      const taken: string[] = [],
+        action = unit.action.bind(unit);
+
+      unit.action = (performed: any, ...args: any[]): void => {
+        taken.push(performed.constructor.name);
+
+        return action(performed, ...args);
+      };
+
+      return taken;
+    };
+
+    it('strikes a lone enemy unit beside a fighter', async (): Promise<void> => {
+      const { dependencies, enemy, player, survey, unitOf } = await setUp(),
+        fighter = unitOf(player, Fighter, 5, 5),
+        taken = spy(fighter);
+
+      unitOf(enemy, Warrior, 6, 5);
+      survey();
+      fighter.setActive(true);
+
+      expect(
+        await new AirWar(dependencies, civ1Knowledge).attempt(
+          new ActiveUnit(player, fighter)
+        )
+      ).true;
+      expect(taken).eql(['Attack']);
+    });
+
+    it('stands an aircraft down in its city with nothing to strike', async (): Promise<void> => {
+      const { dependencies, player, unitOf } = await setUp(),
+        bomber = unitOf(player, Bomber, 5, 5),
+        taken = spy(bomber);
+
+      bomber.setActive(true);
+
+      expect(
+        await new AirWar(dependencies, civ1Knowledge).attempt(
+          new ActiveUnit(player, bomber)
+        )
+      ).true;
+      expect(taken).eql(['NoOrders']);
+    });
+
+    it('leaves a paratrooper with nowhere to drop to the other strategies', async (): Promise<void> => {
+      const { dependencies, player, unitOf } = await setUp(),
+        paratrooper = unitOf(player, Rifleman, 5, 5);
+
+      expect(
+        await new AirWar(dependencies, civ1Knowledge).attempt(
+          new ActiveUnit(player, paratrooper)
+        )
+      ).false;
+    });
+  });
 });
