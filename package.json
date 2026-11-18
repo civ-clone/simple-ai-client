@@ -169,6 +169,7 @@
       "@civ-clone/base-unit-agent",
       "@civ-clone/base-unit-trait-covert",
       "@civ-clone/base-unit-trait-diplomatic-missions",
+      "@civ-clone/base-unit-trait-paradrop",
       "@civ-clone/base-unit-trait-single-use",
       "@civ-clone/base-unit-trait-trade-missions",
       "@civ-clone/civ1-city",
