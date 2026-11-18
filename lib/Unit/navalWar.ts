@@ -35,6 +35,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { hasRole } from '@civ-clone/base-unit-role/roleOf';
 import { isEnemy } from '../Player/rivals';
+import { isOnSea } from '../City/explorerShip';
 import { reachableTiles } from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
 import { isFerry, isFerryType } from './carriesUnits';
 import { isFerrying } from './overseas';
@@ -144,7 +145,7 @@ const sailFor = (
 
     if (path) {
       memory.unitPathData.set(unit, path);
-      navalPaths.add(unit);
+      navalPaths.set(unit, path);
 
       return true;
     }
@@ -155,12 +156,15 @@ const sailFor = (
 
 // The warships whose path a naval task set, so that it's dropped once they have no task: another strategy would
 //  otherwise follow it to where a target was.
-const navalPaths = new WeakSet<Unit>();
+const navalPaths = new WeakMap<Unit, Path>();
 
-// Drops the path a naval task gave `unit`, if it has one.
+// Drops the path a naval task gave `unit`, if that's still the path it has (not one another strategy has set since).
 export const dropNavalPath = (memory: Memory, unit: Unit): void => {
-  if (navalPaths.has(unit)) {
-    navalPaths.delete(unit);
+  const path = navalPaths.get(unit);
+
+  navalPaths.delete(unit);
+
+  if (path !== undefined && memory.unitPathData.get(unit) === path) {
     memory.unitPathData.delete(unit);
   }
 };
@@ -514,7 +518,7 @@ const threatenedPorts = (
   const count = dependencies.cityRegistry
     .getByPlayer(player)
     .filter((other: City): boolean => {
-      if (!other.tile().isCoast()) {
+      if (!other.tile().isCoast() || !isOnSea(other)) {
         return false;
       }
 
