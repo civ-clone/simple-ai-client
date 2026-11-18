@@ -81,12 +81,15 @@ describe('terrain read from the rule set (L24)', (): void => {
             )
         )
       ),
+      // As base-unit-movement's job rules do, by the terrain the unit stands on: 10 turns on Plains, 20 elsewhere.
       new MovementCost(
         new Criterion(
           (unit: Unit, action: unknown): boolean =>
             action instanceof TransformTerrain
         ),
-        new Effect((): number => 10)
+        new Effect((unit: Unit): number =>
+          unit.tile().terrain() instanceof Plains ? 10 : 20
+        )
       )
     );
     setup.game.turn.increment();
@@ -94,7 +97,8 @@ describe('terrain read from the rule set (L24)', (): void => {
 
     const [job] = transformAt(setup, 2, 0);
 
-    // Plains (1 food, 1 shield) to Grassland (2 food): the city works the square.
+    // Plains (1 food, 1 shield) to Grassland (2 food): the city works the square. The Engineers stand on the city's
+    //  Grassland, but the job is on the Plains, so it takes the Plains' 10 turns.
     expect(job.action).equal('transformTerrain');
     expect(job.turns).equal(10);
     expect(job.value).greaterThan(0);

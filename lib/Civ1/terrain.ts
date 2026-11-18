@@ -933,18 +933,23 @@ const transformTurns = (
     return known;
   }
 
-  const action = new TransformTerrain(
+  // The rules ask the unit where it stands (`unit.tile()`) for the terrain a job is on: a stand-in for the unit on
+  //  `tile`, as it would be once there.
+  const worker = Object.create(unit, {
+      tile: { value: (): Tile => tile },
+    }) as Unit,
+    action = new TransformTerrain(
       tile,
       tile,
-      unit,
+      worker,
       dependencies.ruleRegistry,
       dependencies.turn
     ),
     [work = 1]: number[] = dependencies.ruleRegistry
-      .process(MovementCost, unit, action)
+      .process(MovementCost, worker, action)
       .sort((a: number, b: number): number => b - a),
     rate = dependencies.ruleRegistry
-      .process(WorkRate, unit)
+      .process(WorkRate, worker)
       .find((answer: number | undefined): boolean => answer !== undefined),
     turns = Math.max(
       1,
