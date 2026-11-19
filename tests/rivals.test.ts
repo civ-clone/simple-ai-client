@@ -16,7 +16,7 @@ import { createDependencies } from '@civ-clone/base-strategy-ai/lib/Dependencies
 import { dependenciesFor } from '../registerStrategies';
 import { expect } from 'chai';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
-import rivalOf from '../lib/Player/rivals';
+import rivalOf, { knownEnemyCities } from '../lib/Player/rivals';
 import simpleRLELoader from '@civ-clone/simple-world-generator/tests/lib/simpleRLELoader';
 import unitRules from '@civ-clone/civ1-unit/registerRules';
 import worldRules from '@civ-clone/civ1-world/registerRules';
@@ -87,6 +87,7 @@ const setUp = async ({
     dependencies: createDependencies(dependenciesFor(game)),
     game,
     other,
+    otherCity,
     player,
   };
 };
@@ -115,6 +116,19 @@ describe('rivalOf (civ-clone/web-renderer#424)', (): void => {
     const overseas = await setUp({ otherAt: 6 });
 
     expect(rivalOf(overseas.dependencies, overseas.player)).null;
+  });
+
+  it('counts no destroyed city, so is no one whose only city is razed (#1163)', async (): Promise<void> => {
+    const { dependencies, other, otherCity, player } = await setUp();
+
+    expect(knownEnemyCities(dependencies, player)).length(1);
+    expect(knownEnemyCities(dependencies, player)[0] === otherCity).true;
+
+    otherCity.destroy();
+
+    expect(knownEnemyCities(dependencies, player)).length(0);
+    expect(rivalOf(dependencies, player) === other).false;
+    expect(rivalOf(dependencies, player)).null;
   });
 
   it("takes on one as strong with a bold leader's confidence", async (): Promise<void> => {

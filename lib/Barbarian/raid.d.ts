@@ -25,7 +25,6 @@ export declare const leaves: (
   dependencies: Dependencies,
   tile: Tile
 ) => boolean;
-export declare const liveCities: (dependencies: Dependencies) => City[];
 export declare const nearestCity: (tile: Tile, cities: City[]) => City | null;
 export type Step = {
   action: Action;

@@ -12,6 +12,7 @@ import Unit from '@civ-clone/core-unit/Unit';
 import { canFerryFromLandmassOf } from '../Unit/overseas';
 import { continentOf } from '../City/explorers';
 import { hasTreaty } from './treaties';
+import { liveCities } from '../City/liveCities';
 import { militaryPower } from '@civ-clone/core-power/lib/strength';
 import { product } from '@civ-clone/base-leader-personality/lib/combine';
 
@@ -40,20 +41,18 @@ export const confidentPower = (
 ): number =>
   power * product(dependencies.ruleRegistry, AttackConfidence, player, other);
 
-// The enemy cities `player` knows of.
+// The enemy cities `player` knows of, still standing (civ-clone/web-renderer#1163).
 export const knownEnemyCities = (
   dependencies: Dependencies,
   player: Player
 ): City[] => {
   const playerWorld = dependencies.playerWorldRegistry.getByPlayer(player);
 
-  return dependencies.cityRegistry
-    .entries()
-    .filter(
-      (city: City): boolean =>
-        isEnemy(dependencies, player, city.player()) &&
-        playerWorld.includes(city.tile())
-    );
+  return liveCities(dependencies).filter(
+    (city: City): boolean =>
+      isEnemy(dependencies, player, city.player()) &&
+      playerWorld.includes(city.tile())
+  );
 };
 
 const rivals = new WeakMap<
