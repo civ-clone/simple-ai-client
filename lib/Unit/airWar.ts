@@ -53,7 +53,7 @@ import Tile from '@civ-clone/core-world/Tile';
 import Trait from '@civ-clone/core-civilization/Trait';
 import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
-import { liveCities } from '../Barbarian/raid';
+import { liveCities } from '../City/liveCities';
 import movesBetween from '../movesBetween';
 import { fuelFor } from './fuel';
 import { isEnemy } from '../Player/rivals';

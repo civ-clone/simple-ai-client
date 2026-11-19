@@ -34,6 +34,7 @@ import Player from '@civ-clone/core-player/Player';
 import Tile from '@civ-clone/core-world/Tile';
 import Unit from '@civ-clone/core-unit/Unit';
 import { continentOf } from '../City/explorers';
+import { liveCities } from '../City/liveCities';
 import { tradeTargets } from './envoys';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 import reachableTiles from '@civ-clone/base-strategy-ai/lib/Unit/reachable';
@@ -539,14 +540,13 @@ export const invasionTargets = (
 
   const home = landmassOf(dependencies, unit.tile()),
     playerWorld = dependencies.playerWorldRegistry.getByPlayer(player),
-    candidates = dependencies.cityRegistry
-      .entries()
-      .filter(
-        (city: City): boolean =>
-          city.player() === rival &&
-          playerWorld.includes(city.tile()) &&
-          !home.has(city.tile())
-      );
+    // Standing cities only: the registry keeps destroyed ones (civ-clone/web-renderer#1163).
+    candidates = liveCities(dependencies).filter(
+      (city: City): boolean =>
+        city.player() === rival &&
+        playerWorld.includes(city.tile()) &&
+        !home.has(city.tile())
+    );
 
   if (candidates.length === 0) {
     return [];

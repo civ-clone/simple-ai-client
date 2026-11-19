@@ -31,6 +31,7 @@ import { ferryShipFor } from '../lib/City/explorerShip';
 import governmentRules from '@civ-clone/civ1-government/registerRules';
 import {
   INVADERS,
+  invasionTargets,
   isFerrying,
   overseasStateFor,
   planGarrison,
@@ -393,6 +394,38 @@ describe('overseas (civ-clone/web-renderer#211, #374)', (): void => {
           )
         )
       ).null;
+    });
+
+    it('targets no destroyed city (#1163)', async (): Promise<void> => {
+      const { city, dependencies, enemy, game, memory, player, world } =
+          await withEnemy(),
+        // A second city of the enemy's on island B, still standing, keeps it the rival.
+        standing = new City(
+          enemy,
+          world.get(7, 4),
+          '',
+          game.rules,
+          game.workedTiles
+        ),
+        horseman = new Horseman(null, player, world.get(1, 1), game.rules);
+
+      expect(invasionTargets(dependencies, player, horseman)).length(2);
+
+      city.destroy();
+
+      const targets = invasionTargets(dependencies, player, horseman);
+
+      expect(targets).length(1);
+      expect(targets[0] === standing.tile()).true;
+      expect(
+        planInvasion(dependencies, player, memory, horseman)?.target ===
+          standing.tile()
+      ).true;
+
+      standing.destroy();
+
+      expect(invasionTargets(dependencies, player, horseman)).length(0);
+      expect(planInvasion(dependencies, player, memory, horseman)).null;
     });
 
     it('sends up to INVADERS invaders for the same city, and not a defender', async (): Promise<void> => {

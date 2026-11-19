@@ -30,6 +30,7 @@ import cityGold from '@civ-clone/base-barbarians/lib/cityGold';
 import isBarbarian from '@civ-clone/base-civilization-barbarian/isBarbarian';
 import leadsGroup from '@civ-clone/base-barbarians/lib/leadsGroup';
 import leavesMap from '@civ-clone/base-barbarians/lib/leavesMap';
+import { liveCities } from '../City/liveCities';
 import { nearPole } from '@civ-clone/base-barbarians/lib/polar';
 import { noOrders } from '@civ-clone/base-strategy-ai/lib/Unit/orders';
 
@@ -106,11 +107,6 @@ const landMassOf = (tile: Tile): LandMass | null =>
     .map()
     .landMasses()
     .find((landMass: LandMass): boolean => landMass.hasTile(tile)) ?? null;
-
-export const liveCities = (dependencies: Dependencies): City[] =>
-  dependencies.cityRegistry
-    .entries()
-    .filter((city: City): boolean => !city.destroyed());
 
 export const nearestCity = (tile: Tile, cities: City[]): City | null =>
   cities.reduce(
