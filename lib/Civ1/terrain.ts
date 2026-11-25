@@ -20,6 +20,7 @@ import {
   Republic,
 } from '@civ-clone/civ1-government/Governments';
 import { Food, Production, Trade } from '@civ-clone/civ1-world/Yields';
+import isEarth from '@civ-clone/civ1-world/lib/earth';
 import {
   TerrainJob,
   TerrainJobValue,
@@ -184,10 +185,11 @@ export const shouldBuildCity = (
   player: Player,
   tile: Tile
 ): boolean => {
-  const isEarth = dependencies.engine.option('earth', false),
+  // From the world, which a save keeps, not the `earth` option, which it doesn't (civ-clone/web-renderer#175).
+  const onEarth = isEarth(tile.map()),
     hasNoCities = dependencies.cityRegistry.getByPlayer(player).length === 0;
 
-  if (isEarth && hasNoCities) {
+  if (onEarth && hasNoCities) {
     return true;
   }
 
