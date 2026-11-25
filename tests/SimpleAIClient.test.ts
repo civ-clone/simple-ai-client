@@ -1885,6 +1885,37 @@ describe('SimpleAIClient', (): void => {
     expect(settlers.destroyed()).false;
   });
 
+  it('should found its first city wherever it stands on the Earth, as the world says, not the option', async (): Promise<void> => {
+    withCivilizations();
+
+    const [client] = await createClients(),
+      world = await simpleWorldLoader('7G42D', 7, 7),
+      player = client.player(),
+      start = world.get(3, 3),
+      engine = dependencies.engine;
+
+    try {
+      expect(civ1Knowledge.shouldBuildCity(dependencies, player, start)).false;
+
+      // The option chooses the Earth's generator, before there is a world, and isn't saved: alone, it says nothing.
+      engine.setOption('earth', true);
+
+      expect(civ1Knowledge.shouldBuildCity(dependencies, player, start)).false;
+
+      engine.setOption('earth', false);
+
+      // As a world the Earth made records (core-world's `World#generatorId()`), and a loaded one keeps.
+      (world as unknown as { _generatorId: string })._generatorId = 'earth';
+
+      expect(civ1Knowledge.shouldBuildCity(dependencies, player, start)).true;
+    } finally {
+      engine.setOption('earth', false);
+      clientRegistry.unregister(client);
+      currentPlayerRegistry.unregister(player);
+      playerRegistry.unregister(player);
+    }
+  });
+
   it('should not offer a tile another unit is already heading for', async (): Promise<void> => {
     withCivilizations();
 

@@ -154,7 +154,7 @@
     "@civ-clone/core-unit": "^0.1.32",
     "@civ-clone/core-unit-improvement": "^0.1.0",
     "@civ-clone/core-wonder": "^0.1.0",
-    "@civ-clone/core-world": "^0.1.24",
+    "@civ-clone/core-world": "^0.1.25",
     "@civ-clone/core-world-path": "^0.1.0",
     "@civ-clone/core-yield": "^0.1.0",
     "@civ-clone/library-city": "^0.1.4",
